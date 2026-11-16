@@ -1,8 +1,8 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement} from './engine.js?v=12';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=12';
-import {setupSfx} from './music.js?v=12';
-import {icon} from './icons.js?v=12';
+  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement} from './engine.js?v=13';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=13';
+import {setupSfx} from './music.js?v=13';
+import {icon} from './icons.js?v=13';
 
 const el=id=>document.getElementById(id);
 let state,session,selected=null,busy=false,polling=false,generation=0,revision=0,rendered='';
@@ -86,7 +86,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=12').then(({createIso})=>{
+import('./isometric.js?v=13').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -633,6 +633,30 @@ function showTrainingCompare(player,unit,index,rank){
     ...(skillEffects[kind]?[h('p','tip-note',skillEffects[kind])]:[]));
   el('training-compare').hidden=false;
 }
+const gameoverDialog=el('gameover');
+gameoverDialog.addEventListener('cancel',event=>event.preventDefault());
+el('gameover-home').onclick=()=>{
+  gameoverDialog.close();
+  el('leave').onclick();
+};
+gameoverDialog.querySelector('.gameover-skull').append(icon('skull'));
+/** Ventana de fin de partida cuando cae todo el grupo (tras terminar las animaciones). */
+function updateGameOver(){
+  const lost=state?.phase==='lost';
+  if(!lost){if(gameoverDialog.open)gameoverDialog.close();return;}
+  if(gameoverDialog.open||playing||pending.length||performance.now()<lastDamageUntil)return;
+  const foes=state.units.filter(u=>u.enemy);
+  const stat=(iconName,label,value)=>[h('dt',null,icon(iconName),label),h('dd',null,String(value))];
+  el('gameover-stats').replaceChildren(
+    ...stat('level','Piso alcanzado',state.floor+' de 6'),
+    ...stat('clock','Rondas en este piso',state.rounds||1),
+    ...stat('skull','Enemigos caídos en este piso',foes.filter(u=>u.hp<=0).length+' / '+foes.length));
+  el('gameover-party').replaceChildren(...state.players.map(p=>h('li',null,portrait(p.classId),
+    h('span',null,h('strong',null,p.name),h('small',null,classes[p.classId].name+' · nivel '+p.level)))));
+  hideUnit();
+  sfx('blast');
+  gameoverDialog.showModal();
+}
 function pawnName(name){
   const tag=document.createElement('span');
   tag.className='pawn-name';
@@ -874,13 +898,14 @@ function render(){
   el('entry').hidden=!!state;
   el('game').hidden=!state;
   document.body.classList.toggle('in-expedition',!!state);
-  if(!state){if(trainingDialog.open)trainingDialog.close();return;}
+  if(!state){if(trainingDialog.open)trainingDialog.close();if(gameoverDialog.open)gameoverDialog.close();return;}
   const turn=state.units[state.turn];
   const mine=state.phase==='combat'&&turn?.id===session.id;
   const host=state.players[0]?.id===session.id;
   const rewardReady=lootReady();
   const title={lobby:'Sala de expedición',combat:'Piso '+state.floor+' · '+state.layoutName+' · '+turn?.name+(mine?' (tú)':''),reward:rewardReady?'Botín y mercader':'Victoria',won:'Expedición completada',lost:'El grupo ha caído'}[state.phase];
   el('phase').textContent=title;
+  updateGameOver();
   el('turn-bar').hidden=state.phase!=='combat'&&!rewardReady;
   el('turn-bar').classList.toggle('timer-only',state.phase!=='combat');
   if(!el('turn-bar').hidden)paintClock();

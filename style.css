@@ -514,6 +514,29 @@ summary{cursor:pointer}
   .training-compare{position:static;width:auto;margin-bottom:12px}
 }
 
+/* ───────────── Fin de partida ───────────── */
+.gameover{width:min(94vw,420px);border:1px solid #7c3a46;border-radius:16px;padding:26px 24px 22px;text-align:center;color:var(--paper);
+  background:radial-gradient(circle at 50% 0%,#5a1e2a55,transparent 60%),linear-gradient(160deg,#ffffff0b,transparent 45%),var(--bg-2);
+  box-shadow:0 30px 80px #000e,0 0 60px #b5303a33}
+.gameover[open]{animation:gameover-in .45s var(--ease)}
+@keyframes gameover-in{from{opacity:0;transform:translateY(14px) scale(.96)}}
+.gameover::backdrop{background:radial-gradient(circle,#2a0a10cc,#050308f0);backdrop-filter:blur(4px) grayscale(.6)}
+.gameover-skull{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 10px;border-radius:50%;color:#ff9a8a;background:#0d0b14;border:1px solid #7c3a46;box-shadow:0 0 24px #ff6a5a44}
+.gameover-skull .icon{width:36px;height:36px}
+.gameover h2{font-size:2rem;color:#ffb6a4;letter-spacing:.02em}
+.gameover-sub{color:var(--muted);font-size:.88rem;margin:4px 0 16px}
+.gameover-stats{display:grid;gap:6px;margin:0 0 14px;padding:12px 14px;border-radius:10px;background:#0d0b14aa;border:1px solid var(--line)}
+.gameover-stats div,.gameover-stats{grid-template-columns:1fr auto;align-items:center}
+.gameover-stats dt{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:.84rem;text-align:left}
+.gameover-stats dt .icon{width:16px;height:16px}
+.gameover-stats dd{margin:0;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+.gameover-party{list-style:none;margin:0 0 18px;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.gameover-party li{display:flex;align-items:center;gap:8px;padding:5px 10px 5px 6px;border-radius:99px;background:#ffffff08;border:1px solid var(--line);text-align:left;filter:grayscale(.5)}
+.gameover-party canvas{width:22px;image-rendering:pixelated}
+.gameover-party span{display:grid;line-height:1.2}
+.gameover-party strong{font-size:.82rem}.gameover-party small{color:var(--muted);font-size:.68rem}
+#gameover-home{width:100%}
+
 /* ───────────── Responsive ───────────── */
 @media(max-width:1100px){
   .layout{grid-template-columns:minmax(0,1fr) minmax(190px,230px);grid-template-areas:"arena inventory" "left inventory"}

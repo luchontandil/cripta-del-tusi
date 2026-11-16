@@ -7,7 +7,7 @@
   <title>Cripta del tusi</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="./style.css?v=12">
+  <link rel="stylesheet" href="./style.css?v=13">
 </head>
 <body><main>
   <header class="brand">
@@ -82,5 +82,13 @@
   </section>
 </main>
 <dialog id="training" aria-labelledby="training-title"><aside id="training-compare" class="training-compare" aria-live="polite" hidden></aside><h2 id="training-title"></h2><p>Aprende una habilidad o mejora una que ya conoces. Pasa el ratón por una opción para ver cómo cambia.</p><div id="training-choices"></div></dialog>
-<script type="module" src="./client.js?v=12"></script></body>
+<dialog id="gameover" class="gameover" aria-labelledby="gameover-title">
+  <div class="gameover-skull" aria-hidden="true"></div>
+  <h2 id="gameover-title">El grupo ha caído</h2>
+  <p class="gameover-sub">La cripta reclama a otro grupo de aventureros.</p>
+  <dl id="gameover-stats" class="gameover-stats"></dl>
+  <ul id="gameover-party" class="gameover-party"></ul>
+  <button id="gameover-home" class="primary big">Volver al inicio</button>
+</dialog>
+<script type="module" src="./client.js?v=13"></script></body>
 </html>

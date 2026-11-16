@@ -705,6 +705,7 @@ function plant(kind){
 }
 export function miniature(kind,tint=null) {
   if(creatures[kind])return creatures[kind](kind);
+  if(ps1Kits[kind])return ps1Hero(kind,tint);
   if(heroKits[kind])return chibiHero(kind,tint);
   let [body,accent,dark,skin]=looks[kind]||looks.enemy;
   // Color del jugador: la ropa toma el color de su puesto (J1 rojo, J2 azul...).
@@ -1076,4 +1077,162 @@ function chibiHero(kind,tint){
     if(crystal){crystal.rotation.y=t*1.5;crystal.material.emissiveIntensity=.7+Math.sin(t*3)*.25+swing;}
   };
   return {root,figure,legs,arms,head:top*size,animate};
+}
+
+// ───────────── Héroes estilo PS1 (decisión de Lucho, 17-11-2026: ~4–5 cabezas) ─────────────
+// Low-poly facetado con color por vértice (una sola textura pequeña para la cara).
+// Escala: 1 casilla = 1 unidad; altura ≈1,35; cabeza ≈0,3 → 4,5 cabezas.
+// Cada grupo móvil (torso+cabeza, brazos, piernas, arma, escudo) es UNA malla fusionada → 7–8 draw calls.
+const ps1Material=new T.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:.78,metalness:.08});
+/** Pieza low-poly: geometría + color + transformación, lista para fusionar. */
+function lp(list,geometry,color,[x,y,z],[rx,ry,rz]=[0,0,0],[sx,sy,sz]=[1,1,1]){
+  const g=geometry.index?geometry.toNonIndexed():geometry.clone();
+  g.deleteAttribute('uv');
+  const m=new T.Matrix4().compose(new T.Vector3(x,y,z),new T.Quaternion().setFromEuler(new T.Euler(rx,ry,rz)),new T.Vector3(sx,sy,sz));
+  g.applyMatrix4(m);
+  const c=new T.Color(color);
+  const n=g.attributes.position.count;
+  const colors=new Float32Array(n*3);
+  for(let i=0;i<n;i++){colors[i*3]=c.r;colors[i*3+1]=c.g;colors[i*3+2]=c.b;}
+  g.setAttribute('color',new T.BufferAttribute(colors,3));
+  list.push(g);
+  return g;
+}
+/** Fusiona piezas en una sola malla (una draw call). */
+function fuse(list,name){
+  let count=0;for(const g of list)count+=g.attributes.position.count;
+  const pos=new Float32Array(count*3),col=new Float32Array(count*3);
+  let o=0;
+  for(const g of list){pos.set(g.attributes.position.array,o*3);col.set(g.attributes.color.array,o*3);o+=g.attributes.position.count;}
+  const geometry=new T.BufferGeometry();
+  geometry.setAttribute('position',new T.BufferAttribute(pos,3));
+  geometry.setAttribute('color',new T.BufferAttribute(col,3));
+  geometry.computeVertexNormals();
+  const mesh=new T.Mesh(geometry,ps1Material);
+  mesh.name=name;mesh.castShadow=true;mesh.receiveShadow=true;
+  return mesh;
+}
+const P={
+  box:new T.BoxGeometry(1,1,1),
+  prism6:new T.CylinderGeometry(.5,.5,1,6),
+  taper6:new T.CylinderGeometry(.42,.5,1,6),
+  taper8:new T.CylinderGeometry(.36,.5,1,8),
+  head:new T.CylinderGeometry(.44,.5,1,8),
+  dome:new T.SphereGeometry(.5,8,4,0,Math.PI*2,0,Math.PI/2),
+  ball:new T.SphereGeometry(.5,7,5),
+  cone6:new T.ConeGeometry(.5,1,6),
+  oct:new T.OctahedronGeometry(.5,0)
+};
+/** Cara pixelada de 16×16 (estilo textura de PS1). */
+const faceTextures=new Map();
+function faceTexture(skin,hair,{scar=false}={}){
+  const key=skin+hair+scar;
+  if(faceTextures.has(key))return faceTextures.get(key);
+  const c=document.createElement('canvas');c.width=c.height=16;
+  const g=c.getContext('2d');
+  const px=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h);};
+  px(0,0,16,16,skin);
+  const shade=new T.Color(skin).multiplyScalar(.82).getStyle();
+  px(0,12,16,4,shade);px(0,0,2,16,shade);px(14,0,2,16,shade);
+  px(3,5,4,1,hair);px(9,5,4,1,hair);            // cejas
+  px(4,7,2,2,'#f4f0e6');px(10,7,2,2,'#f4f0e6'); // ojos
+  px(5,7,1,2,'#1a1620');px(10,7,1,2,'#1a1620');
+  px(7,8,2,3,shade);                             // nariz
+  px(6,12,4,1,'#6a2e2a');                        // boca
+  if(scar)px(11,9,1,3,'#b05a4a');
+  const t=new T.CanvasTexture(c);t.magFilter=t.minFilter=T.NearestFilter;t.colorSpace=T.SRGBColorSpace;
+  faceTextures.set(key,t);
+  return t;
+}
+const ps1Kits={
+  guardia:{cloth:'#3f7a74',clothDark:'#2a5450',steel:'#a9b8b6',steelDark:'#5f6f70',brass:'#c9963f',leather:'#5a3a26',skin:'#d9a07c',hair:'#4a2e1e'}
+};
+function ps1Hero(kind,tint){
+  const k={...ps1Kits[kind]};
+  if(tint){k.cloth=tint.hex;k.clothDark=tint.dark;}
+  const root=new T.Group(),figure=new T.Group();root.add(figure);
+  // ── Torso, cadera y cabeza (una malla) ──
+  const body=[];
+  lp(body,P.taper8,k.leather,[0,.62,0],[0,Math.PI/8,0],[.3,.1,.22]);              // cadera
+  lp(body,P.box,k.brass,[0,.665,.105],[0,0,0],[.08,.06,.03]);                     // hebilla
+  lp(body,P.taper8,k.steel,[0,.86,0],[Math.PI,Math.PI/8,0],[.4,.34,.27]);          // peto (ancho arriba)
+  lp(body,P.box,k.steelDark,[0,.86,.125],[0,0,0],[.04,.3,.03]);                    // cresta del peto
+  lp(body,P.box,k.cloth,[0,.6,.12],[.08,0,0],[.2,.3,.03]);                         // tabardo delantero
+  lp(body,P.box,k.cloth,[0,.6,-.12],[-.08,0,0],[.22,.3,.03]);                      // tabardo trasero
+  lp(body,P.box,k.brass,[0,.74,.135],[0,0,0],[.2,.025,.02]);
+  lp(body,P.prism6,k.skin,[0,1.05,0],[0,0,0],[.12,.08,.12]);                       // cuello
+  lp(body,P.taper6,k.steelDark,[0,1.04,0],[0,Math.PI/6,0],[.28,.06,.24]);          // gorjal
+  lp(body,P.head,k.skin,[0,1.2,0],[0,Math.PI/8,0],[.24,.28,.25]);                  // cabeza
+  lp(body,P.dome,k.steel,[0,1.27,0],[0,Math.PI/8,0],[.31,.24,.31]);                // casco
+  lp(body,P.prism6,k.brass,[0,1.275,0],[0,Math.PI/6,0],[.31,.03,.31]);             // aro del casco
+  lp(body,P.box,k.steel,[0,1.22,.13],[0,0,0],[.035,.13,.03]);                      // nasal
+  lp(body,P.box,k.steel,[0,1.15,-.1],[.15,0,0],[.27,.2,.07]);                      // cubrenuca
+  for(const s of [-1,1])lp(body,P.box,k.hair,[s*.115,1.24,-.02],[0,0,0],[.03,.06,.16]); // pelo bajo el casco
+  for(const s of [-1,1])lp(body,P.box,k.steel,[s*.12,1.16,.04],[0,s*.25,0],[.03,.13,.14]); // carrilleras
+  lp(body,P.box,k.cloth,[0,1.42,-.02],[0,0,0],[.04,.12,.28]);                      // cimera
+  lp(body,P.box,k.clothDark,[0,1.44,-.17],[.5,0,0],[.04,.08,.1]);
+  const torso=fuse(body,'body');figure.add(torso);
+  // Cara pixelada (una draw call más, compartida entre héroes con la misma piel).
+  const face=new T.Mesh(new T.PlaneGeometry(.17,.17),new T.MeshStandardMaterial({map:faceTexture(k.skin,k.hair,{scar:true}),roughness:.9}));
+  face.position.set(0,1.185,.122);torso.add(face);
+  // ── Piernas ──
+  const legs=[-1,1].map(s=>{
+    const leg=new T.Group();leg.position.set(s*.09,.6,0);figure.add(leg);
+    const p=[];
+    lp(p,P.taper6,k.clothDark,[0,-.13,0],[Math.PI,0,0],[.13,.26,.13]);             // muslo
+    lp(p,P.oct,k.steel,[0,-.27,.04],[0,0,0],[.11,.1,.09]);                          // rodillera
+    lp(p,P.taper6,k.steel,[0,-.42,0],[Math.PI,0,0],[.12,.24,.12]);                  // greba
+    lp(p,P.box,k.leather,[0,-.565,.035],[0,0,0],[.13,.07,.21]);                      // bota
+    lp(p,P.box,k.steelDark,[0,-.55,.13],[.5,0,0],[.12,.04,.05]);                     // puntera
+    leg.add(fuse(p,'leg'));
+    return leg;
+  });
+  // ── Brazos (hombrera, brazo, guantelete, mano) ──
+  const arms=[-1,1].map(s=>{
+    const arm=new T.Group();arm.position.set(s*.22,.99,0);figure.add(arm);
+    const p=[];
+    lp(p,P.dome,k.steel,[s*.02,.0,0],[0,0,s*-.35],[.2,.15,.2]);                     // hombrera
+    lp(p,P.box,k.brass,[s*.06,-.02,0],[0,0,s*-.35],[.13,.025,.2]);
+    lp(p,P.taper6,k.clothDark,[0,-.13,0],[Math.PI,0,0],[.1,.22,.1]);               // brazo
+    lp(p,P.taper6,k.steel,[0,-.32,0],[Math.PI,0,0],[.11,.2,.11]);                   // antebrazo
+    lp(p,P.box,k.leather,[0,-.45,.01],[0,0,0],[.09,.08,.09]);                       // mano
+    arm.add(fuse(p,'arm'));
+    const held=new T.Group();held.name='held';held.position.set(0,-.45,.04);arm.add(held);
+    return arm;
+  });
+  // ── Escudo heráldico (mano izquierda) ──
+  const shieldShape=new T.Shape();
+  shieldShape.moveTo(-.2,.2);shieldShape.lineTo(.2,.2);shieldShape.lineTo(.2,-.02);shieldShape.lineTo(0,-.26);shieldShape.lineTo(-.2,-.02);shieldShape.closePath();
+  const shieldGeo=new T.ExtrudeGeometry(shieldShape,{depth:.04,bevelEnabled:false});
+  const sp=[];
+  lp(sp,shieldGeo,k.steelDark,[0,0,0],[0,0,0],[1.08,1.08,1]);
+  lp(sp,shieldGeo,k.cloth,[0,.005,.035],[0,0,0],[.9,.9,.4]);
+  lp(sp,P.box,k.brass,[0,.03,.06],[0,0,0],[.05,.3,.02]);
+  lp(sp,P.box,k.brass,[0,.08,.06],[0,0,0],[.24,.05,.02]);
+  lp(sp,P.oct,k.brass,[0,.08,.075],[0,0,0],[.07,.07,.04]);
+  const shield=fuse(sp,'shield');
+  shield.position.set(-.06,.02,.08);shield.rotation.y=-.35;
+  arms[0].getObjectByName('held').add(shield);
+  // ── Espada (mano derecha) ──
+  const wp=[];
+  lp(wp,P.box,'#d6e0e4',[0,.3,0],[0,0,0],[.06,.5,.018]);
+  lp(wp,P.cone6,'#d6e0e4',[0,.58,0],[0,0,0],[.06,.08,.02]);
+  lp(wp,P.box,k.brass,[0,.04,0],[0,0,0],[.2,.035,.05]);
+  lp(wp,P.prism6,k.leather,[0,-.03,0],[0,0,0],[.035,.1,.035]);
+  lp(wp,P.oct,k.brass,[0,-.1,0],[0,0,0],[.06,.06,.06]);
+  const sword=fuse(wp,'sword');
+  const swordHolder=arms[1].getObjectByName('held');
+  swordHolder.add(sword);swordHolder.rotation.x=1.25;
+  const animate=(t,{gait,swing,walking,phase})=>{
+    const breath=Math.sin(t*2.4+phase);
+    const idle=walking?0:1;
+    figure.position.y=Math.abs(gait)*.05+breath*.008*idle;
+    torso.rotation.y=idle*Math.sin(t*.4+phase)*.08;
+    figure.rotation.z=walking?gait*.035:0;
+    arms[0].rotation.x=gait*.4-.1*idle;
+    arms[1].rotation.x=-gait*.4-swing*1.5-(.18+breath*.04)*idle;
+    arms[0].rotation.z=-.1;arms[1].rotation.z=.1;
+    legs[0].rotation.x=-gait*.55;legs[1].rotation.x=gait*.55;
+  };
+  return {root,figure,legs,arms,head:1.46,animate,pose:{T:()=>{arms[0].rotation.set(0,0,-Math.PI/2);arms[1].rotation.set(0,0,Math.PI/2);legs.forEach(l=>l.rotation.set(0,0,0));}}};
 }

@@ -722,7 +722,8 @@ summary{cursor:pointer}
   --bevel:inset 2px 2px 0 var(--frame-hi),inset -2px -2px 0 var(--frame-lo);
   --drop:4px 4px 0 #000;
 }
-*,*::before,*::after{border-radius:0!important}
+/* Los objetos conservan su estética propia (redondeados, degradados por rareza y brillo). */
+:where(*:not(.loot-card,.loot-card *,.inventory-slot,.inventory-slot *,.bag-grid,.tip-item,.tip-item *,.loot-icon,.item-socket,.shop-cards *)),:where(*:not(.loot-card,.loot-card *,.inventory-slot,.inventory-slot *,.bag-grid,.tip-item,.tip-item *,.loot-icon,.item-socket,.shop-cards *))::before,:where(*:not(.loot-card,.loot-card *,.inventory-slot,.inventory-slot *,.bag-grid,.tip-item,.tip-item *,.loot-icon,.item-socket,.shop-cards *))::after{border-radius:0!important}
 #clock,#seconds,.turn-art,.voter,.class-card .class-art,.event-art,.gameover-skull{border-radius:50%!important}
 .route-node{border-radius:0!important}
 html{image-rendering:pixelated}
@@ -740,15 +741,15 @@ h1,h2,h3,h4{font-family:var(--font-display);font-weight:700;text-shadow:2px 2px 
 .icon svg{shape-rendering:crispEdges;stroke-width:2}
 
 /* Marcos de panel: borde negro, bisel interior y sombra sólida. */
-.panel,.hud,.tip,#training,.gameover,.journey,.class-preview,.route-map,.loot-card,.item-ghost,
-#rewards .inventory-panel,.inventory-slot>.item,.training-compare{
+.panel,.hud,.tip:not(.tip-item),#training,.gameover,.journey,.class-preview,.route-map,.item-ghost,
+#rewards .inventory-panel,.training-compare{
   background:var(--bg-2)!important;background-image:none!important;
   border:2px solid #000!important;
   box-shadow:var(--bevel),var(--drop)!important;
   backdrop-filter:none!important;
 }
 .panel::after,#iso-world::after{display:none}
-.tip{background:#120e10!important}
+.tip:not(.tip-item){background:#120e10!important}
 .journey{background:#0b090b!important}
 .route-map{background:#0f0c0e!important}
 
@@ -820,16 +821,10 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 #clock.urgent{box-shadow:0 0 0 2px #000,0 0 0 4px #c9402f,0 0 0 6px #000}
 #seconds{background:#0a0809;font-family:var(--font-ui)}
 
-/* Inventario y objetos. */
-.inventory-slot{background:#0f0c0e;border:2px solid #000;box-shadow:inset 2px 2px 0 #000,inset -2px -2px 0 #2e2622}
-.inventory-slot.filled{background:#1a1416;box-shadow:inset 0 0 0 2px var(--rarity),inset 3px 3px 0 #000}
-.inventory-slot.filled:hover{transform:none;box-shadow:inset 0 0 0 2px var(--rarity),0 0 0 2px var(--rarity)}
-.bag-grid{background:#070608;border:2px solid #000}
+/* Inventario: solo el contenedor sigue el tema; los objetos mantienen su estilo. */
 .inventory-panel progress::-webkit-progress-value{background:#9b6ad6}
-.loot-card::before{height:4px;box-shadow:none}
-.loot-card:hover{transform:translate(-2px,-2px);box-shadow:var(--bevel),6px 6px 0 #000!important}
-.loot-icon,.tip-item-art{background:#0a0809;border:2px solid var(--rarity);box-shadow:inset 2px 2px 0 #000}
-.item-socket{background:#1a1020;border:2px solid #000}
+.inventory-slot,.loot-card,.tip-item,.item,.item *,.loot-card *{font-family:var(--font-ui)}
+.loot-card h4,.tip-item .tip-title strong{text-shadow:none}
 
 /* Mapa, eventos, tienda. */
 .map-lines line{stroke:#4a3c34;stroke-width:3;stroke-dasharray:4 6}
@@ -848,3 +843,11 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 /* Diálogos. */
 #training::backdrop,.gameover::backdrop{background:#000000d0;backdrop-filter:none}
 .gameover{background:#140c0e!important}
+/* Botones dentro de objetos: el estilo anterior, redondeado y con degradado. */
+.loot-card button,.inventory-slot>.item button{
+  border-radius:var(--radius-btn,6px);border:1px solid #5a4f72;background:linear-gradient(180deg,#332c47,#272137);
+  box-shadow:0 1px 0 #ffffff12 inset,0 2px 6px #0006;letter-spacing:0;
+}
+.loot-card button:hover:not(:disabled),.inventory-slot>.item button:hover:not(:disabled){border-color:#d6ad66;background:linear-gradient(180deg,#3c3453,#2d263f);box-shadow:0 1px 0 #ffffff12 inset,0 2px 6px #0006}
+.loot-card button.primary{color:#2a1f12;border-color:#ffe2a6;background:linear-gradient(180deg,#ffe5ad,#e4b56d 55%,#c9944d);box-shadow:0 1px 0 #fff7 inset,0 6px 18px #c9944d40,0 2px 4px #0007}
+.loot-card button.primary:hover:not(:disabled){background:linear-gradient(180deg,#fff0c9,#ecc07a 55%,#d6a157);border-color:#fff1c8}

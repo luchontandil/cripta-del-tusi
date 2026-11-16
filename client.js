@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=24';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=24';
-import {setupSfx} from './music.js?v=24';
-import {icon} from './icons.js?v=24';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=25';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=25';
+import {setupSfx} from './music.js?v=25';
+import {icon} from './icons.js?v=25';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -95,7 +95,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=24').then(({createIso})=>{
+import('./isometric.js?v=25').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -963,6 +963,12 @@ function renderMap(box){
   svg.setAttribute('class','map-lines');
   svg.setAttribute('preserveAspectRatio','none');
   const current=path.at(-1);
+  const byId=new Map(rows.flat().map(n=>[n.id,n]));
+  // Salas que aún se pueden alcanzar desde donde está el grupo: el resto queda cerrado.
+  const reachFrom=ids=>{const seen=new Set(ids);for(const id of seen)for(const next of byId.get(id)?.next||[])seen.add(next);return seen;};
+  const starts=current&&byId.has(current)?[current]:options.length?options:rows[0].map(n=>n.id);
+  const reachable=reachFrom(starts);
+  const lines=[];
   for(const row of rows)for(const node of row)for(const id of node.next){
     const other=rows.flat().find(n=>n.id===id);
     const a=at(node),b=at(other);
@@ -970,7 +976,8 @@ function renderMap(box){
     line.setAttribute('x1',a.x);line.setAttribute('y1',a.y);line.setAttribute('x2',b.x);line.setAttribute('y2',b.y);
     const walked=path.includes(node.id)&&path.includes(id);
     const open=(node.id===current||(!current&&false))&&options.includes(id);
-    line.setAttribute('class',walked?'walked':open?'open':'');
+    line.setAttribute('class',walked?'walked':open?'open':reachable.has(node.id)&&reachable.has(id)?'':'closed');
+    lines.push({line,from:node.id,to:id});
     svg.append(line);
   }
   const map=h('div','route-map',svg);
@@ -983,7 +990,8 @@ function renderMap(box){
   for(const node of rows.flat()){
     const option=options.indexOf(node.id);
     const visited=path.includes(node.id);
-    const b=h('button','route-node kind-'+node.kind+(visited?' visited':'')+(node.id===current?' current':'')+(option>=0?' available':'')+(option>=0&&myVote===option?' voted':''),icon(nodeIcons[node.kind]));
+    const closed=!visited&&!reachable.has(node.id);
+    const b=h('button','route-node kind-'+node.kind+(visited?' visited':'')+(closed?' closed':'')+(node.id===current?' current':'')+(option>=0?' available':'')+(option>=0&&myVote===option?' voted':''),icon(nodeIcons[node.kind]));
     b.type='button';
     const p=at(node);
     b.style.left=(p.x/width*100)+'%';
@@ -998,12 +1006,24 @@ function renderMap(box){
         h('p','tip-note',info?info.powers:nodeKinds[node.kind].description),option>=0?h('p','tip-note strong','Haz clic para votar este camino.'):null].filter(Boolean),
         {left:r.left,top:r.top,bottom:r.bottom},'tip-skill');
     };
-    b.onpointerleave=b.onblur=hideUnit;
+    b.onpointerleave=b.onblur=()=>{hideUnit();map.classList.remove('previewing');map.querySelectorAll('.preview').forEach(e=>e.classList.remove('preview'));};
+    if(option>=0){
+      // Al pasar por una opción se ilumina todo lo que esa rama deja abierto.
+      const enter=b.onpointerenter;
+      b.onpointerenter=b.onfocus=()=>{
+        enter();
+        const branch=reachFrom([node.id]);
+        map.classList.add('previewing');
+        for(const other of map.querySelectorAll('.route-node'))other.classList.toggle('preview',branch.has(other.dataset.id));
+        for(const {line,from,to} of lines)line.classList.toggle('preview',(branch.has(from)&&branch.has(to))||(from===current&&to===node.id));
+      };
+    }
+    b.dataset.id=node.id;
     map.append(b);
   }
   const legend=h('div','map-legend',...Object.entries(nodeKinds).map(([kind,info])=>h('span','legend-item kind-'+kind,icon(nodeIcons[kind]),info.name)));
   const actNumber=state.route.act||1;
-  box.replaceChildren(h('div','journey-head',h('h3',null,icon('crown'),'Acto '+actNumber+' de '+ACTS+' · '+actNames[actNumber-1]),h('p',null,'Cada jugador vota la siguiente sala. Tenéis 15 segundos.')),map,legend,voteStatus());
+  box.replaceChildren(h('div','journey-head',h('h3',null,icon('crown'),'Acto '+actNumber+' de '+ACTS+' · '+actNames[actNumber-1]),h('p',null,'Cada jugador vota la siguiente sala. Cada camino cierra otros: pasa el ratón por una sala para ver lo que deja abierto. Tenéis 15 segundos.')),map,legend,voteStatus());
 }
 function renderEvent(box){
   const myVote=state.vote?.votes?.[session.id];

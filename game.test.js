@@ -698,16 +698,42 @@ test('cada acto tiene su ambientación, su fauna y salas generadas al azar',()=>
   const seq=()=>{r=(r*16807)%2147483647;return r/2147483647;};
   const s=create();join(s,'p0','A','guardia');act(s,'p0',{type:'start'},seq);
   const seen=new Set(),styles=new Set(),names=new Set();
-  for(let i=0;i<22;i++){
+  let rooms=0;
+  while(s.floor<23){
     for(let k=0;k<8&&s.phase!=='combat';k++){
       if(s.phase==='map'){const o=Math.max(0,s.vote.options.findIndex(id=>s.route.rows.flat().find(n=>n.id===id).kind==='combat'));act(s,'p0',{type:'vote',option:o},seq);}
       else if(s.phase==='event')act(s,'p0',{type:'vote',option:0},seq);
+      else if(s.phase==='shop')act(s,'p0',{type:'ready'},seq);
     }
     assert.equal(s.phase,'combat');
     assert.equal(s.biome,actBiomes[s.act-1]);
     seen.add(s.walls.join(',')+'|'+s.voids.join(','));styles.add(s.layoutStyle);names.add(s.layoutName);
+    rooms++;
     s.phase='reward';s.picks=['p0'];act(s,'p0',{type:'next'},seq);
   }
-  assert.equal(seen.size,22);
-  assert.ok(styles.size>=5&&names.size>=18,styles.size+' estilos, '+names.size+' nombres');
+  assert.ok(rooms>=15);
+  assert.equal(seen.size,rooms);
+  assert.ok(styles.size>=5&&names.size>=rooms-3,styles.size+' estilos, '+names.size+' nombres');
+});
+
+test('el árbol de pisos tiene ramas: cada elección cierra caminos',()=>{
+  let closed=0,edges=0,nodes=0;
+  for(let seed=1;seed<=40;seed++){
+    let r=seed;const seq=()=>{r=(r*16807)%2147483647;return r/2147483647;};
+    for(let act=1;act<=3;act++){
+      const route=makeRoute(seq,act);
+      route.rows.forEach((row,i)=>{
+        const next=route.rows[i+1];
+        if(!next)return;
+        for(const node of row){
+          assert.ok(node.next.length>=1,'cada sala lleva a algún sitio');
+          edges+=node.next.length;nodes++;
+          if(row.length>1&&next.length>1&&node.next.length<next.length)closed++;
+        }
+        for(const other of next)assert.ok(row.some(n=>n.next.includes(other.id)),'todas las salas son alcanzables');
+      });
+    }
+  }
+  assert.ok(edges/nodes<2,'pocas conexiones por sala: '+(edges/nodes).toFixed(2));
+  assert.ok(closed>nodes*.4,'la mayoría de elecciones cierran salas');
 });

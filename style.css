@@ -924,3 +924,9 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 .hell .cell.wall{background:linear-gradient(150deg,#2a1c22,#120c10 70%);border-color:#ff6a1a44;box-shadow:inset 0 -5px 0 #0a0608,inset 0 0 6px #ff6a1a55}
 .jungle .cell.water{background:radial-gradient(ellipse at 30% 20%,#7aa04a 0,transparent 55%),linear-gradient(160deg,#2f5a24,#0f2610 75%);border-color:#b8e07a33}
 .hell .cell.water{background:radial-gradient(ellipse at 30% 30%,#ffd36b 0,transparent 45%),linear-gradient(160deg,#ff6a1a,#8a1a04 75%);border-color:#ffb34766;box-shadow:inset 0 0 14px #3a0800cc}
+/* Árbol con ramas: salas cerradas apagadas y vista previa de la rama al pasar el ratón */
+.map-lines line.closed{opacity:.18}
+.route-node.closed{opacity:.3;filter:grayscale(.85)}
+.route-map.previewing .route-node:not(.preview):not(.current):not(.visited){opacity:.35}
+.route-map.previewing .route-node.preview{opacity:1;filter:none;box-shadow:0 0 0 2px var(--gold),0 0 12px #f2cd8a88}
+.map-lines line.preview{stroke:var(--gold);stroke-dasharray:none;stroke-width:3;opacity:1}

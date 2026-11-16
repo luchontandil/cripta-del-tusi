@@ -926,16 +926,27 @@ export function makeRoute(rng,act=1){
     if(!kinds.some(kind=>kind==='combat'||kind==='elite'))kinds[kinds.indexOf('shop')===0?count-1:0]='combat';
     rows.push(xs.map((x,i)=>({id:act+'-'+local+'-'+i,floor,kind:kinds[i],x,next:[]})));
   }
+  // Ramas: cada sala lleva a la más cercana del piso siguiente y, a veces, se bifurca hacia una vecina.
+  // Así cada decisión cierra caminos: no todo está conectado con todo.
   for(let r=0;r<rows.length-1;r++){
     const here=rows[r],next=rows[r+1];
+    const nearest=x=>next.reduce((a,b)=>Math.abs(a.x-x)<=Math.abs(b.x-x)?a:b);
     for(const node of here){
-      node.next=next.filter(other=>Math.abs(other.x-node.x)<=.4).map(other=>other.id);
-      if(!node.next.length)node.next=[next.reduce((a,b)=>Math.abs(a.x-node.x)<=Math.abs(b.x-node.x)?a:b).id];
+      if(here.length===1||next.length===1){node.next=next.map(other=>other.id);continue;}
+      const main=nearest(node.x);
+      node.next=[main.id];
+      if(rng()<.35){
+        const side=next.filter(other=>other!==main&&Math.abs(other.x-node.x)<=.4)
+          .sort((a,b)=>Math.abs(a.x-node.x)-Math.abs(b.x-node.x))[0];
+        if(side)node.next.push(side.id);
+      }
     }
+    // Ninguna sala queda inalcanzable: la que nadie apunta recibe el camino de la sala más cercana de arriba.
     for(const other of next){
       if(here.some(node=>node.next.includes(other.id)))continue;
       here.reduce((a,b)=>Math.abs(a.x-other.x)<=Math.abs(b.x-other.x)?a:b).next.push(other.id);
     }
+    for(const node of here)node.next.sort((a,b)=>next.findIndex(n=>n.id===a)-next.findIndex(n=>n.id===b));
   }
   return {act,rows,path:[],seen:[]};
 }

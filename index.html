@@ -7,7 +7,7 @@
   <title>Cripta del tusi</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="./style.css?v=13">
+  <link rel="stylesheet" href="./style.css?v=14">
 </head>
 <body><main>
   <header class="brand">
@@ -44,7 +44,7 @@
   <div id="unit-tooltip" class="tip" role="tooltip" hidden></div>
   <section id="game" hidden>
     <div class="topbar panel">
-      <div class="status"><span id="room" class="chip"></span><button id="copy-code" class="ghost" hidden>Copiar código</button></div>
+      <div class="status"><span id="room" class="chip"></span><span id="mods" class="chip mods-chip" hidden></span><button id="copy-code" class="ghost" hidden>Copiar código</button></div>
       <h2 id="phase"></h2>
       <div class="top-actions"><button id="view-toggle" class="ghost" aria-pressed="false" hidden>Vista isométrica</button><button id="leave" class="ghost">Salir</button></div>
     </div>
@@ -54,6 +54,7 @@
         <section class="panel combat-log"><h3>Registro</h3><ol id="log"></ol></section>
       </aside>
       <section class="arena">
+        <section id="journey" class="journey panel" hidden></section>
         <div id="battlefield">
           <div id="iso-world" hidden></div><div id="board"></div><div id="animations" aria-hidden="true"></div>
           <div class="field-menu" aria-label="Controles del tablero">
@@ -90,5 +91,5 @@
   <ul id="gameover-party" class="gameover-party"></ul>
   <button id="gameover-home" class="primary big">Volver al inicio</button>
 </dialog>
-<script type="module" src="./client.js?v=13"></script></body>
+<script type="module" src="./client.js?v=14"></script></body>
 </html>

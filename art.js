@@ -1,3 +1,48 @@
+const creatureArt={
+  slime:(c,look)=>{
+    const king=look==='slimeking';
+    const [dark,mid,light]=king?['#5b2a86','#a35bd9','#e2b8ff']:['#1f6b3a','#4fc271','#b8f5c6'];
+    const r=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
+    r(4,27,18,2,'#19151e90');
+    r(7,12,12,2,dark);r(5,14,16,2,dark);r(4,16,18,9,dark);r(5,25,16,2,dark);
+    r(8,13,10,2,mid);r(6,15,14,10,mid);r(7,25,12,1,mid);
+    r(8,15,4,2,light);r(7,17,2,2,light);
+    r(9,18,3,3,'#f6fff6');r(15,18,3,3,'#f6fff6');r(10,19,2,2,'#14281a');r(16,19,2,2,'#14281a');
+    r(11,23,5,1,'#14281a');
+    if(king){r(8,8,10,3,'#f2c45c');for(const x of [8,12,16])r(x,5,2,3,'#ffd977');r(12,9,2,1,'#ff6a6a');}
+  },
+  bat:c=>{
+    const r=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
+    r(6,27,14,2,'#19151e90');
+    r(1,11,6,2,'#4a3358');r(0,13,8,3,'#6b4a7d');r(2,16,3,2,'#4a3358');r(5,16,3,3,'#6b4a7d');
+    r(19,11,6,2,'#4a3358');r(18,13,8,3,'#6b4a7d');r(21,16,3,2,'#4a3358');r(18,16,3,3,'#6b4a7d');
+    r(9,8,2,4,'#4a3358');r(15,8,2,4,'#4a3358');
+    r(8,11,10,10,'#3a2648');r(9,12,8,8,'#4a3358');
+    r(10,14,2,2,'#ff5a5a');r(14,14,2,2,'#ff5a5a');
+    r(11,18,1,2,'#f4ece0');r(14,18,1,2,'#f4ece0');
+    r(10,21,2,2,'#3a2648');r(14,21,2,2,'#3a2648');
+  },
+  skull:c=>{
+    const r=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
+    r(6,27,14,2,'#19151e70');
+    r(5,9,16,2,'#bdb5a2');r(4,11,18,8,'#bdb5a2');r(6,7,14,2,'#bdb5a2');
+    r(6,8,13,10,'#e8e0cc');r(5,11,16,6,'#e8e0cc');
+    r(7,12,4,4,'#1a1420');r(15,12,4,4,'#1a1420');r(8,13,2,2,'#8dffb0');r(16,13,2,2,'#8dffb0');
+    r(12,16,2,2,'#1a1420');
+    r(7,19,12,3,'#d6cdb8');for(const x of [8,10,12,14,16])r(x,19,1,2,'#1a1420');
+    r(8,22,10,2,'#bdb5a2');
+    r(2,6,2,3,'#7dffb0');r(22,9,2,3,'#7dffb0');r(3,20,2,2,'#7dffb0');
+  },
+  worm:c=>{
+    const r=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
+    r(2,27,22,2,'#19151e90');
+    r(2,22,5,5,'#8d4f4a');r(6,20,5,6,'#b7766c');r(10,18,5,7,'#8d4f4a');
+    r(13,9,9,11,'#b7766c');r(12,11,11,8,'#b7766c');r(14,8,7,2,'#c98a7f');
+    r(15,13,5,5,'#2a0f14');r(13,10,2,2,'#ffcc4d');r(20,10,2,2,'#ffcc4d');
+    r(14,18,2,3,'#f2e6d0');r(19,18,2,3,'#f2e6d0');
+    r(7,21,1,4,'#6e3a37');r(11,19,1,5,'#6e3a37');
+  }
+};
 const palettes = {
   guardia:['#315251','#73937a','#d7b169','#f7dda0'],
   tirador:['#283e2d','#51865b','#b28455','#f2ce92'],
@@ -15,6 +60,7 @@ export function portrait(look) {
   image.height=30;
   image.setAttribute('aria-hidden','true');
   const c=image.getContext('2d');
+  if(creatureArt[look]){creatureArt[look](c,look);return image;}
   const [dark,mid,light,shine]=palettes[look]||palettes.enemy;
   const ink='#201820';
   const rect=(x,y,w,h,color)=>{c.fillStyle=color;c.fillRect(x,y,w,h);};

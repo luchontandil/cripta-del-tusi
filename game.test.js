@@ -2,14 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices} from './engine.js';
+import {makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
   const s=create();
   classes.forEach((kind,i)=>join(s,'p'+i,'Jugador '+i,kind));
   act(s,'p0',{type:'start'},rng);
+  enterCombat(s);
   return s;
+}
+/** Vota en el mapa un nodo de combate normal para entrar a pelear. */
+function enterCombat(s){
+  for(let i=0;i<8&&s.phase!=='combat';i++){
+    if(s.phase==='map'){
+      const option=Math.max(0,s.vote.options.findIndex(id=>s.route.rows.flat().find(n=>n.id===id).kind==='combat'));
+      for(const p of s.players)if(s.phase==='map')act(s,p.id,{type:'vote',option},rng);
+    }else if(s.phase==='event'){
+      for(const p of s.players)if(s.phase==='event')act(s,p.id,{type:'vote',option:0},rng);
+    }
+  }
+  if(s.phase==='combat'){s.water=[];s.traps=[];}
 }
 function timeout(s) {
   s.deadline=0;
@@ -119,6 +132,7 @@ test('genera botín con afijos y permite equipar, engarzar, extraer y vender una
   act(s,'p0',{type:'train',skill:newSpell.index},rng);
   assert.throws(()=>act(s,'p0',{type:'train',skill:0},rng),/pendiente/);
   act(s,'p0',{type:'next'},rng);
+  enterCombat(s);
   assert.equal(s.floor,2);
   assert.equal(p.level,2);
   const raised=s.units.find(u=>u.id==='p0');
@@ -217,7 +231,7 @@ test('los pisos alternan diseños y todas las casillas libres están conectadas'
       dimensions.add(s.width+'×'+s.height);
       assert.equal(s.floor===1,s.voids.length===0);
       const start=Array.from({length:s.width*s.height},(_,i)=>i).find(i=>onBoard(s,i)&&!s.walls.includes(i));
-      assert.equal(paths({...s,units:[]},{pos:start},s.width*s.height).size,s.width*s.height-s.walls.length-s.voids.length-1);
+      assert.equal(paths({...s,units:[]},{pos:start},s.width*s.height).size,s.width*s.height-s.walls.length-s.voids.length-s.water.length-1);
       assert.equal(new Set(s.units.map(u=>u.pos)).size,s.units.length);
       assert.ok(s.units.every(u=>onBoard(s,u.pos)&&!s.walls.includes(u.pos)));
       const heroes=s.units.filter(u=>!u.enemy);
@@ -229,6 +243,7 @@ test('los pisos alternan diseños y todas las casillas libres están conectadas'
       s.phase='reward';
       s.picks=s.players.map(p=>p.id);
       act(s,'p0',{type:'next'},()=>((size*17+floor*13)%97)/97);
+      enterCombat(s);
       assert.notEqual(s.layoutName,previous);
       assert.notDeepEqual([s.width,s.height],previousSize);
     }
@@ -290,7 +305,12 @@ test('dos clientes reciben la misma trayectoria completa y el cambio de turno', 
   assert.equal(peer.status,200);
   assert.equal((await request(path)).status,401);
   assert.equal((await request(path+'/action',{type:'start'},peer.key)).status,400);
-  const started=await request(path+'/action',{type:'start'},host.key);
+  const map=await request(path+'/action',{type:'start'},host.key);
+  assert.equal(map.state.phase,'map');
+  assert.equal(map.state.deadline-map.state.turnStarted,15000);
+  const option=map.state.vote.options.findIndex(id=>map.state.route.rows[0].find(n=>n.id===id).kind==='combat');
+  assert.equal((await request(path+'/action',{type:'vote',option},host.key)).state.phase,'map');
+  const started=await request(path+'/action',{type:'vote',option},peer.key);
   assert.equal(started.state.phase,'combat');
   const origin=started.state.units.find(u=>u.id===host.id).pos;
   const moved=await request(path+'/action',{type:'move',pos:origin-2},host.key);
@@ -303,4 +323,68 @@ test('dos clientes reciben la misma trayectoria completa y el cambio de turno', 
   assert.equal((await request(path+'/action',{type:'end'},host.key)).status,200);
   const active=await request(path,null,peer.key);
   assert.equal(active.state.units[active.state.turn].id,peer.id);
+});
+
+test('el camino tiene 6 pisos, jefes en 3 y 6 y todos los nodos alcanzables',()=>{
+  for(let seed=1;seed<30;seed++){
+    let x=seed;const random=()=>((x=(Math.imul(x,1664525)+1013904223)>>>0)/4294967296);
+    const route=makeRoute(random);
+    assert.equal(route.rows.length,6);
+    assert.equal(route.rows[2][0].kind,'boss');
+    assert.equal(route.rows[5][0].kind,'boss');
+    for(let r=1;r<6;r++)for(const node of route.rows[r])assert.ok(route.rows[r-1].some(prev=>prev.next.includes(node.id)));
+    for(let r=0;r<5;r++)for(const node of route.rows[r])assert.ok(node.next.length>0);
+  }
+});
+test('los eventos se votan, el empate lo decide el anfitrión y aplican efectos al próximo combate',()=>{
+  const s=create();
+  join(s,'p0','Uno','guardia');join(s,'p1','Dos','mago');
+  act(s,'p0',{type:'start'},rng);
+  s.route.rows[0]=[{id:'1-0',floor:1,kind:'event',x:.27,next:s.route.rows[1].map(n=>n.id)},{id:'1-1',floor:1,kind:'combat',x:.73,next:s.route.rows[1].map(n=>n.id)}];
+  s.vote.options=['1-0','1-1'];
+  act(s,'p1',{type:'vote',option:1},rng);
+  assert.equal(s.phase,'map');
+  act(s,'p0',{type:'vote',option:0},rng);
+  assert.equal(s.phase,'event');
+  assert.equal(s.floor,1);
+  s.event=null;
+  s.event={id:'camp',title:'',text:'',options:[{},{}]};
+  s.vote={kind:'event',options:[0,1],votes:{}};
+  act(s,'p0',{type:'vote',option:1},rng);
+  act(s,'p1',{type:'vote',option:1},rng);
+  assert.equal(s.pending.ap,1);
+  assert.equal(s.pending.mp,1);
+  assert.equal(s.phase,'map');
+  enterCombat(s);
+  const hero=s.units.find(u=>u.id===s.units[s.turn].id&&!u.enemy)||s.units.find(u=>!u.enemy);
+  assert.equal(s.mods.ap,1);
+  if(!s.units[s.turn].enemy)assert.equal(s.ap,5+(s.units[s.turn].stats.action||0));
+  assert.ok(hero.hp<=Math.ceil(hero.max*.8));
+});
+test('el voto se resuelve al acabarse los 15 segundos',()=>{
+  const s=create();
+  join(s,'p0','Uno','guardia');join(s,'p1','Dos','mago');
+  act(s,'p0',{type:'start'},rng);
+  assert.equal(s.deadline-s.turnStarted,15000);
+  act(s,'p1',{type:'vote',option:s.vote.options.length-1},rng);
+  timeout(s);
+  assert.notEqual(s.phase,'map');
+});
+test('el combate de élite trae un enemigo extra y mejor botín',()=>{
+  const normal=encounter(2,1),elite=encounter(2,1,true);
+  assert.equal(elite.length,normal.length+1);
+  assert.ok(elite[0].hp>normal[0].hp);
+});
+test('el agua bloquea el paso pero no la visión y los pinchos dañan al pisarlos',()=>{
+  const s=battle('tirador');
+  const hero=s.units[s.turn];
+  s.walls=[];
+  s.water=[hero.pos-1];
+  assert.equal(paths(s,hero,3).has(hero.pos-1),false);
+  assert.equal(lineOfSight(s,hero.pos,hero.pos-2),true);
+  s.water=[];
+  s.traps=[{pos:hero.pos-1,kind:'spikes'}];
+  const hp=hero.hp;
+  act(s,'p0',{type:'move',pos:hero.pos-1},rng);
+  assert.equal(hero.hp,hp-(3+s.floor));
 });

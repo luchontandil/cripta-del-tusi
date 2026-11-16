@@ -1,5 +1,5 @@
 import * as T from './three.module.js';
-import {miniature,obstacle,piece,solid} from './models3d.js?v=7';
+import {miniature,obstacle,piece,solid} from './models3d.js?v=14';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -10,6 +10,30 @@ const tilesets={
 const overlayColors={walk:'#448ead',cast:'#725298',aim:'#f1bf71',route:'#b3efff',area:'#ed8855',blocked:'#b34255',damage:'#ea6a50',poison:'#9abe56',slow:'#719add'};
 const ink='#121423';
 const flatTile=new T.PlaneGeometry(1,1).rotateX(-Math.PI/2);
+const waterGeometry=new T.PlaneGeometry(1,1,6,6).rotateX(-Math.PI/2);
+let waterMaterial=null;
+/** Agua animada: olas suaves, reflejos y espuma en los bordes de la casilla. */
+function makeWater(clockUniform){
+  if(waterMaterial)return waterMaterial;
+  waterMaterial=new T.ShaderMaterial({
+    uniforms:{time:clockUniform},
+    vertexShader:`uniform float time; varying vec2 vUv; varying vec3 vWorld; varying float vWave;
+      void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.);
+        float wave=sin(w.x*3.1+time*1.7)*.5+sin(w.z*2.7-time*1.3)*.5;
+        w.y+=wave*.018;vWave=wave;vWorld=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,
+    fragmentShader:`uniform float time; varying vec2 vUv; varying vec3 vWorld; varying float vWave;
+      void main(){
+        vec3 deep=vec3(.05,.2,.32),shallow=vec3(.16,.52,.68);
+        float caustic=pow(abs(sin(vWorld.x*5.+time*1.1)*sin(vWorld.z*5.3-time*.9)),3.);
+        vec3 c=mix(deep,shallow,.45+vWave*.25)+caustic*.22;
+        vec2 q=min(vUv,1.-vUv);float edge=smoothstep(.09,.0,min(q.x,q.y));
+        c=mix(c,vec3(.75,.92,1.),edge*.35);
+        gl_FragColor=vec4(c,.92);
+      }`,
+    transparent:true
+  });
+  return waterMaterial;
+}
 const clock={value:0};
 const overlayCache=new Map();
 /** Material de resaltado: relleno translúcido, borde luminoso y pulso suave. */
@@ -121,6 +145,7 @@ export function createIso(mount,onCell){
   const overlays=[];
   const torches=[];
   const torchLights=[];
+  const gasPuffs=[];
   const hoverMarker=new T.Mesh(flatTile,overlayMaterial('#ffffff',.55));
   hoverMarker.visible=false;
   hoverMarker.renderOrder=3;
@@ -195,6 +220,7 @@ export function createIso(mount,onCell){
     overlays.length=0;
     torches.length=0;
     torchLights.length=0;
+    gasPuffs.length=0;
     const mode=state.biome||'crypt';
     const palette=tilesets[mode]||tilesets.crypt;
     const walls=new Set(state.walls);
@@ -207,7 +233,7 @@ export function createIso(mount,onCell){
       const coord=logical(state,pos);
       const v=random(state.mapSeed,pos);
       const color=palette[Math.floor(v*palette.length)];
-      piece(stage,'cube',color,coord.x,-.057,coord.z,.963,.114,.963);
+      if(!state.water?.includes(pos))piece(stage,'cube',color,coord.x,-.057,coord.z,.963,.114,.963);
       const x=pos%w,z=Math.floor(pos/w);
       if(!ground(x-1,z)||!ground(x+1,z)||!ground(x,z-1)||!ground(x,z+1)){
         piece(stage,'cube',ink,coord.x,-.24,coord.z,1,.36,1);
@@ -219,6 +245,26 @@ export function createIso(mount,onCell){
           piece(stage,'cube',palette[pos%palette.length],coord.x-.52,.17,coord.z,.22,.34,.96);
           exposed.push([coord.x-.55,coord.z]);
         }
+      }
+      if(state.water?.includes(pos)){
+        // Hundimos la losa y ponemos la superficie del agua encima.
+        piece(stage,'cube','#0d1a26',coord.x,-.14,coord.z,1,.1,1);
+        const surface=new T.Mesh(waterGeometry,makeWater(clock));
+        surface.position.set(coord.x,-.02,coord.z);
+        surface.renderOrder=1;
+        stage.add(surface);
+      }
+      const trap=state.traps?.find(t=>t.pos===pos);
+      if(trap?.kind==='spikes'){
+        piece(stage,'cube','#2a2433',coord.x,.004,coord.z,.7,.02,.7);
+        for(const [dx,dz] of [[-.17,-.17],[.17,-.17],[-.17,.17],[.17,.17],[0,0]])
+          piece(stage,'cone','#c9c3d6',coord.x+dx,.11,coord.z+dz,.1,.2,.1).castShadow=true;
+      }else if(trap?.kind==='gas'){
+        piece(stage,'disc','#1b1622',coord.x,.006,coord.z,.6,.02,.6);
+        for(const d of [-.12,0,.12])piece(stage,'cube','#3a3346',coord.x+d,.02,coord.z,.04,.02,.5);
+        const puff=piece(stage,'orb','#b9e574',coord.x,.22,coord.z,.38,.26,.38,true);
+        puff.material=new T.MeshBasicMaterial({color:'#b9e574',transparent:true,opacity:.22,depthWrite:false});
+        gasPuffs.push(puff);
       }
       const overlay=new T.Mesh(flatTile,overlayMaterial(overlayColors.walk));
       overlay.position.set(coord.x,.012,coord.z);
@@ -232,7 +278,7 @@ export function createIso(mount,onCell){
         block.position.copy(coord);
         block.rotation.y=((pos%4)*Math.PI)/2;
         obstacle(block,mode,Math.floor(v*3));
-      }else if(v<.085){
+      }else if(v<.085&&!state.water?.includes(pos)&&!trap){
         const chip=piece(stage,'cube',palette[0],coord.x-.22,.012,coord.z+.21,.22,.022,.035);
         chip.rotation.y=v*12;
       }
@@ -488,6 +534,12 @@ export function createIso(mount,onCell){
     for(const [index,light] of torchLights.entries()){
       light.intensity=reduced?14:12.5+Math.sin(now*.011+index*2.1)*1.6+Math.sin(now*.027+index)*1.1;
     }
+    for(const [index,puff] of gasPuffs.entries()){
+      const k=reduced?0:now*.0015+index*1.7;
+      puff.position.y=.2+Math.sin(k)*.05;
+      puff.scale.set(.36+Math.sin(k*1.3)*.05,.24+Math.sin(k)*.04,.36+Math.cos(k*1.1)*.05);
+      puff.material.opacity=.16+Math.sin(k*2)*.06;
+    }
     for(const [index,flame] of torches.entries()){
       const t=reduced?0:now*.007+index;
       flame.scale.y=.34+Math.sin(t)*.065;
@@ -510,12 +562,16 @@ export function createIso(mount,onCell){
       const strike=Math.max(0,1-(now-(model.strike??-10000))/285);
       const swing=Math.sin(strike*Math.PI);
       const breath=reduced?0:Math.sin(now*.003+model.phase);
+      if(model.animate){
+        model.animate(now/1000,{gait,swing,walking:!!walk,reduced,phase:model.phase});
+      }else{
       model.figure.position.y=reduced?0:Math.abs(gait)*.055+breath*.024;
       model.figure.rotation.z=walk?gait*.055:breath*.035;
       model.arms[0].rotation.x=gait*.36+breath*.12;
       model.arms[1].rotation.x=-gait*.36-swing*.97-breath*.10;
       model.legs[0].rotation.x=-gait*.43;
       model.legs[1].rotation.x=gait*.43;
+      }
       if(model.ring.visible&&!reduced){
         model.ring.rotation.y=now*.0012;
         const s=1+Math.sin(now*.005)*.05;

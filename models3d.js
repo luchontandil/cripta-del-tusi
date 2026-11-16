@@ -50,7 +50,156 @@ function staff(parent,color,arcane){
   piece(parent,'gem',color,0,.42,0,.19,.26,.19,true);
   if(arcane)piece(parent,'ring','#93c7ff',0,.42,0,.29,.29,.29,true);
 }
+const creatures={slime:slime,slimeking:slime,bat:bat,skull:skull,worm:worm};
+const glass=(color,opacity=.82)=>new T.MeshStandardMaterial({color,roughness:.25,metalness:.05,transparent:true,opacity,emissive:color,emissiveIntensity:.18});
+function add(parent,shape,material,x,y,z,sx,sy,sz){
+  const mesh=new T.Mesh(shapes[shape],material);
+  mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);
+  mesh.castShadow=true;parent.add(mesh);return mesh;
+}
+/** Limo: cuerpo gelatinoso que respira, rebota al moverse y se estira al atacar. */
+function slime(kind){
+  const king=kind==='slimeking';
+  const tone=king?'#c77dff':'#6fdc8c';
+  const root=new T.Group(),figure=new T.Group(),body=new T.Group();
+  root.add(figure);figure.add(body);
+  const jelly=add(body,'orb',glass(tone),0,.3,0,.74,.58,.74);
+  add(body,'gem',solid(king?'#ffe27a':'#d9ff9e',true),0,.28,0,.16,.2,.16);
+  for(const x of [-.13,.13]){
+    add(body,'orb',solid('#f6fff6'),x,.42,.3,.13,.15,.08);
+    add(body,'orb',solid('#14281a'),x,.42,.335,.065,.085,.04);
+  }
+  add(body,'cube',solid('#1d3b26'),0,.31,.33,.12,.025,.02);
+  if(king){
+    add(body,'column',solid('#f2c45c'),0,.62,0,.3,.07,.3);
+    for(const a of [0,1.26,2.51,3.77,5.03])add(body,'cone',solid('#ffd977'),Math.sin(a)*.14,.71,Math.cos(a)*.14,.07,.12,.07);
+  }
+  const size=king?1.5:1;
+  figure.scale.setScalar(size);
+  const animate=(t,{gait,swing,walking,reduced})=>{
+    const breath=reduced?0:Math.sin(t*3.1);
+    const hop=walking?Math.abs(gait):0;
+    body.position.y=hop*.28;
+    const squash=1+breath*.07-hop*.12+swing*.25;
+    body.scale.set(1/Math.sqrt(squash)*(1+(walking?(1-hop)*.12:0)),squash,1/Math.sqrt(squash));
+    body.position.z=swing*.22;
+    jelly.material.emissiveIntensity=.18+swing*.6;
+  };
+  return {root,figure,legs:[],arms:[],head:.75*size,animate};
+}
+/** Murciélago: vuela con aleteo rápido, se balancea y se lanza en picado al atacar. */
+function bat(){
+  const root=new T.Group(),figure=new T.Group(),body=new T.Group();
+  root.add(figure);figure.add(body);
+  const fur=solid('#7a58a0'),membrane=new T.MeshStandardMaterial({color:'#a77fc4',roughness:.7,side:T.DoubleSide,emissive:'#3a2050',emissiveIntensity:.4});
+  add(body,'orb',fur,0,0,0,.36,.34,.32);
+  add(body,'orb',fur,0,.2,.05,.28,.25,.25);
+  for(const side of [-1,1]){
+    const ear=add(body,'cone',fur,side*.09,.36,.03,.08,.16,.06);ear.rotation.z=side*-.3;
+    add(body,'orb',solid('#ff5a5a',true),side*.06,.22,.17,.05,.05,.03);
+    add(body,'cone',solid('#f4ece0'),side*.035,.12,.16,.02,.05,.02).rotation.x=Math.PI;
+  }
+  const wings=[-1,1].map(side=>{
+    const wing=new T.Group();
+    wing.position.set(side*.14,.05,0);
+    body.add(wing);
+    const shape=new T.Shape();
+    shape.moveTo(0,0);shape.lineTo(side*.55,.18);shape.lineTo(side*.5,-.02);shape.lineTo(side*.36,-.1);shape.lineTo(side*.22,-.04);shape.lineTo(side*.1,-.12);shape.lineTo(0,-.06);
+    const mesh=new T.Mesh(new T.ShapeGeometry(shape),membrane);
+    mesh.castShadow=true;
+    wing.add(mesh);
+    add(wing,'cube',fur,side*.27,.08,0,.5,.025,.025).rotation.z=side*.33;
+    return wing;
+  });
+  body.position.y=.72;
+  figure.scale.setScalar(1.55);
+  const animate=(t,{gait,swing,walking,reduced,phase})=>{
+    const flap=reduced?.3:Math.sin(t*(walking?20:13)+phase);
+    wings[0].rotation.y=flap*.9;wings[1].rotation.y=-flap*.9;
+    wings[0].rotation.z=-flap*.25;wings[1].rotation.z=flap*.25;
+    body.position.y=.72+(reduced?0:Math.sin(t*4+phase)*.07)-swing*.3;
+    body.position.z=swing*.35;
+    body.rotation.x=walking?.35:swing*.6;
+    body.rotation.z=reduced?0:Math.sin(t*2.2+phase)*.12;
+  };
+  return {root,figure,legs:[],arms:[],head:1.05*1.55,animate};
+}
+/** Calavera flotante: levita, abre la mandíbula, ojos brillantes y llamas que orbitan. */
+function skull(){
+  const root=new T.Group(),figure=new T.Group(),head=new T.Group();
+  root.add(figure);figure.add(head);
+  const bone=new T.MeshStandardMaterial({color:'#e8e0cc',roughness:.6});
+  add(head,'orb',bone,0,0,0,.48,.44,.46);
+  add(head,'cube',bone,0,-.16,.08,.3,.12,.28);
+  for(const x of [-.11,.11]){
+    add(head,'orb',solid('#1a1420'),x,.02,.2,.13,.13,.06);
+    add(head,'orb',solid('#8dffb0',true),x,.02,.225,.085,.085,.04);
+  }
+  add(head,'gem',solid('#1a1420'),0,-.07,.225,.06,.07,.03);
+  const jaw=new T.Group();
+  jaw.position.set(0,-.2,-.02);
+  head.add(jaw);
+  add(jaw,'cube',bone,0,-.04,.1,.27,.07,.24);
+  for(const x of [-.08,-.027,.027,.08])add(jaw,'cube',solid('#f8f3e6'),x,.0,.21,.035,.04,.02);
+  const flames=[0,1,2].map(i=>{
+    const flame=add(figure,'gem',new T.MeshBasicMaterial({color:'#7dffb0',transparent:true,opacity:.85}),0,.6,0,.08,.13,.08);
+    flame.castShadow=false;return flame;
+  });
+  head.position.y=.68;
+  figure.scale.setScalar(1.35);
+  const animate=(t,{swing,walking,reduced,phase})=>{
+    const r=reduced?0:t;
+    head.position.y=.68+Math.sin(r*2.1+phase)*.08;
+    head.rotation.z=Math.sin(r*1.3+phase)*.14;
+    head.rotation.x=-swing*.45+(walking?.2:0);
+    head.position.z=swing*.18;
+    jaw.rotation.x=.12+Math.max(0,Math.sin(r*3.3+phase))*.25+swing*.7;
+    flames.forEach((flame,i)=>{
+      const a=r*2.4+i*2.094;
+      flame.position.set(Math.cos(a)*.36,head.position.y-.05+Math.sin(r*5+i)*.06,Math.sin(a)*.36);
+      flame.rotation.y=r*4;
+    });
+  };
+  return {root,figure,legs:[],arms:[],head:1.1*1.35,animate};
+}
+/** Gusano de cripta: segmentos que ondulan, cabeza alzada con mandíbulas y embestida. */
+function worm(){
+  const root=new T.Group(),figure=new T.Group();
+  root.add(figure);
+  const flesh=new T.MeshStandardMaterial({color:'#b7766c',roughness:.55});
+  const ring=new T.MeshStandardMaterial({color:'#8d4f4a',roughness:.6});
+  const segments=[0,1,2,3,4].map(i=>{
+    const size=.42-i*.055;
+    const seg=add(figure,'orb',i%2?ring:flesh,0,size*.5,-i*.2,size,size*.9,size);
+    return seg;
+  });
+  const head=new T.Group();
+  figure.add(head);
+  add(head,'orb',flesh,0,0,0,.42,.4,.42);
+  add(head,'orb',solid('#2a0f14'),0,0,.17,.22,.2,.1);
+  for(const side of [-1,1]){
+    const fang=add(head,'cone',solid('#f2e6d0'),side*.11,-.02,.2,.06,.17,.06);
+    fang.rotation.x=Math.PI/2+.3;fang.rotation.z=side*.35;
+    add(head,'orb',solid('#ffcc4d',true),side*.13,.12,.13,.05,.05,.04);
+  }
+  figure.scale.setScalar(1.15);
+  const animate=(t,{gait,swing,walking,reduced,phase})=>{
+    const speed=walking?7:2.6;
+    const r=reduced?0:t;
+    segments.forEach((seg,i)=>{
+      const wave=Math.sin(r*speed-i*.9+phase);
+      seg.position.x=wave*.06*(i+1)*.5;
+      seg.position.y=(.42-i*.055)*.5+Math.max(0,wave)*.05;
+    });
+    const rise=.55+Math.sin(r*1.7+phase)*.06+swing*.1;
+    head.position.set(Math.sin(r*speed+.9+phase)*.04,rise,.16+swing*.32);
+    head.rotation.x=-.25-swing*.5;
+    head.rotation.z=Math.sin(r*1.4+phase)*.15;
+  };
+  return {root,figure,legs:[],arms:[],head:.95*1.15,animate};
+}
 export function miniature(kind) {
+  if(creatures[kind])return creatures[kind](kind);
   const [body,accent,dark,skin]=looks[kind]||looks.enemy;
   const root=new T.Group();
   const figure=new T.Group();

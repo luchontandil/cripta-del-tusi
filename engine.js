@@ -92,15 +92,15 @@ function floorRandom(seed) {
     return seed/4294967296;
   };
 }
-function rollItem(s,rng) {
+function rollItem(s,rng,{bonus=0,gear=false}={}) {
   const itemId = ++s.itemId;
-  if (rng()<.28) {
+  if (!gear&&rng()<.28) {
     const [name,key,value]=pick(inscriptions,rng);
     return {id:itemId,name:'Runa de '+name,kind:'rune',price:7+2*s.floor,stats:{[key]:value}};
   }
   const slot=pick(Object.keys(slots),rng);
   const name=pick(bases[slot],rng);
-  const luck=rng()+s.floor*.055;
+  const luck=rng()+s.floor*.055+bonus;
   const rarity=luck>1.08?3:luck>.83?2:luck>.53?1:0;
   const choices=[...pools[slot]];
   if(slot==='weapon'&&actionWeapons.has(name)&&rarity>=2)choices.push('action');
@@ -130,7 +130,8 @@ function sumStats(equipment) {
 }
 export function create() {
   return {phase:'lobby', floor:0, rounds:0, width:12,height:8,players:[],units:[],walls:[],voids:[],glyphs:[],
-    log:[],events:[],seq:0,itemId:0,turn:0,deadline:0,turnStarted:0,picks:[],offers:{},stock:[],training:false};
+    water:[],traps:[],log:[],events:[],seq:0,itemId:0,turn:0,deadline:0,turnStarted:0,picks:[],offers:{},stock:[],training:false,
+    route:null,node:null,vote:null,event:null,pending:{},mods:{}};
 }
 const alive = unit => unit.hp>0;
 const fail = message => {throw new Error(message);};
@@ -144,18 +145,26 @@ export function join(s,id,name,classId) {
   if(!Object.hasOwn(classes,classId)) fail('Elige una clase válida.');
   s.players.push({id,name:String(name||'Aventurero').trim().slice(0,22)||'Aventurero',classId,bag:[],equipment:{},gold:0,level:1,xp:0,skillRanks:skillRanks(classId),trained:true});
 }
-export function encounter(floor,size) {
+export const monsterNames={slime:'Limo',bat:'Murciélago',skull:'Calavera flotante',worm:'Gusano de cripta',slimeking:'Limo colosal'};
+export function encounter(floor,size,elite=false) {
   const count=Math.min(7,size+Math.floor(floor/2));
-  return Array.from({length:count},(_,i)=>{
+  const lineup=Array.from({length:count},(_,i)=>{
     const boss=floor%3===0&&i===0;
     const ranged=!boss&&floor>1&&i%2===1;
     const elite=!boss&&!ranged&&floor>=4;
-    return {id:'enemy'+i,name:boss?(floor===3?'Oráculo de Ceniza':'Rey del Umbral'):ranged?'Vigía':elite?'Custodio':'Acechador',
-      look:boss?'boss':ranged?'ranged':elite?'elite':'enemy',boss,enemy:true,initiative:boss?16:ranged?11:6,
+    const species=boss?'boss':ranged?'skull':elite?'worm':(i+floor)%2?'bat':'slime';
+    return {id:'enemy'+i,name:boss?(floor===3?'Oráculo de Ceniza':'Rey del Umbral'):monsterNames[species],
+      look:species,boss,elite,enemy:true,initiative:boss?16:ranged?11:species==='bat'?9:6,
       range:boss?4:ranged?8:1,
       hp:boss?48+floor*6+8*(size-1):Math.round((16+4*floor)*(ranged?.75:elite?1.15:1)),
       damage:boss?4+floor:ranged?2+floor:3+floor,stats:{ward:boss?3:elite?2:0},effects:{}};
   });
+  if(!elite)return lineup;
+  // Combate de élite: enemigos más duros y un custodio de refuerzo.
+  for(const u of lineup){u.hp=Math.round(u.hp*1.2);u.damage+=1;u.stats.ward+=1;}
+  lineup.push({id:'enemy'+count,name:monsterNames.slimeking,look:'slimeking',boss:false,elite:true,enemy:true,initiative:8,range:1,
+    hp:Math.round((16+4*floor)*1.5),damage:4+floor,stats:{ward:2},effects:{}});
+  return lineup;
 }
 export const distance = (s,a,b) => Math.abs(a%s.width-b%s.width)+Math.abs(Math.floor(a/s.width)-Math.floor(b/s.width));
 export const onBoard=(s,pos)=>Number.isInteger(pos)&&pos>=0&&pos<s.width*s.height&&!s.voids?.includes(pos);
@@ -164,7 +173,11 @@ const forms={
   L:(x,y)=>x<.52||y>=.43,
   T:(x,y)=>y<.43||(x>=.28&&x<.73),
   C:(x,y)=>x<.49||y<.31||y>=.69,
-  cruz:(x,y)=>(x>=.23&&x<.77)||(y>=.27&&y<.75)
+  cruz:(x,y)=>(x>=.23&&x<.77)||(y>=.27&&y<.75),
+  H:(x,y)=>x<.32||x>=.68||(y>=.36&&y<.64),
+  U:(x,y)=>x<.3||x>=.7||y>=.6,
+  anillo:(x,y)=>!(x>=.38&&x<.62&&y>=.36&&y<.64),
+  rombo:(x,y)=>Math.abs(x-.5)*1.1+Math.abs(y-.5)<.74
 };
 function contour(s,rng){
   if(s.floor===1)return {shape:'rectángulo',voids:[]};
@@ -183,7 +196,15 @@ const layouts=[
   {name:'Pasajes quebrados', pillars:['.......','##...#.','.#...#.','.......','...##..','...#...','.......']},
   {name:'Patio de losas', pillars:['.......','..##...','..#....','.....#.','.....#.','..#....','.......']},
   {name:'Cruce de sepulcros', pillars:['.......','..#....','..#.#..','.......','.#..#..','....#..','.......']},
-  {name:'Cámaras gemelas', pillars:['.......','.#...#.','.#...#.','.......','..#.#..','..#.#..','.......']}
+  {name:'Cámaras gemelas', pillars:['.......','.#...#.','.#...#.','.......','..#.#..','..#.#..','.......']},
+  {name:'Nave central', pillars:['.......','.#.#.#.','.......','.......','.......','.#.#.#.','.......']},
+  {name:'Anillo de tumbas', pillars:['.......','..###..','.#...#.','.#...#.','.#...#.','..#.#..','.......']},
+  {name:'Escalera rota', pillars:['.......','.#.....','.##....','...#...','....##.','.....#.','.......']},
+  {name:'Osario diagonal', pillars:['#......','.#.....','.......','...#...','.......','.....#.','......#']},
+  {name:'Capilla en ruinas', pillars:['.......','.##.##.','.......','..#.#..','.......','.##.##.','.......']},
+  {name:'Laberinto menor', pillars:['.......','.####..','.....#.','.###.#.','.#.....','.#.###.','.......']},
+  {name:'Cripta del eco', pillars:['...#...','.......','.#...#.','#.....#','.#...#.','.......','...#...']},
+  {name:'Sala de columnas', pillars:['.......','.#.#.#.','.......','.#.#.#.','.......','.#.#.#.','.......']}
 ];
 function makeLayout(s,rng){
   const available=layouts.filter(layout=>layout.name!==s.layoutName);
@@ -220,10 +241,38 @@ function makeLayout(s,rng){
     boundary.add(pos);
     if(!connected())boundary.delete(pos);
   }
-  return {name:layout.name,walls:[...boundary]};
+  const blocks=[...boundary];
+  // Agua: charcas que bloquean el paso pero no la visión. El mapa sigue conectado.
+  const water=[];
+  const open=candidates.filter(pos=>!boundary.has(pos));
+  const pools=s.floor===1?1:1+Math.floor(rng()*3);
+  for(let i=0;i<pools&&open.length;i++){
+    let pos=open[roll(0,open.length-1,rng)];
+    const size=2+Math.floor(rng()*4);
+    for(let j=0;j<size&&pos!==undefined;j++){
+      if(!boundary.has(pos)){
+        boundary.add(pos);
+        if(connected())water.push(pos);else boundary.delete(pos);
+      }
+      const next=adjacent(s,pos).filter(n=>open.includes(n)&&!boundary.has(n));
+      pos=next.length?pick(next,rng):undefined;
+    }
+  }
+  // Trampas: pinchos en todos los pisos y gas venenoso desde el piso 2.
+  const traps=[];
+  const spots=open.filter(pos=>!boundary.has(pos));
+  for(let i=0;i<1+Math.floor(s.floor*.7)&&spots.length;i++){
+    const pos=spots.splice(roll(0,spots.length-1,rng),1)[0];
+    traps.push({pos,kind:s.floor>=2&&rng()<.4?'gas':'spikes'});
+  }
+  return {name:layout.name,walls:blocks,water,traps};
 }
-function openFloor(s,rng) {
+function openFloor(s,rng,elite=false) {
   s.phase='combat';
+  s.vote=null;
+  s.event=null;
+  s.mods=s.pending||{};
+  s.pending={};
   s.training=false;
   s.floor++;
   s.rounds=1;
@@ -247,7 +296,10 @@ function openFloor(s,rng) {
   const layout=makeLayout(s,mapRng);
   s.layoutName=layout.name;
   s.walls=layout.walls;
-  const free=Array.from({length:w*s.height},(_,pos)=>pos).filter(pos=>onBoard(s,pos)&&!s.walls.includes(pos));
+  s.water=layout.water;
+  s.traps=layout.traps;
+  const trapCells=new Set(s.traps.map(t=>t.pos));
+  const free=Array.from({length:w*s.height},(_,pos)=>pos).filter(pos=>onBoard(s,pos)&&!s.walls.includes(pos)&&!s.water.includes(pos)&&!trapCells.has(pos));
   const rightScore=pos=>(pos%w)*4-Math.abs(Math.floor(pos/w)-mid);
   const heroPositions=s.floor===1?[0,-1,1,-2].map(y=>w*(mid+y)+w-2):
     [...free].sort((a,b)=>rightScore(b)-rightScore(a)).slice(0,s.players.length);
@@ -264,16 +316,20 @@ function openFloor(s,rng) {
       hp:previous?Math.min(max,Math.max(previous.hp,0)+Math.ceil(max*.45)):max,
       pos:heroPositions[i],effects:{}};
   });
-  const lineup=encounter(s.floor,s.players.length);
+  const lineup=encounter(s.floor,s.players.length,elite);
+  if(s.mods.startHpPct)for(const hero of heroes)hero.hp=Math.max(1,Math.min(hero.hp,Math.ceil(hero.max*s.mods.startHpPct)));
   const spawns=s.floor===1?Array.from({length:(s.height-2)*2},(_,i)=>w*(1+Math.floor(i/2))+1+i%2):
     free.filter(pos=>!heroPositions.includes(pos)).sort((a,b)=>a%w-b%w).slice(0,Math.max(12,lineup.length*2));
   const foes=lineup.map(u=>{
     const pos=spawns.splice(roll(0,spawns.length-1,mapRng),1)[0];
-    return {...u,max:u.hp,pos};
+    const hp=Math.round(u.hp*(s.mods.enemyHp||1));
+    return {...u,hp,max:hp,pos};
   });
   s.units=[...heroes,...foes].sort((a,b)=>b.initiative-a.initiative);
   s.turn=0;
-  note(s,'Piso '+s.floor+' · '+s.layoutName+(s.voids.length?' · '+s.shape.toUpperCase():'')+(s.floor%3===0?' · Cámara del jefe':''));
+  note(s,'Piso '+s.floor+' · '+s.layoutName+(s.voids.length?' · '+s.shape.toUpperCase():'')+(s.floor%3===0?' · Cámara del jefe':elite?' · Combate de élite':''));
+  const effects=modText(s.mods);
+  if(effects)note(s,'Efectos de este combate: '+effects+'.');
   beginTurn(s);
 }
 export function lineOfSight(s,from,to,ignoreId) {
@@ -296,7 +352,7 @@ export function lineOfSight(s,from,to,ignoreId) {
 }
 export function paths(s,unit,limit) {
   if(!onBoard(s,unit.pos))return new Map();
-  const blocked=new Set([...s.walls,...s.units.filter(alive).map(u=>u.pos)]);
+  const blocked=new Set([...s.walls,...(s.water||[]),...s.units.filter(alive).map(u=>u.pos)]);
   const routes=new Map([[unit.pos,[]]]);
   for(const [pos,path] of routes) {
     if(path.length>=limit)continue;
@@ -347,6 +403,19 @@ function triggerGlyph(s,g,unit) {
     note(s,unit.name+' pierde '+power.slow+' PM en su próximo turno por el glifo de cadenas.');
   }
 }
+export const trapInfo={
+  spikes:{name:'Trampa de pinchos',description:floor=>'Al pisarla: '+(3+floor)+' de daño físico (la armadura lo reduce).'},
+  gas:{name:'Trampa de gas',description:floor=>'Al pisarla: 2 de daño y veneno de '+(2+Math.floor(floor/2))+' PV durante 2 turnos.'}
+};
+/** Trampa al pisar una casilla: afecta a héroes y monstruos. */
+function triggerTrap(s,trap,unit){
+  const source={name:trapInfo[trap.kind].name,pos:unit.pos};
+  if(trap.kind==='spikes')hit(s,source,unit,3+s.floor,'trap',false,'physical');
+  else{
+    hit(s,source,unit,2,'trap',false,'shadow');
+    if(alive(unit)){effect(unit,'poison',2+Math.floor(s.floor/2),2);note(s,unit.name+' respira gas venenoso.');}
+  }
+}
 function applyGlyphs(s,unit,oldPos) {
   if(unit.enemy)return;
   for(const g of s.glyphs) {
@@ -367,13 +436,16 @@ function move(s,unit,path,voluntary=true) {
     unit.pos=pos;
     traveled.push(pos);
     applyGlyphs(s,unit,previous);
+    const trap=s.traps?.find(t=>t.pos===pos);
+    if(trap&&alive(unit))triggerTrap(s,trap,unit);
   }
 }
 function beginTurn(s) {
   const u=s.units[s.turn];
   s.enemyPlan=null;
-  s.ap=4+(u.stats?.action||0);
-  s.mp=Math.max(0,3+(u.stats?.movement||0)-(u.effects.slow?.value||0));
+  const bonus=u.enemy?{}:s.mods||{};
+  s.ap=Math.max(1,4+(u.stats?.action||0)+(bonus.ap||0));
+  s.mp=Math.max(0,3+(u.stats?.movement||0)+(bonus.mp||0)-(u.effects.slow?.value||0));
   s.turnStarted=Date.now();
   s.deadline=s.turnStarted+(u.enemy?350:60000);
   if(u.effects.poison)hit(s,{name:'Veneno',pos:u.pos},u,u.effects.poison.value,'poison',false,'shadow');
@@ -388,7 +460,9 @@ function finish(s,rng) {
   if(!s.units.some(u=>!u.enemy&&alive(u))){s.phase='lost';return true;}
   if(s.units.some(u=>u.enemy&&alive(u)))return false;
   s.phase=s.floor===6?'won':'reward';
+  s.mods={};
   s.glyphs=[];
+  const elite=s.node?.kind==='elite';
   s.picks=[];
   s.offers={};
   s.stock=[];
@@ -399,11 +473,11 @@ function finish(s,rng) {
     for(const p of s.players){
       p.xp=100;
       p.trained=false;
-      p.gold+=10+s.floor*4;
-      s.offers[p.id]=Array.from({length:3},()=>rollItem(s,rng));
+      p.gold+=Math.round((10+s.floor*4)*(elite?1.5:1));
+      s.offers[p.id]=Array.from({length:3},(_,i)=>rollItem(s,rng,elite?{bonus:.35,gear:i===0}:{}));
     }
     s.stock=Array.from({length:4},()=>rollItem(s,rng));
-    note(s,'Victoria · Elige botín y prepara tu equipo.');
+    note(s,elite?'Victoria de élite · Botín mejorado y más oro.':'Victoria · Elige botín y prepara tu equipo.');
   }else for(const p of s.players)p.xp=100;
   return true;
 }
@@ -436,7 +510,7 @@ function castGlyph(s,boss,heroes) {
   s.glyphs=s.glyphs.filter(g=>g.owner!==boss.id);
   const target=heroes.reduce((a,b)=>distance(s,boss.pos,a.pos)<=distance(s,boss.pos,b.pos)?a:b);
   const centers=Array.from({length:s.width*s.height},(_,i)=>i)
-    .filter(pos=>onBoard(s,pos)&&!s.walls.includes(pos)&&adjacent(s,pos).filter(n=>!s.walls.includes(n)).length===4)
+    .filter(pos=>onBoard(s,pos)&&!s.walls.includes(pos)&&!s.water?.includes(pos)&&adjacent(s,pos).filter(n=>!s.walls.includes(n)&&!s.water?.includes(n)).length===4)
     .sort((a,b)=>distance(s,a,target.pos)-distance(s,b,target.pos));
   const center=centers[0];
   if(center===undefined)return;
@@ -471,6 +545,158 @@ export function planEnemy(s,unit,heroes){
   available.sort(([a,pa],[b,pb])=>nearest(a)-nearest(b)||pa.length-pb.length);
   return available[0]?.[1]||[];
 }
+// ───────────── Camino entre pisos, eventos y votaciones ─────────────
+export const nodeKinds={
+  combat:{name:'Combate',description:'Enemigos normales y botín estándar.'},
+  elite:{name:'Élite',description:'Enemigos más duros y un custodio extra. Botín mejor y 50 % más de oro.'},
+  event:{name:'Evento',description:'Un encuentro sin combate. El grupo vota entre varias opciones.'},
+  boss:{name:'Jefe',description:'Cámara del jefe con glifos.'}
+};
+const voteTime=15000;
+/** Árbol de 6 pisos: 2-3 caminos por piso y jefes en los pisos 3 y 6. */
+export function makeRoute(rng){
+  const rows=[];
+  for(let floor=1;floor<=6;floor++){
+    if(floor%3===0){rows.push([{id:floor+'-0',floor,kind:'boss',x:.5,next:[]}]);continue;}
+    const count=rng()<.55?3:2;
+    const xs=count===3?[.15,.5,.85]:[.27,.73];
+    const kinds=xs.map((_,i)=>{
+      if(floor===1)return i===0?'combat':rng()<.5?'event':'combat';
+      const r=rng();
+      return r<.42?'combat':r<.7?'elite':'event';
+    });
+    if(floor>1&&new Set(kinds).size===1)kinds[kinds.length-1]=kinds[0]==='event'?'combat':'event';
+    if(!kinds.some(kind=>kind!=='event'))kinds[0]='combat';
+    rows.push(xs.map((x,i)=>({id:floor+'-'+i,floor,kind:kinds[i],x,next:[]})));
+  }
+  for(let r=0;r<rows.length-1;r++){
+    const here=rows[r],next=rows[r+1];
+    for(const node of here){
+      node.next=next.filter(other=>Math.abs(other.x-node.x)<=.5).map(other=>other.id);
+      if(!node.next.length)node.next=[next.reduce((a,b)=>Math.abs(a.x-node.x)<=Math.abs(b.x-node.x)?a:b).id];
+    }
+    for(const other of next){
+      if(here.some(node=>node.next.includes(other.id)))continue;
+      here.reduce((a,b)=>Math.abs(a.x-other.x)<=Math.abs(b.x-other.x)?a:b).next.push(other.id);
+    }
+  }
+  return {rows,path:[],seen:[]};
+}
+const findNode=(s,id)=>s.route.rows.flat().find(node=>node.id===id);
+function routeOptions(s){
+  const row=s.route.rows[s.floor];
+  if(!row)return [];
+  const current=s.node&&findNode(s,s.node.id);
+  return current&&current.floor===s.floor?current.next:row.map(node=>node.id);
+}
+/** Pasa al siguiente piso del camino: vota si hay varias rutas, entra directamente si solo hay una. */
+function openRoute(s,rng){
+  s.training=false;
+  const options=routeOptions(s);
+  if(options.length===1){enterNode(s,findNode(s,options[0]),rng);return;}
+  s.phase='map';
+  s.event=null;
+  s.vote={kind:'map',options,votes:{}};
+  s.turnStarted=Date.now();
+  s.deadline=s.turnStarted+voteTime;
+  note(s,'Piso '+(s.floor+1)+' · El grupo vota el camino.');
+}
+function enterNode(s,node,rng){
+  s.node={id:node.id,kind:node.kind};
+  s.route.path.push(node.id);
+  if(node.kind==='event'){startEvent(s,rng);return;}
+  openFloor(s,rng,node.kind==='elite');
+}
+function castVote(s,player,option,rng){
+  if(!Number.isInteger(option)||option<0||option>=s.vote.options.length)fail('Opción inválida.');
+  s.vote.votes[player.id]=option;
+  note(s,player.name+' vota: '+voteLabel(s,option)+'.');
+  if(s.players.every(p=>Object.hasOwn(s.vote.votes,p.id)))resolveVote(s,rng);
+}
+function voteLabel(s,option){
+  if(s.vote.kind==='map')return nodeKinds[findNode(s,s.vote.options[option]).kind].name;
+  return s.event.options[option].label;
+}
+/** Gana la opción más votada; en empate, la del anfitrión; sin votos, la primera. */
+function resolveVote(s,rng){
+  const counts=s.vote.options.map((_,i)=>Object.values(s.vote.votes).filter(v=>v===i).length);
+  const best=Math.max(...counts);
+  const tied=counts.map((c,i)=>c===best?i:-1).filter(i=>i>=0);
+  const hostVote=s.vote.votes[s.players[0].id];
+  const choice=tied.includes(hostVote)?hostVote:tied[0];
+  note(s,'Decisión del grupo: '+voteLabel(s,choice)+'.');
+  if(s.vote.kind==='map'){enterNode(s,findNode(s,s.vote.options[choice]),rng);return;}
+  const event=events[s.event.id];
+  event.options[choice].apply(s,rng);
+  s.vote=null;
+  openRoute(s,rng);
+}
+const heroesOf=s=>s.units.filter(u=>!u.enemy);
+function healParty(s,pct){
+  for(const hero of heroesOf(s))hero.hp=Math.min(hero.max,Math.max(hero.hp,0)+Math.ceil(hero.max*pct));
+}
+function hurtParty(s,pct){
+  const heroes=heroesOf(s).filter(alive);
+  if(!heroes.length){s.pending.startHpPct=Math.min(s.pending.startHpPct||1,1-pct);return;}
+  for(const hero of heroes)hero.hp=Math.max(1,hero.hp-Math.floor(hero.hp*pct));
+}
+const addMod=(s,key,value)=>{s.pending[key]=(s.pending[key]||0)+value;};
+const giveAll=(s,make)=>{for(const p of s.players)p.bag.push(make(p));};
+export function modText(mods={}){
+  const parts=[];
+  if(mods.ap)parts.push((mods.ap>0?'+':'−')+Math.abs(mods.ap)+' PA');
+  if(mods.mp)parts.push((mods.mp>0?'+':'−')+Math.abs(mods.mp)+' PM');
+  if(mods.enemyHp)parts.push('enemigos +'+Math.round((mods.enemyHp-1)*100)+' % de vida');
+  if(mods.startHpPct)parts.push('empezáis con el '+Math.round(mods.startHpPct*100)+' % de vida');
+  return parts.join(', ');
+}
+const events={
+  fountain:{title:'Fuente de aguas negras',text:'Un manantial oscuro brota entre las losas. El agua huele a hierro y a promesas.',needsHeroes:true,options:[
+    {label:'Beber',detail:'Todo el grupo se cura por completo, pero tiene −1 PM en el próximo combate.',apply:s=>{healParty(s,1);addMod(s,'mp',-1);}},
+    {label:'Llenar los odres',detail:'Todo el grupo recupera un 30 % de su vida.',apply:s=>healParty(s,.3)},
+    {label:'Seguir adelante',detail:'Cada jugador recibe 8 de oro.',apply:s=>{for(const p of s.players)p.gold+=8;}}]},
+  altar:{title:'Altar de sangre',text:'Un altar antiguo exige un tributo. Las runas talladas laten al acercaros.',options:[
+    {label:'Ofrecer sangre',detail:'Todos pierden un 25 % de su vida actual y reciben un objeto raro o mejor.',apply:(s,rng)=>{hurtParty(s,.25);giveAll(s,()=>rollItem(s,rng,{bonus:.6,gear:true}));}},
+    {label:'Rezar',detail:'+1 PA en el próximo combate, pero los enemigos tendrán un 15 % más de vida.',apply:s=>{addMod(s,'ap',1);s.pending.enemyHp=(s.pending.enemyHp||1)*1.15;}},
+    {label:'Marcharse',detail:'No ocurre nada.',apply:()=>{}}]},
+  chest:{title:'Cofre encadenado',text:'Un cofre cubierto de cadenas. Algo dentro tintinea… y algo en la oscuridad os observa.',options:[
+    {label:'Forzar el cofre',detail:'Cada uno recibe un objeto épico, pero los enemigos del próximo combate tendrán un 25 % más de vida.',apply:(s,rng)=>{giveAll(s,()=>rollItem(s,rng,{bonus:1.2,gear:true}));s.pending.enemyHp=(s.pending.enemyHp||1)*1.25;}},
+    {label:'Buscar la llave',detail:'Cada uno recibe 15 de oro.',apply:s=>{for(const p of s.players)p.gold+=15;}}]},
+  camp:{title:'Campamento abandonado',text:'Restos de una hoguera todavía tibia. Alguien estuvo aquí hace poco.',needsHeroes:true,options:[
+    {label:'Descansar',detail:'Todo el grupo recupera un 50 % de su vida.',apply:s=>healParty(s,.5)},
+    {label:'Entrenar',detail:'+1 PA y +1 PM en el próximo combate, pero empezáis con el 80 % de la vida.',apply:s=>{addMod(s,'ap',1);addMod(s,'mp',1);s.pending.startHpPct=Math.min(s.pending.startHpPct||1,.8);}}]},
+  peddler:{title:'Buhonero errante',text:'Un mercader encapuchado arrastra un carro lleno de baratijas brillantes.',options:[
+    {label:'Comprar runas',detail:'Cada uno paga hasta 10 de oro y recibe una runa.',apply:(s,rng)=>{for(const p of s.players){p.gold=Math.max(0,p.gold-10);let rune;do rune=rollItem(s,rng);while(rune.kind!=='rune');p.bag.push(rune);}}},
+    {label:'Pedir consejo',detail:'+1 PM en el próximo combate.',apply:s=>addMod(s,'mp',1)},
+    {label:'Robarle',detail:'Cada uno recibe 25 de oro, pero empezáis el próximo combate con el 75 % de la vida.',apply:s=>{for(const p of s.players)p.gold+=25;s.pending.startHpPct=Math.min(s.pending.startHpPct||1,.75);}}]},
+  library:{title:'Biblioteca olvidada',text:'Estanterías podridas guardan tomos de técnicas perdidas.',options:[
+    {label:'Estudiar',detail:'Cada jugador mejora al azar una habilidad que ya conoce (máximo 3/3).',apply:(s,rng)=>{
+      for(const p of s.players){
+        const options=trainingChoices(p).filter(choice=>choice.rank>0);
+        if(!options.length)continue;
+        const choice=pick(options,rng);
+        p.skillRanks[choice.index]++;
+        const hero=s.units.find(u=>u.id===p.id);
+        if(hero)hero.skillRanks=[...p.skillRanks];
+        note(s,p.name+' mejora '+choice.name+' a '+(choice.rank+1)+'/3.');
+      }}},
+    {label:'Saquear',detail:'Cada uno recibe 12 de oro.',apply:s=>{for(const p of s.players)p.gold+=12;}}]}
+};
+function startEvent(s,rng){
+  const hasHeroes=heroesOf(s).length>0;
+  const pool=Object.keys(events).filter(id=>!s.route.seen.includes(id)&&(hasHeroes||!events[id].needsHeroes));
+  const id=pick(pool.length?pool:Object.keys(events).filter(id=>hasHeroes||!events[id].needsHeroes),rng);
+  s.route.seen.push(id);
+  s.floor++;
+  for(const p of s.players)p.level=s.floor;
+  const event=events[id];
+  s.phase='event';
+  s.event={id,title:event.title,text:event.text,options:event.options.map(({label,detail})=>({label,detail}))};
+  s.vote={kind:'event',options:event.options.map((_,i)=>i),votes:{}};
+  s.turnStarted=Date.now();
+  s.deadline=s.turnStarted+voteTime;
+  note(s,'Piso '+s.floor+' · Evento: '+event.title+'.');
+}
 export function trainingChoices(player){
   return player.skillRanks.flatMap((rank,index)=>rank<3?[{index,rank,name:classes[player.classId].skills[index][0]}]:[]);
 }
@@ -481,10 +707,12 @@ export function tick(s,rng=Math.random) {
       const choice=trainingChoices(p).find(choice=>choice.rank>0)||trainingChoices(p)[0];
       if(choice)p.skillRanks[choice.index]++;
     }
-    openFloor(s,rng);return true;
+    openRoute(s,rng);return true;
   }
+  if(s.phase==='map'||s.phase==='event'){resolveVote(s,rng);return true;}
   if(s.phase!=='combat')return false;
   const unit=s.units[s.turn];
+  if(!alive(unit)){advance(s,rng);return true;}
   if(unit.enemy){
     const heroes=s.units.filter(u=>!u.enemy&&alive(u));
     if(!s.enemyPlan){
@@ -569,7 +797,7 @@ function gearAction(s,p,a,rng) {
     if(s.players[0].id!==p.id)fail('Solo el anfitrión puede continuar.');
     if(s.picks.length!==s.players.length)fail('Falta elegir botín.');
     if(s.training&&s.players.some(p=>!p.trained))fail('Falta elegir habilidades.');
-    openFloor(s,rng);
+    openRoute(s,rng);
   }else{
     if(!item)fail('Objeto no encontrado.');
     if(a.type==='equip'&&item.kind==='gear'){
@@ -592,7 +820,16 @@ export function act(s,id,a,rng=Math.random) {
   const player=s.players.find(p=>p.id===id);
   if(!player)fail('Jugador desconocido.');
   const host=s.players[0].id===id;
-  if(a.type==='start'&&s.phase==='lobby'&&host){openFloor(s,rng);return;}
+  if(a.type==='start'&&s.phase==='lobby'&&host){
+    s.route=makeRoute(rng);
+    openRoute(s,rng);
+    return;
+  }
+  if(s.phase==='map'||s.phase==='event'){
+    if(a.type!=='vote')fail('Ahora toca votar.');
+    castVote(s,player,a.option,rng);
+    return;
+  }
   if(a.type==='restart'&&['won','lost'].includes(s.phase)&&host){
     Object.assign(s,create(),{players:s.players.map(p=>({...p,equipment:{},bag:[],gold:0,level:1,xp:0,skillRanks:skillRanks(p.classId),trained:true})),seq:s.seq});
     return;
@@ -657,7 +894,7 @@ export function act(s,id,a,rng=Math.random) {
     }
     if(alive(target)&&kind==='push'){
       const to=target.pos+(target.pos-unit.pos);
-      if(adjacent(s,target.pos).includes(to)&&!s.walls.includes(to)&&!s.units.some(u=>alive(u)&&u.pos===to))move(s,target,[to],false);
+      if(adjacent(s,target.pos).includes(to)&&!s.walls.includes(to)&&!s.water?.includes(to)&&!s.units.some(u=>alive(u)&&u.pos===to))move(s,target,[to],false);
     }
   }
   finish(s,rng);

@@ -1,8 +1,8 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement} from './engine.js?v=13';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=13';
-import {setupSfx} from './music.js?v=13';
-import {icon} from './icons.js?v=13';
+  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement,nodeKinds,modText,trapInfo} from './engine.js?v=14';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=14';
+import {setupSfx} from './music.js?v=14';
+import {icon} from './icons.js?v=14';
 
 const el=id=>document.getElementById(id);
 let state,session,selected=null,busy=false,polling=false,generation=0,revision=0,rendered='';
@@ -47,7 +47,7 @@ let useIso=localStorage.getItem('cripta-view')!=='2d';
 const battlefield=el('battlefield');
 const worldMount=el('iso-world');
 function syncViewport(){
-  const shown=!!(iso&&useIso&&state?.units.length&&!el('game').hidden);
+  const shown=!!(iso&&useIso&&state?.units.length&&!el('game').hidden&&!['map','event'].includes(state?.phase));
   iso?.show(shown);
   battlefield.classList.toggle('isometric',shown);
   const toggle=el('view-toggle');
@@ -86,7 +86,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=13').then(({createIso})=>{
+import('./isometric.js?v=14').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -226,13 +226,20 @@ function glyphNodes(glyph){
   return [h('div','tip-glyph glyph-'+glyph.kind,icon('glyph'),h('div',null,h('strong',null,info.name),h('p',null,info.description),
     h('small',null,glyph.warn?'Se activa en el próximo turno del jefe.':'Activo')))];
 }
+function terrainNodes(pos){
+  const trap=state.traps?.find(t=>t.pos===pos);
+  if(trap)return [h('div','tip-glyph terrain-'+trap.kind,icon(trap.kind),h('div',null,h('strong',null,trapInfo[trap.kind].name),h('p',null,trapInfo[trap.kind].description(state.floor)),h('small',null,'Afecta a héroes y monstruos')))];
+  if(state.water?.includes(pos))return [h('div','tip-glyph terrain-water',icon('water'),h('div',null,h('strong',null,'Agua'),h('p',null,'No se puede cruzar, pero no bloquea la línea de visión.')))];
+  return [];
+}
 function inspectCell(unit,cell,pos,glyph,source,skill,aim){
   const anchor=iso?.active?iso.anchor(pos):cell.getBoundingClientRect();
   if(!unit){
-    if(glyph)showTip(glyphNodes(glyph),anchor,'tip-compact');
+    const nodes=[...(glyph?glyphNodes(glyph):[]),...terrainNodes(pos)];
+    if(nodes.length)showTip(nodes,anchor,'tip-compact');
     return;
   }
-  const nodes=[tipHead(portrait(unit.look||unit.classId),unit.name,unit.enemy?(unit.look==='boss'?'Jefe':unit.look==='elite'?'Élite':'Enemigo'):classes[unit.classId].name+(unit.level?' · nivel '+unit.level:''),null),hpBar(unit)];
+  const nodes=[tipHead(portrait(unit.look||unit.classId),unit.name,unit.enemy?(unit.boss?'Jefe':unit.elite?'Élite':'Enemigo'):classes[unit.classId].name+(unit.level?' · nivel '+unit.level:''),null),hpBar(unit)];
   if(unit.enemy&&skill){
     const preview=damagePreview(source,unit,skill);
     if(preview&&aim){
@@ -258,6 +265,7 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
   const chips=effectChips(unit);
   if(chips)nodes.push(chips);
   if(glyph)nodes.push(...glyphNodes(glyph));
+  nodes.push(...terrainNodes(pos));
   showTip(nodes,anchor,unit.enemy?'tip-foe':'tip-ally');
 }
 window.addEventListener('scroll',hideUnit,{passive:true});
@@ -657,6 +665,101 @@ function updateGameOver(){
   sfx('blast');
   gameoverDialog.showModal();
 }
+const nodeIcons={combat:'sword',elite:'elite',event:'question',boss:'crown'};
+/** Retratos pequeños de quienes votaron una opción. */
+function voters(option){
+  const votes=state.vote?.votes||{};
+  const list=state.players.filter(p=>votes[p.id]===option);
+  return h('span','voters',...list.map(p=>{
+    const v=h('span','voter'+(p.id===session.id?' me':''),portrait(p.classId));
+    v.title=p.name;
+    return v;
+  }));
+}
+function voteStatus(){
+  const votes=Object.keys(state.vote?.votes||{}).length;
+  const status=h('div','vote-status',icon('users'),h('span',null,'Votos: '+votes+' / '+state.players.length),
+    state.players.length>1?h('small',null,'Empate: decide el anfitrión · sin votos: primera opción'):null);
+  const pending=modText(state.pending);
+  if(pending)status.append(h('span','pending-mods',icon('info'),'Próximo combate: '+pending));
+  return status;
+}
+/** Árbol de pisos: nodos por piso de izquierda a derecha, con conexiones y votos. */
+function renderMap(box){
+  const rows=state.route.rows;
+  const options=state.vote?.options||[];
+  const path=state.route.path;
+  const myVote=state.vote?.votes?.[session.id];
+  const width=1000,height=360,padX=70,padY=46;
+  const at=node=>({x:padX+(node.floor-1)*(width-2*padX)/5,y:padY+node.x*(height-2*padY)});
+  const svgNS='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(svgNS,'svg');
+  svg.setAttribute('viewBox','0 0 '+width+' '+height);
+  svg.setAttribute('class','map-lines');
+  svg.setAttribute('preserveAspectRatio','none');
+  const current=path.at(-1);
+  for(const row of rows)for(const node of row)for(const id of node.next){
+    const other=rows.flat().find(n=>n.id===id);
+    const a=at(node),b=at(other);
+    const line=document.createElementNS(svgNS,'line');
+    line.setAttribute('x1',a.x);line.setAttribute('y1',a.y);line.setAttribute('x2',b.x);line.setAttribute('y2',b.y);
+    const walked=path.includes(node.id)&&path.includes(id);
+    const open=(node.id===current||(!current&&false))&&options.includes(id);
+    line.setAttribute('class',walked?'walked':open?'open':'');
+    svg.append(line);
+  }
+  const map=h('div','route-map',svg);
+  for(let f=1;f<=6;f++){
+    const label=h('span','floor-label'+(f===state.floor+1&&state.phase==='map'?' next':''),'Piso '+f);
+    label.style.left=(at({floor:f,x:0}).x/width*100)+'%';
+    map.append(label);
+  }
+  for(const node of rows.flat()){
+    const option=options.indexOf(node.id);
+    const visited=path.includes(node.id);
+    const b=h('button','route-node kind-'+node.kind+(visited?' visited':'')+(node.id===current?' current':'')+(option>=0?' available':'')+(option>=0&&myVote===option?' voted':''),icon(nodeIcons[node.kind]));
+    b.type='button';
+    const p=at(node);
+    b.style.left=(p.x/width*100)+'%';
+    b.style.top=(p.y/height*100)+'%';
+    b.disabled=option<0||state.phase!=='map';
+    b.setAttribute('aria-label','Piso '+node.floor+' · '+nodeKinds[node.kind].name+(option>=0?' · votar':''));
+    if(option>=0){b.onclick=()=>send({type:'vote',option});b.append(voters(option));}
+    b.onpointerenter=b.onfocus=()=>{
+      const r=b.getBoundingClientRect();
+      showTip([tipHead(h('span','tip-node kind-'+node.kind,icon(nodeIcons[node.kind])),nodeKinds[node.kind].name,'Piso '+node.floor,null),
+        h('p','tip-note',nodeKinds[node.kind].description),option>=0?h('p','tip-note strong','Haz clic para votar este camino.'):null].filter(Boolean),
+        {left:r.left,top:r.top,bottom:r.bottom},'tip-skill');
+    };
+    b.onpointerleave=b.onblur=hideUnit;
+    map.append(b);
+  }
+  const legend=h('div','map-legend',...Object.entries(nodeKinds).map(([kind,info])=>h('span','legend-item kind-'+kind,icon(nodeIcons[kind]),info.name)));
+  box.replaceChildren(h('div','journey-head',h('h3',null,icon('crown'),'Elige el camino'),h('p',null,'Cada jugador vota la siguiente sala. Tenéis 15 segundos.')),map,legend,voteStatus());
+}
+function renderEvent(box){
+  const myVote=state.vote?.votes?.[session.id];
+  const options=state.event.options.map((option,i)=>{
+    const b=h('button','event-option'+(myVote===i?' voted':''),h('span','event-label',option.label),h('span','event-detail',option.detail),voters(i));
+    b.type='button';
+    b.onclick=()=>send({type:'vote',option:i});
+    return b;
+  });
+  box.replaceChildren(h('div','event-card',
+    h('div','event-art',icon('question')),
+    h('p','event-kicker','Evento · piso '+state.floor),
+    h('h3',null,state.event.title),
+    h('p','event-text',state.event.text),
+    h('div','event-options',...options),
+    voteStatus()));
+}
+function renderJourney(){
+  const box=el('journey');
+  const show=['map','event'].includes(state?.phase);
+  box.hidden=!show;
+  if(!show)return;
+  if(state.phase==='map')renderMap(box);else renderEvent(box);
+}
 function pawnName(name){
   const tag=document.createElement('span');
   tag.className='pawn-name';
@@ -839,6 +942,8 @@ function drawBoard(turn,walking,skill){
     const voidCell=!onBoard(state,pos);
     const wall=state.walls.includes(pos);
     const glyph=state.glyphs.find(g=>g.cells.includes(pos));
+    const water=state.water?.includes(pos);
+    const trap=state.traps?.find(t=>t.pos===pos);
     const castRange=skill&&inRange(state,turn,pos,skill);
     const blocked=skill&&hasRange(state,turn,pos,skill)&&!castRange;
     const blast=skill?.[5]==='blast';
@@ -850,9 +955,9 @@ function drawBoard(turn,walking,skill){
     });
     const shadesIndex=((Math.imul(pos+1,2654435761)^state.mapSeed)>>>6)%shades.length;
     cell.style.setProperty('--tile',shades[shadesIndex]);
-    cell.className=['cell',voidCell&&'void',wall&&'wall',path&&'walk',blocked&&'no-sight',castRange&&'cast-range',aim&&'aim',glyph&&'glyph-'+glyph.kind,glyph?.warn&&'warn'].filter(Boolean).join(' ');
+    cell.className=['cell',voidCell&&'void',wall&&'wall',water&&'water',trap&&'trap trap-'+trap.kind,path&&'walk',blocked&&'no-sight',castRange&&'cast-range',aim&&'aim',glyph&&'glyph-'+glyph.kind,glyph?.warn&&'warn'].filter(Boolean).join(' ');
     if(voidCell){cell.disabled=true;cell.setAttribute('aria-hidden','true');}
-    cell.setAttribute('aria-label',(unit?.name||(wall?'Muro':'Casilla'))+' '+(pos%state.width+1)+', '+(Math.floor(pos/state.width)+1));
+    cell.setAttribute('aria-label',(unit?.name||(wall?'Muro':water?'Agua':trap?trapInfo[trap.kind].name:'Casilla'))+' '+(pos%state.width+1)+', '+(Math.floor(pos/state.width)+1));
     if(path){
       cell.onpointerenter=cell.onfocus=()=>{
         paintPath(path,turn.pos);
@@ -868,7 +973,7 @@ function drawBoard(turn,walking,skill){
     }
     if(unit){
       const pawn=document.createElement('span');
-      pawn.className=['pawn',unit.enemy&&'foe',turn===unit&&'active',hidePawn(unit.id)&&'in-motion'].filter(Boolean).join(' ');
+      pawn.className=['pawn','look-'+(unit.look||unit.classId),unit.enemy&&'foe',turn===unit&&'active',hidePawn(unit.id)&&'in-motion'].filter(Boolean).join(' ');
       pawn.dataset.unit=unit.id;
       cell.title=unitLabel(unit);
       const hp=document.createElement('span');
@@ -878,7 +983,7 @@ function drawBoard(turn,walking,skill){
       pawn.append(portrait(unit.look||unit.classId),hp,pawnName(unit.name));
       cell.append(pawn);
     }
-    if(unit||glyph){
+    if(unit||glyph||water||trap){
       const inspect=()=>inspectCell(unit,cell,pos,glyph,turn,skill,aim);
       cell.addEventListener('pointerenter',inspect);
       cell.addEventListener('pointerleave',hideUnit);
@@ -903,10 +1008,11 @@ function render(){
   const mine=state.phase==='combat'&&turn?.id===session.id;
   const host=state.players[0]?.id===session.id;
   const rewardReady=lootReady();
-  const title={lobby:'Sala de expedición',combat:'Piso '+state.floor+' · '+state.layoutName+' · '+turn?.name+(mine?' (tú)':''),reward:rewardReady?'Botín y mercader':'Victoria',won:'Expedición completada',lost:'El grupo ha caído'}[state.phase];
+  const title={map:'Piso '+(state.floor+1)+' · Elige el camino',event:'Evento · '+(state.event?.title||''),lobby:'Sala de expedición',combat:'Piso '+state.floor+' · '+state.layoutName+' · '+turn?.name+(mine?' (tú)':''),reward:rewardReady?'Botín y mercader':'Victoria',won:'Expedición completada',lost:'El grupo ha caído'}[state.phase];
   el('phase').textContent=title;
   updateGameOver();
-  el('turn-bar').hidden=state.phase!=='combat'&&!rewardReady;
+  const journey=['map','event'].includes(state.phase);
+  el('turn-bar').hidden=state.phase!=='combat'&&!rewardReady&&!journey;
   el('turn-bar').classList.toggle('timer-only',state.phase!=='combat');
   if(!el('turn-bar').hidden)paintClock();
   const signature=JSON.stringify([state,selected,rewardReady]);
@@ -974,6 +1080,11 @@ function render(){
     controls.append(hint);
   }
   drawBoard(turn,walking,skill);
+  renderJourney();
+  if(journey){el('battlefield').hidden=true;iso?.show(false);}
+  const mods=modText(state.phase==='combat'?state.mods:{});
+  el('mods').hidden=!mods;
+  el('mods').replaceChildren(icon('info'),mods);
   const player=state.players.find(p=>p.id===session.id);
   renderInventory(player);
   updateTraining(player,rewardReady);
@@ -1103,7 +1214,7 @@ async function refresh(){
 try{session=JSON.parse(sessionStorage.getItem('amber-session'));}catch{session=null;}
 refresh();
 setInterval(()=>{
-  if(state&&!session.code&&['combat','reward'].includes(state.phase)&&Date.now()>=state.deadline){
+  if(state&&!session.code&&['combat','reward','map','event'].includes(state.phase)&&Date.now()>=state.deadline){
     const next=structuredClone(state);
     if(tick(next))setState(next);
   }

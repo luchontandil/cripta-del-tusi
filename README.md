@@ -16,9 +16,9 @@ Entra en http://localhost:3000. Para probar el cooperativo, abre una segunda ven
 
 Los turnos tienen 60 segundos. Las casillas azules se pueden alcanzar. Pasa el puntero para ver la ruta y haz clic para moverte. Selecciona un hechizo para ver su alcance en morado y sus objetivos válidos con borde dorado. La Bola de fuego del Mago permite elegir una casilla y previsualizar su área en naranja. Usa F1 para terminar el turno y las teclas 1 a 4 para seleccionar hechizos. Pasa el puntero sobre una unidad para ver su ficha. El botón SFX controla los sonidos de botones y hechizos. Las casillas rojas indican que hay alcance pero falta línea de visión. Todos los jugadores reciben la misma secuencia de pasos. Los hechizos largos comprueban línea de visión y la vulnerabilidad aumenta el daño de cualquier atacante.
 
-Los jefes de los pisos 3 y 6 anuncian glifos de brasas, veneno y cadenas. Al activarse pueden dañar, envenenar o restar PM a los héroes que entren o comiencen el turno encima.
+Los jefes de los pisos 3 y 6 anuncian un glifo en cruz por vez. El Oráculo alterna brasas y veneno. El Rey alterna cadenas y veneno. Al activarse pueden dañar, envenenar o restar PM a los héroes que entren o comiencen el turno encima.
 
-Entre pisos se elige el botín sobre el tablero. Las tarjetas comparan cada pieza con la equipada y permiten equiparla directamente o guardarla. Hay nueve ranuras de equipo, con iconos propios para cada ranura y las runas. Arrastra objetos de la mochila a una ranura compatible y devuélvelos a la mochila para desequiparlos. El botón Mercader abre la tienda. Cada nuevo piso otorga 4 PV máximos y cada dos niveles suben la potencia y la curación. El equipo combina bases, rarezas y atributos aleatorios. Las runas se guardan en la mochila y pueden venderse, engarzarse en una pieza o extraerse para reutilizarlas.
+Entre pisos se elige el botín sobre el tablero. Las tarjetas comparan cada pieza con la equipada y permiten equiparla directamente o guardarla. Hay nueve ranuras de equipo, con iconos propios para cada ranura y las runas. Arrastra objetos de la mochila a una ranura compatible y devuélvelos a la mochila para desequiparlos. El botón Mercader abre la tienda. Cada nuevo piso da un nivel y 4 PV máximos. Tras la victoria, cada jugador elige una habilidad antes de continuar. El equipo aporta daño elemental, crítico, vida, armadura, alcance, PA o PM según la ranura. El equipo combina bases, rarezas y atributos aleatorios. Las runas se guardan en la mochila y pueden venderse, engarzarse en una pieza o extraerse para reutilizarlas.
 
 ## Publicar en GitHub Pages
 
@@ -47,3 +47,13 @@ Ejecuta `npm test` para comprobar el motor y la sincronización de dos clientes.
 
 
 
+
+
+## Despliegue del multijugador
+
+- Usa un único Web Service Node.js 20+ en Render. Si ya tienes el servicio, sube esta revisión a la rama que usa y selecciona Manual Deploy → Deploy latest commit. Para uno nuevo, conecta el repositorio con el servicio web, selecciona main y deja Root Directory vacío.
+- Build Command: npm test. Start Command: npm start. Health Check Path: /.
+- No se requieren variables obligatorias ni claves de API. Render inyecta PORT. En un servidor propio, PORT es opcional y el valor local por defecto es 3000.
+- Abre la URL HTTPS que muestra Render. El mismo servicio entrega la web y la API. El anfitrión crea una sala y comparte el código.
+- Si entras desde GitHub Pages, abre Jugar con amigos e introduce la misma URL HTTPS de Render en Dirección del servidor. Publica el cliente y el servidor de la misma revisión.
+- Las salas viven en memoria. Un reinicio o un nuevo despliegue corta las partidas en curso.

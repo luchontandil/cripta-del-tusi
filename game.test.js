@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots} from './engine.js';
+import {create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -58,19 +58,23 @@ test('la vulnerabilidad se aplica a otro atacante y el clérigo cura a un aliado
   act(s,'p1',{type:'skill',skill:1,pos:30},rng);
   assert.equal(archer.hp,24);
 });
-test('los jefes anuncian tres tipos de glifo y cadenas resta PM a quien empieza encima',()=>{
+test('el jefe anuncia una sola cruz y las cadenas restan PM al comenzar encima',()=>{
   const s=battle('tirador');
-  s.floor=2;
+  s.floor=5;
   s.phase='reward';
   s.picks=['p0'];
   act(s,'p0',{type:'next'},rng);
   const boss=s.units[s.turn];
   assert.equal(boss.boss,true);
   timeout(s);
-  assert.deepEqual(new Set(s.glyphs.map(g=>g.kind)),new Set(['damage','poison','slow']));
-  assert.ok(s.glyphs.every(g=>g.warn));
+  assert.equal(s.glyphs.length,1);
+  const glyph=s.glyphs[0];
+  assert.equal(glyph.kind,'slow');
+  assert.ok(glyph.warn);
+  const center=glyph.cells[0];
+  assert.deepEqual(new Set(glyph.cells),new Set([center,center-s.width,center+s.width,center-1,center+1]));
   const hero=s.units.find(u=>u.id==='p0');
-  hero.pos=s.glyphs.find(g=>g.kind==='slow').cells[0];
+  hero.pos=center;
   for(let i=0;i<16&&s.glyphs.some(g=>g.warn);i++)timeout(s);
   while(s.units[s.turn]===boss&&s.enemyPlan)timeout(s);
   assert.equal(s.glyphs.every(g=>!g.warn),true);
@@ -107,12 +111,57 @@ test('genera botín con afijos y permite equipar, engarzar, extraer y vender una
   const gold=p.gold;
   act(s,'p0',{type:'sell',item:rune.id},rng);
   assert.equal(p.gold,gold+5);
+  assert.throws(()=>act(s,'p0',{type:'next'},rng),/habilidades/);
+  const newSpell=trainingChoices(p).find(option=>option.rank===0);
+  act(s,'p0',{type:'train',skill:newSpell.index},rng);
+  assert.throws(()=>act(s,'p0',{type:'train',skill:0},rng),/pendiente/);
   act(s,'p0',{type:'next'},rng);
   assert.equal(s.floor,2);
   assert.equal(p.level,2);
   const raised=s.units.find(u=>u.id==='p0');
   assert.ok(raised.max>=hero.max+4);
-  assert.ok(raised.stats.power>=1);
+  assert.ok(raised.stats.physical>=1);
+  assert.ok(skillFor(raised,newSpell.index));
+});
+test('la vista previa aplica el crítico ×1,5 y solo resta armadura al daño físico',()=>{
+  const s=battle('guardia');
+  const hero=s.units[0], foe=s.units[1];
+  hero.stats.physical=2;
+  foe.stats.ward=3;
+  assert.deepEqual(damagePreview(hero,foe,classes.guardia.skills[0]),{element:'physical',normal:[6,9],critical:[10,15],chance:.12});
+  hero.stats.fire=2;
+  assert.deepEqual(damagePreview(hero,foe,classes.guardia.skills.at(-1)).normal,[10,14]);
+});
+test('la IA avanza hacia el rival aunque un aliado cierre el único paso',()=>{
+  const s=battle('tirador');
+  const hero=s.units[0], foe=s.units[1];
+  hero.pos=7;
+  foe.pos=1;
+  s.height=1;
+  s.walls=[];
+  s.units.push({...foe,id:'ally',pos:5});
+  s.mp=3;
+  assert.deepEqual(planEnemy(s,foe,[hero]),[2,3,4]);
+});
+test('el generador solo ofrece PM en botas y PA en amuletos y armas elegibles',()=>{
+  const seen=new Set();
+  for(let seed=1;seed<=120;seed++){
+    let value=seed*Math.imul(seed,2654435761);
+    const rand=()=>{value=(Math.imul(value,1664525)+1013904223)>>>0;return value/4294967296;};
+    const s=battle('guardia');
+    const hero=s.units[0], foe=s.units[1];
+    foe.pos=hero.pos-1;
+    foe.hp=1;
+    act(s,'p0',{type:'skill',skill:0,pos:foe.pos},rand);
+    for(const item of [...s.offers.p0,...s.stock]){
+      if(item.stats.movement){assert.equal(item.slot,'boots');seen.add('PM');}
+      if(item.stats.action){
+        assert.ok(item.slot==='amulet'||(item.slot==='weapon'&&['Cetro de ónice','Lanza de vigía'].includes(item.name)));
+        seen.add('PA');
+      }
+    }
+  }
+  assert.equal(seen.size,2);
 });
 test('la IA rodea un muro y publica el trayecto antes de atacar',()=>{
   const s=battle('tirador');

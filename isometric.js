@@ -396,7 +396,7 @@ export function createIso(mount,onCell){
       if(walk){
         if(walk.first)walk.first=false;
         else walk.elapsed+=delta;
-        const t=walk.elapsed/(reduced?145:225);
+        const t=walk.elapsed/(id.startsWith('enemy')?135:reduced?145:225);
         const i=Math.min(walk.points.length-2,Math.floor(t));
         const a=walk.points[i],b=walk.points[i+1];
         model.root.position.lerpVectors(a,b,ease(clamp(t-i,0,1)));
@@ -454,6 +454,6 @@ export function createIso(mount,onCell){
     magnification=clamp(magnification+delta,.85,1.45);
     fit();
   }
-  return {show,sync,anchor,highlight,move,impact,zoom,get active(){return active;}};
+  return {show,sync,anchor,highlight,move,impact,zoom,resetHover(){hover=null;},get active(){return active;}};
 }
 

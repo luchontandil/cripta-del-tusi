@@ -1,4 +1,5 @@
-import {classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard} from './engine.js?v=9';
+import {classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
+  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements} from './engine.js?v=10';
 import {portrait,spellIcon,equipmentIcon} from './art.js?v=8';
 import {setupSfx} from './music.js?v=8';
 
@@ -6,7 +7,7 @@ const el=id=>document.getElementById(id);
 let state,session,selected=null,busy=false,polling=false,generation=0,revision=0,rendered='';
 let pending=[],playing=null,lastSeq=0,animationEpoch=0;
 let holdLoot=false,lastDamageUntil=0;
-const hitDuration=2000;
+const hitDuration=1000;
 function lootReady(){
   return state?.phase==='reward'&&(!holdLoot||(!playing&&!pending.length&&performance.now()>=lastDamageUntil));
 }
@@ -60,7 +61,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=9').then(({createIso})=>{
+import('./isometric.js?v=10').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -107,14 +108,41 @@ function unitLabel(u){
 function hideUnit(){
   el('unit-tooltip').hidden=true;
 }
-function inspectUnit(unit,cell){
+function resourceText(element,text){
+  element.replaceChildren(...text.split(/(\b(?:PA|PM)\b)/g).map(word=>{
+    if(word!=='PA'&&word!=='PM')return document.createTextNode(word);
+    const badge=document.createElement('b');
+    badge.className=word==='PA'?'stat-pa':'stat-mp';
+    badge.textContent=word;
+    return badge;
+  }));
+}
+function showTooltip(title,rows,anchor){
   const tooltip=el('unit-tooltip');
   const heading=document.createElement('strong');
-  heading.textContent=unit.name+' · '+(unit.enemy?'Enemigo':classes[unit.classId].name);
+  heading.textContent=title;
+  tooltip.replaceChildren(heading,...rows.map(text=>{
+    const row=document.createElement('div');
+    resourceText(row,text);
+    return row;
+  }));
+  tooltip.hidden=false;
+  const left=Math.max(6,Math.min(anchor.left,window.innerWidth-tooltip.offsetWidth-6));
+  const above=anchor.top-tooltip.offsetHeight-7;
+  tooltip.style.left=left+'px';
+  tooltip.style.top=(above>=6?above:Math.max(6,Math.min(anchor.bottom+7,window.innerHeight-tooltip.offsetHeight-6)))+'px';
+}
+function inspectCell(unit,cell,pos,glyph,source,skill,aim){
+  const anchor=iso?.active?iso.anchor(pos):cell.getBoundingClientRect();
+  const glyphLines=glyph?[glyphInfo[glyph.kind].name,glyphInfo[glyph.kind].description,glyph.warn?'Se activa en el próximo turno del jefe.':'Activo.']:null;
+  if(!unit){
+    if(glyphLines)showTooltip(glyphLines[0],glyphLines.slice(1),anchor);
+    return;
+  }
   const effects=Object.entries(unit.effects||{}).map(([key,status])=>iconName[key]+' '+status.value+' · '+status.turns+' turno'+(status.turns===1?'':'s'));
   const rows=[
-    'Vida: '+unit.hp+'/'+unit.max+' PV',
-    'Protección: '+(unit.stats?.ward||0)+' de reducción por golpe',
+    '♥ Vida: '+unit.hp+'/'+unit.max+' PV',
+    '⛨ Armadura: '+(unit.stats?.ward||0)+' de reducción física',
     'Iniciativa: '+unit.initiative,
     'Movimiento base: '+(3+(unit.stats?.movement||0))+' PM'
   ];
@@ -122,17 +150,14 @@ function inspectUnit(unit,cell){
   if(unit.enemy)rows.push('Ataque: '+unit.damage+'–'+(unit.damage+2),'Alcance: '+unit.range+' casillas');
   else rows.push(...Object.entries(unit.stats||{}).filter(([key,value])=>value&&!['ward','movement','vitality'].includes(key)).map(([key,value])=>statNames[key]+': +'+value));
   rows.push(effects.length?'Efectos: '+effects.join(' / '):'Sin efectos activos');
-  tooltip.replaceChildren(heading,...rows.map(text=>{
-    const row=document.createElement('div');
-    row.textContent=text;
-    return row;
-  }));
-  tooltip.hidden=false;
-  const anchor=iso?.active?iso.anchor(unit.pos):cell.getBoundingClientRect();
-  const left=Math.max(6,Math.min(anchor.left,window.innerWidth-tooltip.offsetWidth-6));
-  const above=anchor.top-tooltip.offsetHeight-7;
-  tooltip.style.left=left+'px';
-  tooltip.style.top=(above>=6?above:Math.min(anchor.bottom+7,window.innerHeight-tooltip.offsetHeight-6))+'px';
+  if(unit.enemy&&skill){
+    const preview=damagePreview(source,unit,skill);
+    if(preview&&aim)rows.unshift('⚔ '+elements[preview.element]+' · '+preview.normal.join('–')+' daño',
+      '✦ Crítico ('+Math.round(preview.chance*100)+' %): '+preview.critical.join('–'));
+    else if(preview)rows.unshift('Fuera de alcance o sin visión.');
+  }
+  if(glyphLines)rows.push(...glyphLines);
+  showTooltip(unit.name+' · '+(unit.enemy?'Enemigo':classes[unit.classId].name),rows,anchor);
 }
 window.addEventListener('scroll',hideUnit,{passive:true});
 function initiative(turn){
@@ -154,7 +179,9 @@ function panel(title){
   box.append(h);
   return box;
 }
-const describe=stats=>Object.entries(stats).map(([key,value])=>'+'+value+' '+statNames[key]).join(' · ');
+const statIcons={physical:'⚔',fire:'♨',ice:'❄',arcane:'✦',shadow:'◐',vitality:'♥',reach:'◎',ward:'⛨',critical:'✸',movement:'➝',action:'◆'};
+const statText=(key,value)=>statIcons[key]+' +'+value+(key==='critical'?' %':'')+' '+statNames[key];
+const describe=stats=>Object.entries(stats).map(([key,value])=>statText(key,value)).join(' · ');
 function itemRow(item,title,actions=[]){
   const row=document.createElement('div');
   row.className='item';
@@ -168,7 +195,7 @@ function itemRow(item,title,actions=[]){
   row.append(heading);
   if(item){
     const desc=document.createElement('small');
-    desc.textContent=[item.rarity,describe(item.stats),item.socket?'⚒ '+item.socket.name+' · '+describe(item.socket.stats):''].filter(Boolean).join(' · ');
+    resourceText(desc,[item.rarity,describe(item.stats),item.socket?'⚒ '+item.socket.name+' · '+describe(item.socket.stats):''].filter(Boolean).join(' · '));
     row.append(desc);
   }
   row.append(...actions);
@@ -188,7 +215,7 @@ function comparison(item,player){
     if(!change)continue;
     const stat=document.createElement('span');
     stat.className=change>0?'gain':'loss';
-    stat.textContent=(change>0?'+':'−')+Math.abs(change)+' '+label;
+    resourceText(stat,statIcons[key]+' '+(change>0?'+':'−')+Math.abs(change)+(key==='critical'?' %':'')+' '+label);
     delta.append(stat);
   }
   if(!delta.children.length)delta.textContent='Mismos atributos';
@@ -208,7 +235,7 @@ function lootCard(item,player){
   const stats=document.createElement('ul');
   for(const [key,value] of Object.entries(item.stats)){
     const li=document.createElement('li');
-    li.textContent='+'+value+' '+statNames[key];
+    resourceText(li,statText(key,value));
     stats.append(li);
   }
   card.append(visual,title,type,stats);
@@ -288,6 +315,20 @@ function inventorySlot(item,label,actions=[],fallback=''){
   }
   face.title=item?.name||label||'Ranura vacía';
   if(item)face.setAttribute('aria-label',(label?label+' · ':'')+item.name);
+  if(item&&label){
+    const inspect=()=>showTooltip(item.name,[item.rarity||'',...Object.entries(item.stats).map(([key,value])=>statText(key,value)),
+      ...(item.socket?['Engarzada: '+item.socket.name,describe(item.socket.stats)]:[])].filter(Boolean),face.getBoundingClientRect());
+    face.addEventListener('pointerenter',inspect);
+    face.addEventListener('pointerleave',hideUnit);
+    face.addEventListener('focus',inspect);
+    face.addEventListener('blur',hideUnit);
+    if(item.socket){
+      const rune=equipmentIcon('rune');
+      rune.classList.add('socket-icon');
+      rune.title=item.socket.name;
+      face.append(rune);
+    }
+  }
   tile.append(face);
   if(item)tile.append(itemRow(item,'',actions));
   return tile;
@@ -301,7 +342,14 @@ function renderInventory(player){
   const choosing=trading&&!state.picks.includes(player.id);
   rewards.hidden=!choosing&&!(trading&&shopShown);
   if(state.phase==='lobby'){holder.replaceChildren();rewards.replaceChildren();return;}
-  const gear=panel('Nivel '+player.level+' · '+player.gold+' oro');
+  const gear=panel('Nivel '+player.level);
+  const xp=document.createElement('progress');
+  xp.max=100;
+  xp.value=player.xp||0;
+  xp.setAttribute('aria-label','Experiencia');
+  const xpLabel=document.createElement('small');
+  xpLabel.textContent=(player.xp||0)+' / 100 XP';
+  gear.append(xp,xpLabel);
   const gearGrid=document.createElement('div');
   gearGrid.className='equipment-grid';
   for(const [slot,label] of Object.entries(slots)){
@@ -337,6 +385,10 @@ function renderInventory(player){
   for(let index=player.bag.length;index<visibleSlots;index++)bagGrid.append(inventorySlot(null,''));
   if(trading)dropZone(bagGrid,p=>p.from==='gear',p=>send({type:'unequip',slot:p.slot}));
   bag.append(bagGrid);
+  const gold=document.createElement('div');
+  gold.className='bag-gold';
+  gold.textContent='◈ '+player.gold+' oro';
+  bag.append(gold);
   holder.replaceChildren(gear,bag);
   if(rewards.hidden){rewards.replaceChildren();return;}
   const shop=panel('Mercader');
@@ -363,6 +415,20 @@ function renderInventory(player){
     renderInventory(player);
   }));
   rewards.replaceChildren(...(choosing?[loot]:[]),...(shopShown?[shop]:[]));
+}
+const trainingDialog=el('training');
+trainingDialog.addEventListener('cancel',event=>event.preventDefault());
+function updateTraining(player,ready){
+  if(!ready||!state.training||player.trained){
+    if(trainingDialog.open)trainingDialog.close();
+    return;
+  }
+  if(trainingDialog.open)return;
+  el('training-title').textContent='Nivel '+(player.level+1)+' · Habilidad';
+  el('training-choices').replaceChildren(...trainingChoices(player).map(({index,rank,name})=>
+    actionButton((rank?'Mejorar a '+(rank+1)+'/3 · ':'Aprender · ')+name,'train',{skill:index})));
+  hideUnit();
+  trainingDialog.showModal();
 }
 function pawnName(name){
   const tag=document.createElement('span');
@@ -460,7 +526,7 @@ async function animate(){
     let from=boardPoint(event.from);
     for(const square of event.path){
       const to=boardPoint(square);
-      const motion=pawn.animate([from,to],{duration:220,easing:'ease-in-out',fill:'forwards'});
+      const motion=pawn.animate([from,to],{duration:event.unit.startsWith('enemy')?140:220,easing:'ease-in-out',fill:'forwards'});
       await motion.finished.catch(()=>{});
       if(epoch!==animationEpoch)break;
       Object.assign(pawn.style,to);
@@ -532,6 +598,7 @@ function drawBoard(turn,walking,skill){
   const board=el('board');
   const field=el('battlefield');
   hideUnit();
+  iso?.resetHover();
   field.hidden=!state.units.length;
   board.replaceChildren();
   syncViewport();
@@ -562,7 +629,7 @@ function drawBoard(turn,walking,skill){
     if(path){
       cell.onpointerenter=cell.onfocus=()=>{
         paintPath(path,turn.pos);
-        el('path-status').textContent=path.length+' PM · Clic para moverte';
+        resourceText(el('path-status'),path.length+' PM · Clic para moverte');
       };
       cell.onpointerleave=cell.onblur=()=>{
         paintPath();
@@ -583,9 +650,12 @@ function drawBoard(turn,walking,skill){
       hp.append(document.createElement('i'));
       pawn.append(portrait(unit.look||unit.classId),hp,pawnName(unit.name));
       cell.append(pawn);
-      cell.addEventListener('pointerenter',()=>inspectUnit(unit,cell));
+    }
+    if(unit||glyph){
+      const inspect=()=>inspectCell(unit,cell,pos,glyph,turn,skill,aim);
+      cell.addEventListener('pointerenter',inspect);
       cell.addEventListener('pointerleave',hideUnit);
-      cell.addEventListener('focus',()=>inspectUnit(unit,cell));
+      cell.addEventListener('focus',inspect);
       cell.addEventListener('blur',hideUnit);
     }
     if(glyph)cell.title=[cell.title,{damage:'Brasas',poison:'Veneno',slow:'Cadenas'}[glyph.kind],glyph.warn?'Se activa en el próximo turno del jefe':'Glifo activo'].filter(Boolean).join(' · ');
@@ -601,7 +671,7 @@ function render(){
   el('entry').hidden=!!state;
   el('game').hidden=!state;
   document.body.classList.toggle('in-expedition',!!state);
-  if(!state)return;
+  if(!state){if(trainingDialog.open)trainingDialog.close();return;}
   const turn=state.units[state.turn];
   const mine=state.phase==='combat'&&turn?.id===session.id;
   const host=state.players[0]?.id===session.id;
@@ -619,7 +689,7 @@ function render(){
   el('turns').replaceChildren(...initiative(turn));
   el('log').replaceChildren(...state.log.map(entry=>{
     const li=document.createElement('li');
-    li.textContent=entry;
+    resourceText(li,entry);
     return li;
   }));
   const controls=el('controls');
@@ -630,15 +700,19 @@ function render(){
   if(state.phase==='lobby'&&host)controls.append(actionButton('Iniciar expedición','start'));
   if(rewardReady&&host){
     const next=actionButton('Siguiente piso','next');
-    next.disabled=state.picks.length!==state.players.length;
+    next.disabled=state.picks.length!==state.players.length||(state.training&&state.players.some(p=>!p.trained));
+    next.className='primary next-floor';
     controls.append(next);
   }
   if(['won','lost'].includes(state.phase)&&host)controls.append(actionButton('Volver a la sala','restart'));
   const walking=mine&&selected===null?paths(state,turn,state.mp):new Map();
-  const skill=mine&&selected!==null?classes[turn.classId].skills[selected]:null;
+  const skill=mine&&selected!==null?skillFor(turn,selected):null;
   if(mine){
     controls.append(btn('Mover',()=>{selected=null;render();},selected===null));
-    classes[turn.classId].skills.forEach(([name,cost,range,min,max,kind,symbol,minRange=0],i)=>{
+    classes[turn.classId].skills.forEach((_,i)=>{
+      const current=skillFor(turn,i);
+      if(!current)return;
+      const [name,cost,range,min,max,kind,symbol,minRange=0]=current;
       const b=btn(name,()=>selectSpell(i),selected===i);
       b.className='ability';
       b.prepend(spellIcon(kind,symbol));
@@ -647,7 +721,11 @@ function render(){
       shortcut.setAttribute('aria-hidden','true');
       b.append(shortcut);
       b.setAttribute('aria-keyshortcuts',String(i+1));
-      b.title=cost+' PA · alcance '+minRange+'–'+(range+(range>1?turn.stats.reach:0))+(kind==='dash'?' · movimiento sin gastar PM':' · '+min+'–'+max+' '+(['heal','cleanse'].includes(kind)?'cura':'daño base'));
+      b.title='Nivel '+turn.skillRanks[i]+' · '+cost+' PA · alcance '+minRange+'–'+(range+(modifiableRange(current)?turn.stats.reach:0))+(kind==='dash'?' · movimiento sin gastar PM':' · '+min+'–'+max+' '+(['heal','cleanse'].includes(kind)?'cura':'daño base'));
+      const costLabel=document.createElement('span');
+      costLabel.className='stat-pa ability-cost';
+      costLabel.textContent=cost+' PA';
+      b.append(costLabel);
       b.disabled=cost>state.ap;
       controls.append(b);
     });
@@ -657,7 +735,9 @@ function render(){
     controls.append(hint);
   }
   drawBoard(turn,walking,skill);
-  renderInventory(state.players.find(p=>p.id===session.id));
+  const player=state.players.find(p=>p.id===session.id);
+  renderInventory(player);
+  updateTraining(player,rewardReady);
 }
 function endTurn(){
   if(state?.phase==='combat'&&state.units[state.turn]?.id===session?.id)send({type:'end'});
@@ -665,7 +745,7 @@ function endTurn(){
 function selectSpell(index){
   const unit=state?.units[state.turn];
   if(state?.phase!=='combat'||unit?.id!==session?.id)return;
-  const skill=classes[unit.classId].skills[index];
+  const skill=skillFor(unit,index);
   if(!skill||skill[1]>state.ap)return;
   selected=selected===index?null:index;
   render();
@@ -693,6 +773,9 @@ async function request(base,path,body,key){
   });
   const result=await response.json().catch(()=>({error:'El servidor todavía no responde.'}));
   if(!response.ok||result.error)throw Object.assign(new Error(result.error),{status:response.status});
+  if(!result.state?.players?.every(player=>Array.isArray(player.skillRanks))){
+    throw new Error('La versión del servidor no coincide con la del juego.');
+  }
   return result;
 }
 async function send(action){

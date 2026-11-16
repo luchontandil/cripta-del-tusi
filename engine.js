@@ -27,8 +27,40 @@ export const classes = {
     ['Paso de sombra',2,3,0,0,'dash','↢',1]
   ]}
 };
+const unlocks={
+  guardia:['Golpe de brasas',2,2,8,12,'damage','✹'],
+  tirador:['Flecha ígnea',2,6,7,10,'damage','✹',2],
+  mistico:['Alba radiante',3,5,12,16,'heal','✚'],
+  mago:['Rayo umbrío',2,6,8,12,'damage','✦'],
+  sombra:['Corte glacial',2,2,6,10,'slow','❄']
+};
+const initialSkills=Object.fromEntries(Object.entries(classes).map(([id,cls])=>[id,cls.skills.map(()=>1)]));
+for(const [id,skill] of Object.entries(unlocks))classes[id].skills.push(skill);
+const skillRanks=id=>[...initialSkills[id],0];
+export function skillFor(unit,index,preview=false){
+  const base=classes[unit.classId]?.skills[index];
+  const rank=unit.skillRanks?.[index]??initialSkills[unit.classId]?.[index]??0;
+  if(!base||(!rank&&!preview))return null;
+  const skill=[...base];
+  if(rank>1){
+    if(skill[5]==='dash')skill[2]+=rank-1;
+    else {skill[3]+=(rank-1)*2;skill[4]+=(rank-1)*2;}
+  }
+  return skill;
+}
+export const elements={physical:'Físico',fire:'Fuego',ice:'Hielo',arcane:'Arcano',shadow:'Sombra'};
+const damageKeys=Object.keys(elements);
+export function skillElement(unit,skill){
+  if(skill[5]==='blast'||skill[6]==='✹')return 'fire';
+  if(skill[0]==='Escarcha'||skill[0]==='Corte glacial')return 'ice';
+  if(unit.classId==='sombra'||skill[0]==='Rayo umbrío')return 'shadow';
+  if(unit.classId==='mago'||unit.classId==='mistico')return 'arcane';
+  return 'physical';
+}
+export const modifiableRange=skill=>skill[2]>1&&skill[5]!=='dash';
 export const slots = {weapon:'Arma',helmet:'Casco',armor:'Armadura',gloves:'Guantes',belt:'Cinturón',boots:'Botas',ring:'Anillo',amulet:'Amuleto',charm:'Talismán'};
-export const statNames = {power:'Potencia', vitality:'Vitalidad', healing:'Curación', reach:'Alcance', ward:'Protección', critical:'Crítico', movement:'PM'};
+export const statNames = {...Object.fromEntries(Object.entries(elements).map(([key,name])=>[key,'Daño '+name.toLowerCase()])),
+  vitality:'Vida',reach:'Alcance',ward:'Armadura',critical:'Crítico',movement:'PM',action:'PA'};
 const rarities = ['Común','Poco común','Raro','Épico'];
 const bases = {
   weapon:['Arco de tejo','Sable de cobre','Cetro de ónice','Lanza de vigía'],
@@ -42,12 +74,13 @@ const bases = {
   charm:['Ojo de la cripta','Diente de vigía','Llave de los ecos']
 };
 const pools = {
-  weapon:['power','reach','critical'],helmet:['vitality','ward','critical'],armor:['vitality','ward','healing'],
-  gloves:['power','critical','healing'],belt:['vitality','ward','power'],boots:['movement','vitality','ward'],
-  ring:['critical','reach','power'],amulet:['vitality','healing','reach'],charm:['healing','critical','power','reach']
+  weapon:['element','reach','critical'],helmet:['vitality','ward','critical'],armor:['vitality','ward','element'],
+  gloves:['element','critical','reach'],belt:['vitality','ward','element'],boots:['movement','vitality','ward'],
+  ring:['critical','reach','element'],amulet:['vitality','action','reach'],charm:['element','critical','reach']
 };
+const actionWeapons=new Set(['Cetro de ónice','Lanza de vigía']);
 const inscriptions = [
-  ['Brasa','power',2], ['Brote','healing',3], ['Brújula','reach',1],
+  ['Brasa','fire',2],['Escarcha','ice',2],['Acero','physical',2],['Éter','arcane',2],['Umbría','shadow',2],['Brújula','reach',1],
   ['Muralla','ward',1], ['Centella','critical',8], ['Pulso','vitality',5]
 ];
 const pick = (values,rng) => values[Math.floor(rng()*values.length)];
@@ -66,32 +99,38 @@ function rollItem(s,rng) {
     return {id:itemId,name:'Runa de '+name,kind:'rune',price:7+2*s.floor,stats:{[key]:value}};
   }
   const slot=pick(Object.keys(slots),rng);
+  const name=pick(bases[slot],rng);
   const luck=rng()+s.floor*.055;
   const rarity=luck>1.08?3:luck>.83?2:luck>.53?1:0;
   const choices=[...pools[slot]];
+  if(slot==='weapon'&&actionWeapons.has(name)&&rarity>=2)choices.push('action');
   const stats={};
   for (let i=0;i<Math.min(choices.length,1+rarity);i++) {
     const key=choices.splice(roll(0,choices.length-1,rng),1)[0];
-    stats[key]={
-      power:roll(1,2+rarity,rng), vitality:roll(3,5+rarity*3,rng),
-      healing:roll(1,3+rarity,rng), reach:1, ward:rarity>=2?2:1,
-      critical:roll(4,7+3*rarity,rng), movement:1
-    }[key];
+    if(key==='element')stats[pick(damageKeys,rng)]=roll(1,2+rarity,rng);
+    else if(key==='vitality')stats[key]=roll(3,5+rarity*3,rng);
+    else if(key==='critical')stats[key]=roll(4,7+3*rarity,rng);
+    else stats[key]=key==='ward'&&rarity>=2?2:1;
   }
-  return {id:itemId,name:pick(bases[slot],rng),kind:'gear',slot,rarity:rarities[rarity],grade:rarity,stats,price:6+rarity*7+s.floor,socket:null};
+  return {id:itemId,name,kind:'gear',slot,rarity:rarities[rarity],grade:rarity,stats,price:6+rarity*7+s.floor,socket:null};
 }
 function sumStats(equipment) {
   const totals=Object.fromEntries(Object.keys(statNames).map(key=>[key,0]));
   for (const gear of Object.values(equipment)) {
     for (const stats of [gear.stats,gear.socket?.stats||{}]) {
-      for (const [key,value] of Object.entries(stats)) totals[key]+=value;
+      for (const [key,value] of Object.entries(stats)){
+        if(!Object.hasOwn(totals,key))continue;
+        if(key==='movement'&&gear.slot!=='boots')continue;
+        if(key==='action'&&gear.slot!=='amulet'&&!(gear.slot==='weapon'&&actionWeapons.has(gear.name)))continue;
+        totals[key]+=value;
+      }
     }
   }
   return totals;
 }
 export function create() {
   return {phase:'lobby', floor:0, rounds:0, width:12,height:8,players:[],units:[],walls:[],voids:[],glyphs:[],
-    log:[],events:[],seq:0,itemId:0,turn:0,deadline:0,turnStarted:0,picks:[],offers:{},stock:[]};
+    log:[],events:[],seq:0,itemId:0,turn:0,deadline:0,turnStarted:0,picks:[],offers:{},stock:[],training:false};
 }
 const alive = unit => unit.hp>0;
 const fail = message => {throw new Error(message);};
@@ -103,7 +142,7 @@ function emit(s,event) {
 export function join(s,id,name,classId) {
   if(s.phase!=='lobby'||s.players.length>=4) fail('La sala no admite más jugadores.');
   if(!Object.hasOwn(classes,classId)) fail('Elige una clase válida.');
-  s.players.push({id,name:String(name||'Aventurero').trim().slice(0,22)||'Aventurero',classId,bag:[],equipment:{},gold:0,level:1});
+  s.players.push({id,name:String(name||'Aventurero').trim().slice(0,22)||'Aventurero',classId,bag:[],equipment:{},gold:0,level:1,xp:0,skillRanks:skillRanks(classId),trained:true});
 }
 export function encounter(floor,size) {
   const count=Math.min(7,size+Math.floor(floor/2));
@@ -113,7 +152,7 @@ export function encounter(floor,size) {
     const elite=!boss&&!ranged&&floor>=4;
     return {id:'enemy'+i,name:boss?(floor===3?'Oráculo de Ceniza':'Rey del Umbral'):ranged?'Vigía':elite?'Custodio':'Acechador',
       look:boss?'boss':ranged?'ranged':elite?'elite':'enemy',boss,enemy:true,initiative:boss?16:ranged?11:6,
-      range:boss?4:ranged?5:1,hp:boss?30+floor*3+6*(size-1):9+2*floor,damage:2+Math.floor(floor/2)+(boss?2:0),effects:{}};
+      range:boss?4:ranged?8:1,hp:boss?30+floor*3+6*(size-1):9+2*floor,damage:2+Math.floor(floor/2)+(boss?2:0),stats:{ward:boss?2:elite?1:0},effects:{}};
   });
 }
 export const distance = (s,a,b) => Math.abs(a%s.width-b%s.width)+Math.abs(Math.floor(a/s.width)-Math.floor(b/s.width));
@@ -183,6 +222,7 @@ function makeLayout(s,rng){
 }
 function openFloor(s,rng) {
   s.phase='combat';
+  s.training=false;
   s.floor++;
   s.rounds=1;
   s.mapSeed=randomSeed(rng);
@@ -213,11 +253,12 @@ function openFloor(s,rng) {
     const previous=s.units.find(u=>u.id===p.id);
     const level=s.floor;
     p.level=level;
+    p.xp=0;
+    p.trained=true;
     const stats=sumStats(p.equipment);
-    stats.power+=Math.floor(level/2);
-    stats.healing+=Math.floor(level/2);
+    for(const key of damageKeys)stats[key]+=Math.floor(level/2);
     const max=classes[p.classId].hp+stats.vitality+(level-1)*4;
-    return {id:p.id,name:p.name,classId:p.classId,level,initiative:classes[p.classId].initiative,stats,max,
+    return {id:p.id,name:p.name,classId:p.classId,level,skillRanks:[...p.skillRanks],initiative:classes[p.classId].initiative,stats,max,
       hp:previous?Math.min(max,Math.max(previous.hp,0)+Math.ceil(max*.45)):max,
       pos:heroPositions[i],effects:{}};
   });
@@ -266,9 +307,21 @@ export function paths(s,unit,limit) {
   return routes;
 }
 export const reachable=(s,unit,limit)=>new Map([...paths(s,unit,limit)].map(([pos,path])=>[pos,path.length]));
-function hit(s,actor,target,raw,kind='damage',critical=false) {
+function netDamage(target,raw,element,critical,extra=0){
+  return Math.max(0,Math.floor((raw+extra)*(critical?1.5:1))-(element==='physical'?(target.stats?.ward||0):0));
+}
+export const critChance=unit=>Math.min(1,.12+(unit.stats?.critical||0)/100);
+export function damagePreview(unit,target,skill){
+  if(['heal','cleanse','dash'].includes(skill[5]))return null;
+  const element=skillElement(unit,skill);
+  const bonus=unit.stats?.[element]||0;
+  const extra=target.effects?.expose?.value||0;
+  const range=critical=>[skill[3],skill[4]].map(base=>netDamage(target,base+bonus,element,critical,extra));
+  return {normal:range(false),critical:range(true),chance:critChance(unit),element};
+}
+function hit(s,actor,target,raw,kind='damage',critical=false,element='physical') {
   const extra=kind==='damage'?(target.effects.expose?.value||0):0;
-  const damage=Math.min(target.hp,Math.max(1,raw+extra-(target.stats?.ward||0)));
+  const damage=Math.min(target.hp,netDamage(target,raw,element,critical,extra));
   target.hp-=damage;
   emit(s,{kind,unit:target.id,pos:target.pos,from:actor.pos,amount:damage,critical});
   note(s,actor.name+' → '+target.name+' · −'+damage+' PV'+(extra?' (+'+extra+' vulnerabilidad)':'')+(critical?' · crítico':''));
@@ -281,7 +334,7 @@ function applyGlyphs(s,unit,oldPos) {
   if(unit.enemy)return;
   for(const g of s.glyphs) {
     if(g.warn||!alive(unit)||!g.cells.includes(unit.pos)||g.cells.includes(oldPos))continue;
-    if(g.kind==='damage')hit(s,{name:'Glifo de brasas',pos:unit.pos},unit,8,'glyph');
+    if(g.kind==='damage')hit(s,{name:'Glifo de brasas',pos:unit.pos},unit,8,'glyph',false,'fire');
     if(g.kind==='poison') {
       effect(unit,'poison',3,2);
       note(s,unit.name+' queda envenenado.');
@@ -309,11 +362,11 @@ function move(s,unit,path,voluntary=true) {
 function beginTurn(s) {
   const u=s.units[s.turn];
   s.enemyPlan=null;
-  s.ap=4;
+  s.ap=4+(u.stats?.action||0);
   s.mp=Math.max(0,3+(u.stats?.movement||0)-(u.effects.slow?.value||0));
   s.turnStarted=Date.now();
-  s.deadline=s.turnStarted+(u.enemy?950:60000);
-  if(u.effects.poison)hit(s,{name:'Veneno',pos:u.pos},u,u.effects.poison.value,'poison');
+  s.deadline=s.turnStarted+(u.enemy?350:60000);
+  if(u.effects.poison)hit(s,{name:'Veneno',pos:u.pos},u,u.effects.poison.value,'poison',false,'shadow');
   applyGlyphs(s,u,-1);
 }
 function endEffects(unit) {
@@ -332,13 +385,16 @@ function finish(s,rng) {
   s.turnStarted=Date.now();
   s.deadline=s.turnStarted+62500;
   if(s.phase==='reward'){
+    s.training=true;
     for(const p of s.players){
+      p.xp=100;
+      p.trained=false;
       p.gold+=10+s.floor*4;
       s.offers[p.id]=Array.from({length:3},()=>rollItem(s,rng));
     }
     s.stock=Array.from({length:4},()=>rollItem(s,rng));
     note(s,'Victoria · Elige botín y prepara tu equipo.');
-  }
+  }else for(const p of s.players)p.xp=100;
   return true;
 }
 function advance(s,rng) {
@@ -352,32 +408,30 @@ function advance(s,rng) {
     if(alive(s.units[s.turn]))return;
   }
 }
-function castGlyph(s,boss,heroes,rng) {
-  s.glyphs=s.glyphs.filter(g=>g.owner!==boss.id||--g.remaining>0);
-  if(s.glyphs.some(g=>g.owner===boss.id&&g.warn)){
-    s.glyphs.forEach(g=>{if(g.owner===boss.id)g.warn=false;});
-    note(s,boss.name+' activa sus glifos. Sal de las zonas marcadas.');
+export const glyphInfo={
+  damage:{name:'Glifo de brasas',description:'Inflige 8 de daño de fuego al entrar o empezar el turno.'},
+  poison:{name:'Glifo de veneno',description:'Aplica veneno de 3 PV por turno durante 2 turnos.'},
+  slow:{name:'Glifo de cadenas',description:'Resta 2 PM al entrar o empezar el turno.'}
+};
+function castGlyph(s,boss,heroes) {
+  const existing=s.glyphs.find(g=>g.owner===boss.id);
+  if(existing?.warn){
+    existing.warn=false;
+    note(s,boss.name+' activa '+glyphInfo[existing.kind].name.toLowerCase()+'.');
     return;
   }
-  if(s.glyphs.some(g=>g.owner===boss.id))return;
+  s.glyphs=s.glyphs.filter(g=>g.owner!==boss.id);
   const target=heroes.reduce((a,b)=>distance(s,boss.pos,a.pos)<=distance(s,boss.pos,b.pos)?a:b);
-  const options=[target.pos];
-  for(let i=0;i<options.length&&options.length<5;i++){
-    for(const pos of adjacent(s,options[i])){
-      if(!s.walls.includes(pos)&&!options.includes(pos))options.push(pos);
-    }
-  }
-  const kinds=['damage','poison','slow'];
-  const first=(boss.glyphCycle||0)%kinds.length;
+  const centers=Array.from({length:s.width*s.height},(_,i)=>i)
+    .filter(pos=>onBoard(s,pos)&&!s.walls.includes(pos)&&adjacent(s,pos).filter(n=>!s.walls.includes(n)).length===4)
+    .sort((a,b)=>distance(s,a,target.pos)-distance(s,b,target.pos));
+  const center=centers[0];
+  if(center===undefined)return;
+  const kinds=boss.name==='Oráculo de Ceniza'?['damage','poison']:['slow','poison'];
+  const kind=kinds[(boss.glyphCycle||0)%kinds.length];
   boss.glyphCycle=(boss.glyphCycle||0)+1;
-  for(let i=0;i<Math.min(options.length,3);i++){
-    const center=options.splice(i===0?0:roll(0,options.length-1,rng),1)[0];
-    const other=adjacent(s,center).find(pos=>pos!==target.pos&&!options.includes(pos)&&!s.walls.includes(pos)&&!s.glyphs.some(g=>g.cells.includes(pos)));
-    const cells=[center];
-    if(other!==undefined)cells.push(other);
-    s.glyphs.push({owner:boss.id,kind:kinds[(first+i)%kinds.length],cells,warn:true,remaining:3});
-  }
-  note(s,boss.name+' anuncia glifos de brasas, veneno y cadenas.');
+  s.glyphs.push({owner:boss.id,kind,cells:[center,...adjacent(s,center)],warn:true});
+  note(s,boss.name+' anuncia '+glyphInfo[kind].name.toLowerCase()+'.');
 }
 function attackOptions(s,unit,heroes,pos){
   return heroes.filter(h=>distance(s,pos,h.pos)<=unit.range&&lineOfSight(s,pos,h.pos,unit.id))
@@ -391,29 +445,42 @@ export function planEnemy(s,unit,heroes){
     if(!target)continue;
     const nearest=Math.min(...heroes.map(h=>distance(s,pos,h.pos)));
     const lethal=target.hp<=unit.damage?5:0;
-    const rangedSafety=unit.range>1?Math.min(nearest,unit.range)*2:0;
+    const rangedSafety=unit.range>1?Math.min(nearest,unit.range)*2.7:0;
     const score=lethal+rangedSafety-target.hp*.13-path.length*.54;
     firing.push({path,score});
   }
   const local=firing.filter(option=>option.path.length<=s.mp).sort((a,b)=>b.score-a.score);
   if(local.length)return local[0].path;
   const approach=firing.sort((a,b)=>a.path.length-b.path.length||b.score-a.score)[0];
-  return approach?.path.slice(0,s.mp)||[];
+  if(approach)return approach.path.slice(0,s.mp);
+  const nearest=pos=>Math.min(...heroes.map(hero=>distance(s,pos,hero.pos)));
+  const available=[...routes].filter(([pos,path])=>path.length<=s.mp&&nearest(pos)<nearest(unit.pos));
+  available.sort(([a,pa],[b,pb])=>nearest(a)-nearest(b)||pa.length-pb.length);
+  return available[0]?.[1]||[];
+}
+export function trainingChoices(player){
+  return player.skillRanks.flatMap((rank,index)=>rank<3?[{index,rank,name:classes[player.classId].skills[index][0]}]:[]);
 }
 export function tick(s,rng=Math.random) {
   if(Date.now()<s.deadline)return false;
-  if(s.phase==='reward'){openFloor(s,rng);return true;}
+  if(s.phase==='reward'){
+    for(const p of s.players.filter(p=>s.training&&!p.trained)){
+      const choice=trainingChoices(p).find(choice=>choice.rank>0)||trainingChoices(p)[0];
+      if(choice)p.skillRanks[choice.index]++;
+    }
+    openFloor(s,rng);return true;
+  }
   if(s.phase!=='combat')return false;
   const unit=s.units[s.turn];
   if(unit.enemy){
     const heroes=s.units.filter(u=>!u.enemy&&alive(u));
     if(!s.enemyPlan){
-      if(unit.boss)castGlyph(s,unit,heroes,rng);
+      if(unit.boss)castGlyph(s,unit,heroes);
       const route=planEnemy(s,unit,heroes);
       if(route.length){
         move(s,unit,route);
         s.enemyPlan=unit.id;
-        s.deadline=Date.now()+route.length*220+400;
+        s.deadline=Date.now()+route.length*150+120;
         return true;
       }
     }
@@ -435,14 +502,14 @@ export function hasRange(s,unit,pos,skill) {
   const [,cost,range,,,,,min=0]=skill;
   if(!onBoard(s,pos)||s.walls.includes(pos)||cost>s.ap)return false;
   const d=distance(s,unit.pos,pos);
-  return d>=min&&d<=range+(range>1?(unit.stats?.reach||0):0);
+  return d>=min&&d<=range+(modifiableRange(skill)?(unit.stats?.reach||0):0);
 }
 export function inRange(s,unit,pos,skill) {
   return hasRange(s,unit,pos,skill)&&lineOfSight(s,unit.pos,pos);
 }
 export function castableCell(s,unit,pos,skill){
   if(!inRange(s,unit,pos,skill))return false;
-  return skill[5]==='blast'||(skill[5]==='dash'&&!s.units.some(u=>alive(u)&&u.pos===pos)&&paths(s,unit,skill[2]+unit.stats.reach).has(pos));
+  return skill[5]==='blast'||(skill[5]==='dash'&&!s.units.some(u=>alive(u)&&u.pos===pos)&&paths(s,unit,skill[2]).has(pos));
 }
 export function spellArea(s,pos,skill) {
   return skill[5]==='blast'?[pos,...adjacent(s,pos)].filter(cell=>!s.walls.includes(cell)):[pos];
@@ -453,7 +520,13 @@ export function targetable(s,unit,target,skill) {
 function gearAction(s,p,a,rng) {
   const bagIndex=p.bag.findIndex(item=>item.id===a.item);
   const item=p.bag[bagIndex];
-  if(a.type==='reward'){
+  if(a.type==='train'){
+    if(!s.training||p.trained)fail('No tienes una mejora pendiente.');
+    const choice=trainingChoices(p).find(option=>option.index===a.skill);
+    if(!choice)fail('La habilidad ya está al máximo o no existe.');
+    p.skillRanks[choice.index]++;
+    p.trained=true;
+  }else if(a.type==='reward'){
     const choices=s.offers[p.id];
     if(s.picks.includes(p.id)||!choices)fail('Ya elegiste botín.');
     const loot=choices.find(choice=>choice.id===a.item);
@@ -482,6 +555,7 @@ function gearAction(s,p,a,rng) {
   }else if(a.type==='next'){
     if(s.players[0].id!==p.id)fail('Solo el anfitrión puede continuar.');
     if(s.picks.length!==s.players.length)fail('Falta elegir botín.');
+    if(s.training&&s.players.some(p=>!p.trained))fail('Falta elegir habilidades.');
     openFloor(s,rng);
   }else{
     if(!item)fail('Objeto no encontrado.');
@@ -507,7 +581,7 @@ export function act(s,id,a,rng=Math.random) {
   const host=s.players[0].id===id;
   if(a.type==='start'&&s.phase==='lobby'&&host){openFloor(s,rng);return;}
   if(a.type==='restart'&&['won','lost'].includes(s.phase)&&host){
-    Object.assign(s,create(),{players:s.players.map(p=>({...p,equipment:{},bag:[],gold:0,level:1})),seq:s.seq});
+    Object.assign(s,create(),{players:s.players.map(p=>({...p,equipment:{},bag:[],gold:0,level:1,xp:0,skillRanks:skillRanks(p.classId),trained:true})),seq:s.seq});
     return;
   }
   if(s.phase==='reward'){gearAction(s,player,a,rng);return;}
@@ -521,7 +595,7 @@ export function act(s,id,a,rng=Math.random) {
     if(!alive(unit))advance(s,rng);
     return;
   }
-  const skill=classes[unit.classId].skills[a.skill];
+  const skill=skillFor(unit,a.skill);
   if(a.type!=='skill'||!Number.isInteger(a.skill)||!skill)fail('Acción inválida.');
   const [name,cost,,min,max,kind]=skill;
   if(cost>s.ap)fail('No te quedan suficientes puntos de acción.');
@@ -530,7 +604,7 @@ export function act(s,id,a,rng=Math.random) {
     if(!castableCell(s,unit,a.pos,skill))fail('No hay una ruta libre a esa casilla.');
     s.ap-=cost;
     spellCue(s,unit,a.pos,kind);
-    move(s,unit,paths(s,unit,skill[2]+unit.stats.reach).get(a.pos),false);
+    move(s,unit,paths(s,unit,skill[2]).get(a.pos),false);
     if(!alive(unit))advance(s,rng);
     return;
   }
@@ -540,7 +614,8 @@ export function act(s,id,a,rng=Math.random) {
     const area=spellArea(s,a.pos,skill);
     spellCue(s,unit,a.pos,kind,area);
     for(const foe of s.units.filter(u=>u.enemy&&alive(u)&&area.includes(u.pos))){
-      hit(s,unit,foe,roll(min,max,rng)+unit.stats.power);
+      const element=skillElement(unit,skill);
+      hit(s,unit,foe,roll(min,max,rng)+unit.stats[element],'damage',rng()<critChance(unit),element);
     }
     finish(s,rng);
     return;
@@ -549,14 +624,15 @@ export function act(s,id,a,rng=Math.random) {
   s.ap-=cost;
   spellCue(s,unit,target.pos,kind);
   if(support(kind)){
-    const amount=Math.min(target.max-target.hp,roll(min,max,rng)+unit.stats.healing);
+    const amount=Math.min(target.max-target.hp,roll(min,max,rng)+Math.floor(unit.level/2));
     target.hp+=amount;
     if(kind==='cleanse')target.effects={};
     emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount});
     note(s,name+' → '+target.name+' · +'+amount+' PV'+(kind==='cleanse'?' · purificado':''));
   }else{
-    const critical=rng()<Math.min(.5,.12+unit.stats.critical/100);
-    hit(s,unit,target,roll(min,max,rng)+unit.stats.power+(critical?4:0),'damage',critical);
+    const critical=rng()<critChance(unit);
+    const element=skillElement(unit,skill);
+    hit(s,unit,target,roll(min,max,rng)+unit.stats[element],'damage',critical,element);
     if(alive(target)&&kind==='expose'){
       effect(target,'expose',3,2);
       note(s,target.name+' queda vulnerable: todos los atacantes infligen +3.');

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#171917">
   <title>Cripta del tusi</title>
-  <link rel="stylesheet" href="./style.css?v=9">
+  <link rel="stylesheet" href="./style.css?v=10">
 </head>
 <body><main>
   <header><div class="crest" aria-hidden="true">◆</div><h1>Cripta del tusi</h1></header>
@@ -43,16 +43,19 @@
           </div>
           <section id="rewards" aria-label="Botín y mercader" hidden></section>
         </div>
-        <div id="glyph-legend" hidden class="legend"><span>◆ Brasas · daño</span><span>◆ Veneno · daño por turno</span><span>◆ Cadenas · −2 PM</span></div>
+        <div id="glyph-legend" hidden class="legend"><span>◆ Brasas · daño</span><span>◆ Veneno · daño por turno</span><span>◆ Cadenas · <b class="stat-mp">−2 PM</b></span></div>
         <div id="controls" class="actionbar"></div>
         <div id="turn-bar" class="panel" hidden>
-          <div class="resources"><span class="points ap"><strong id="pa"></strong> PA</span><span class="points mp"><strong id="pm"></strong> PM</span></div>
+          <span class="points ap"><strong id="pa"></strong> PA</span>
           <div id="clock" role="progressbar" aria-label="Tiempo de turno" aria-valuemin="0"><span id="seconds"></span></div>
+          <span class="points mp"><strong id="pm"></strong> PM</span>
           <button id="end-turn" class="primary" aria-keyshortcuts="F1">Terminar turno <kbd>F1</kbd></button>
         </div>
       </section>
       <aside id="inventory" hidden></aside>
     </div>
   </section>
-</main><script type="module" src="./client.js?v=9"></script></body>
+</main>
+<dialog id="training" aria-labelledby="training-title"><h2 id="training-title"></h2><p>Aprende una habilidad o mejora una que ya conoces.</p><div id="training-choices"></div></dialog>
+<script type="module" src="./client.js?v=10"></script></body>
 </html>

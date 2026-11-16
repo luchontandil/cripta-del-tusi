@@ -1,8 +1,8 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement,nodeKinds,modText,trapInfo} from './engine.js?v=18';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=18';
-import {setupSfx} from './music.js?v=18';
-import {icon} from './icons.js?v=18';
+  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement,nodeKinds,modText,trapInfo} from './engine.js?v=19';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=19';
+import {setupSfx} from './music.js?v=19';
+import {icon} from './icons.js?v=19';
 
 const el=id=>document.getElementById(id);
 let state,session,selected=null,busy=false,polling=false,generation=0,revision=0,rendered='';
@@ -86,7 +86,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=18').then(({createIso})=>{
+import('./isometric.js?v=19').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();

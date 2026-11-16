@@ -1,5 +1,5 @@
 import * as T from './three.module.js';
-import {miniature,obstacle,piece,solid} from './models3d.js?v=18';
+import {miniature,obstacle,piece,solid} from './models3d.js?v=19';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -142,7 +142,7 @@ export function createIso(mount,onCell){
           vec3 c=texture2D(image,(p+.5)/resolution+o).rgb;
           glow+=max(c-.62,0.);
         }
-        gl_FragColor=vec4(base.rgb+glow*.16,base.a);
+        gl_FragColor=vec4(base.rgb+glow*.08,base.a);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
         // Gradación: sombras frías, luces cálidas, algo más de contraste.
@@ -151,12 +151,12 @@ export function createIso(mount,onCell){
         c=mix(c,c*vec3(.92,.95,1.12),1.-smoothstep(.0,.45,l));
         c=mix(c,c*vec3(1.07,1.0,.9),smoothstep(.5,1.,l));
         c=mix(vec3(l),c,1.12);
-        c=(c-.5)*1.06+.5;
+        c=(c-.5)*1.12+.5;
         // Viñeta.
         vec2 v=tex-.5;
         c*=1.-dot(v,v)*.42;
         float threshold=mod(p.x+p.y*2.,4.)/4.-.375;
-        gl_FragColor.rgb=clamp(floor(clamp(c,0.,1.)*31.+.5+threshold)/31.,0.,1.);
+        gl_FragColor.rgb=clamp(floor(clamp(c,0.,1.)*14.+.5+threshold)/14.,0.,1.);
       }`,
     transparent:true,depthTest:false
   });
@@ -192,7 +192,7 @@ export function createIso(mount,onCell){
       viewWidth=lastRect.width;
       viewHeight=lastRect.height;
       renderer.setSize(viewWidth,viewHeight,false);
-      const density=Math.min(1,.72*Math.max(1,Math.min(2,window.devicePixelRatio||1)));
+      const density=.5;
       pixels.setSize(Math.max(1,Math.round(viewWidth*density)),Math.max(1,Math.round(viewHeight*density)));
       pixelMaterial.uniforms.resolution.value.set(pixels.width,pixels.height);
     }

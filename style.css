@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Pirata+One&family=Rubik:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Jacquard+12&family=Pixelify+Sans:wght@400;500;600;700&family=Silkscreen&display=swap');
 
 /* ───────────── Tokens ───────────── */
 :root{
@@ -707,3 +707,144 @@ summary{cursor:pointer}
   .moving canvas,.impact,#clock.urgent,.tip{animation:none}
   .impact.damage-number{animation:none;translate:0 var(--float-offset,0px)}
 }
+
+/* ═════════════ Tema Loop Hero: pixel art oscuro, paleta corta, marcos con bisel duro ═════════════ */
+:root{
+  --font-title:'Jacquard 12','Pixelify Sans',monospace;
+  --font-display:'Pixelify Sans','Silkscreen',monospace;
+  --font-ui:'Pixelify Sans','Silkscreen',monospace;
+  --bg-0:#060507;--bg-1:#0c0a0d;--bg-2:#151114;--bg-3:#1e181b;--bg-4:#2a2124;
+  --line:#3a2f2c;--line-strong:#5c4a40;--line-gold:#8c6a2e;
+  --paper:#ece2cf;--muted:#a8998a;--faint:#6f6458;
+  --gold:#f0c45a;--gold-2:#c8922c;--gold-glow:#f0c45a40;
+  --frame:#4a3c34;--frame-hi:#7a6656;--frame-lo:#1a1412;
+  --radius:0;--radius-sm:0;
+  --bevel:inset 2px 2px 0 var(--frame-hi),inset -2px -2px 0 var(--frame-lo);
+  --drop:4px 4px 0 #000;
+}
+*,*::before,*::after{border-radius:0!important}
+#clock,#seconds,.turn-art,.voter,.class-card .class-art,.event-art,.gameover-skull{border-radius:50%!important}
+.route-node{border-radius:0!important}
+html{image-rendering:pixelated}
+body{
+  font-family:var(--font-ui);font-size:17px;letter-spacing:.02em;
+  -webkit-font-smoothing:none;-moz-osx-font-smoothing:unset;font-smooth:never;
+  background:#070608;
+  background-image:
+    radial-gradient(#ffffff09 1px,transparent 1px),
+    radial-gradient(ellipse at 50% -10%,#2a1b14 0,transparent 55%);
+  background-size:6px 6px,100% 100%;
+}
+body::before{display:none}
+h1,h2,h3,h4{font-family:var(--font-display);font-weight:700;text-shadow:2px 2px 0 #000;letter-spacing:.03em}
+.icon svg{shape-rendering:crispEdges;stroke-width:2}
+
+/* Marcos de panel: borde negro, bisel interior y sombra sólida. */
+.panel,.hud,.tip,#training,.gameover,.journey,.class-preview,.route-map,.loot-card,.item-ghost,
+#rewards .inventory-panel,.inventory-slot>.item,.training-compare{
+  background:var(--bg-2)!important;background-image:none!important;
+  border:2px solid #000!important;
+  box-shadow:var(--bevel),var(--drop)!important;
+  backdrop-filter:none!important;
+}
+.panel::after,#iso-world::after{display:none}
+.tip{background:#120e10!important}
+.journey{background:#0b090b!important}
+.route-map{background:#0f0c0e!important}
+
+/* Botones con bisel de píxel. */
+button{
+  font-family:var(--font-ui);font-weight:600;letter-spacing:.03em;
+  background:#2a221f;border:2px solid #000;color:var(--paper);
+  box-shadow:inset 2px 2px 0 #5c4c42,inset -2px -2px 0 #120d0b;
+  transition:none;
+}
+button:hover:not(:disabled){background:#3a2f2a;border-color:#000;box-shadow:inset 2px 2px 0 #7d6a5c,inset -2px -2px 0 #120d0b}
+button:active:not(:disabled){transform:translate(1px,1px);box-shadow:inset 2px 2px 0 #120d0b,inset -2px -2px 0 #5c4c42}
+button[aria-pressed=true]{border-color:#000;box-shadow:inset 2px 2px 0 #120d0b,inset -2px -2px 0 #5c4c42,0 0 0 2px var(--gold)}
+button.primary{
+  color:#1c1206;background:#d9a23a;border-color:#000;text-shadow:none;
+  box-shadow:inset 2px 2px 0 #ffe08a,inset -2px -2px 0 #7a4f12;
+}
+button.primary:hover:not(:disabled){background:#eab64a;box-shadow:inset 2px 2px 0 #fff0b0,inset -2px -2px 0 #7a4f12}
+button.ghost{background:#1a1517;box-shadow:inset 2px 2px 0 #3a302c,inset -2px -2px 0 #0a0708}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000;box-shadow:inset 2px 2px 0 #000,inset -2px -2px 0 #3a302c}
+.chip{background:#1a1517;border:2px solid #000;box-shadow:inset 1px 1px 0 #4a3c34}
+
+/* Cabecera y entrada. */
+.brand h1{font-family:var(--font-title);font-weight:400;font-size:clamp(3rem,8vw,5.6rem);letter-spacing:.02em;
+  background:none;-webkit-background-clip:initial;background-clip:initial;color:var(--gold);
+  text-shadow:3px 3px 0 #6a3d10,6px 6px 0 #000;filter:none}
+.crest{filter:none}
+.tagline{color:var(--muted);text-transform:uppercase;font-size:.8rem;letter-spacing:.12em}
+.class-card{background:#1a1517;box-shadow:inset 2px 2px 0 #3e332e,inset -2px -2px 0 #0a0708}
+.class-card[aria-checked=true]{background:#2c221d;box-shadow:inset 2px 2px 0 #7d6a5c,inset -2px -2px 0 #0a0708,0 0 0 2px var(--gold)}
+.class-card .class-art{background:#0a0809}
+.class-preview{background:#0f0c0e!important}
+.preview-head strong,.event-card h3,.gameover h2{font-family:var(--font-title);font-weight:400;letter-spacing:.02em;text-shadow:2px 2px 0 #000}
+.preview-head strong{font-size:2rem}.event-card h3{font-size:2.8rem}.gameover h2{font-size:3rem}
+.role-tag,.ability-cost,.ability kbd,.ability-rank,.tier,.tip-badge,.effect-chip,.legend span,.ready-chip,.shop-wallet{border-radius:0!important}
+
+/* Barra superior, orden de turno y registro. */
+#phase{font-size:clamp(1.1rem,2vw,1.5rem)}
+.initiative li{background:#120e10;border:2px solid #000;box-shadow:inset 1px 1px 0 #3a302c}
+.initiative li.current{background:#2a2014;border-color:#000;box-shadow:inset 0 0 0 2px var(--gold)}
+.initiative li.current::before{box-shadow:none}
+.turn-hp{height:5px;background:#000}
+.turn-hp i{background:#5fbf4a}.foe .turn-hp i{background:#c9402f}
+.combat-log li{border-left:2px solid #3a302c;font-size:.86rem}
+.combat-log li:last-child{border-left-color:var(--gold)}
+
+/* Tablero. */
+#iso-world,#board{border:2px solid #000;box-shadow:var(--bevel),var(--drop);background:#050405}
+#iso-world{background:#060507}
+.field-menu{background:#120e10;border:2px solid #000;box-shadow:var(--bevel),var(--drop);backdrop-filter:none}
+.field-menu button{box-shadow:none;border:2px solid transparent}
+.field-menu button:hover:not(:disabled){background:#2a221f;border-color:#000}
+.field-menu button[aria-pressed=true]{background:#2a2014;border-color:#000;box-shadow:inset 0 0 0 2px var(--gold-2)}
+.iso-label{background:#000;border:2px solid #000;box-shadow:inset 1px 1px 0 #4a3c34;font-family:var(--font-ui);font-size:.7rem;font-weight:600}
+.iso-label.active{box-shadow:inset 0 0 0 1px var(--gold)}
+.iso-label i{height:3px}
+.cell{border:1px solid #00000080}
+.pawn-name{background:#000;font-family:var(--font-ui);font-weight:600}
+.impact.damage-number{font-family:var(--font-ui);-webkit-text-stroke:0;text-shadow:2px 2px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000}
+
+/* HUD inferior. */
+.hud{background:#120e10!important}
+.ability{background:#1a1517;box-shadow:inset 2px 2px 0 #3e332e,inset -2px -2px 0 #0a0708}
+.ability[aria-pressed=true]{background:#2c221d;box-shadow:inset 2px 2px 0 #7d6a5c,inset -2px -2px 0 #0a0708,0 0 0 2px var(--gold)}
+.spell-icon{border:2px solid #000;box-shadow:inset 2px 2px 0 #ffffff40,inset -2px -2px 0 #00000080}
+.points{border:2px solid #000;box-shadow:inset 2px 2px 0 #ffffff22,inset -2px -2px 0 #00000080}
+#clock{box-shadow:0 0 0 2px #000,0 0 0 4px var(--frame-hi),0 0 0 6px #000}
+#clock.urgent{box-shadow:0 0 0 2px #000,0 0 0 4px #c9402f,0 0 0 6px #000}
+#seconds{background:#0a0809;font-family:var(--font-ui)}
+
+/* Inventario y objetos. */
+.inventory-slot{background:#0f0c0e;border:2px solid #000;box-shadow:inset 2px 2px 0 #000,inset -2px -2px 0 #2e2622}
+.inventory-slot.filled{background:#1a1416;box-shadow:inset 0 0 0 2px var(--rarity),inset 3px 3px 0 #000}
+.inventory-slot.filled:hover{transform:none;box-shadow:inset 0 0 0 2px var(--rarity),0 0 0 2px var(--rarity)}
+.bag-grid{background:#070608;border:2px solid #000}
+.inventory-panel progress::-webkit-progress-value{background:#9b6ad6}
+.loot-card::before{height:4px;box-shadow:none}
+.loot-card:hover{transform:translate(-2px,-2px);box-shadow:var(--bevel),6px 6px 0 #000!important}
+.loot-icon,.tip-item-art{background:#0a0809;border:2px solid var(--rarity);box-shadow:inset 2px 2px 0 #000}
+.item-socket{background:#1a1020;border:2px solid #000}
+
+/* Mapa, eventos, tienda. */
+.map-lines line{stroke:#4a3c34;stroke-width:3;stroke-dasharray:4 6}
+.map-lines line.walked{stroke:var(--gold-2);stroke-dasharray:none}
+.map-lines line.open{stroke:var(--gold);stroke-dasharray:none;animation:none}
+.route-node{background:#151114;border:2px solid #000;box-shadow:inset 2px 2px 0 #4a3c34,inset -2px -2px 0 #0a0708,3px 3px 0 #000}
+.route-node.available{animation:none;box-shadow:inset 0 0 0 2px var(--gold),3px 3px 0 #000}
+.route-node.available:hover{transform:translate(-50%,-52%)}
+.route-node.voted{background:#3a2a10;box-shadow:inset 0 0 0 2px var(--gold),0 0 0 2px var(--gold),3px 3px 0 #000}
+.route-node.visited{background:#2a2014}
+.route-node.current{box-shadow:inset 0 0 0 2px var(--gold-2),0 0 0 2px #000,3px 3px 0 #000}
+.event-option{background:#1a1517;box-shadow:inset 2px 2px 0 #3e332e,inset -2px -2px 0 #0a0708}
+.event-option.voted{background:#2c221d;box-shadow:inset 0 0 0 2px var(--gold)}
+.event-art{background:#0a0809;border:2px solid #000;box-shadow:inset 0 0 0 2px #4f8fbf}
+
+/* Diálogos. */
+#training::backdrop,.gameover::backdrop{background:#000000d0;backdrop-filter:none}
+.gameover{background:#140c0e!important}

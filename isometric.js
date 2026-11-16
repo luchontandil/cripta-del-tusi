@@ -545,8 +545,18 @@ export function createIso(mount,onCell){
       flame.scale.y=.34+Math.sin(t)*.065;
       flame.rotation.y=t*.45;
     }
+    const heroSpots=[...models.values()].filter(m=>!m.unit.enemy&&m.unit.hp>0).map(m=>m.root.position);
     for(const [id,model] of models){
       const walk=steps.get(id);
+      // Los enemigos miran siempre hacia el héroe vivo más cercano (salvo al caminar o atacar).
+      if(model.unit.enemy&&!walk&&heroSpots.length&&now-(model.strike??-10000)>350){
+        const p=model.root.position;
+        const target=heroSpots.reduce((a,b)=>a.distanceToSquared(p)<=b.distanceToSquared(p)?a:b);
+        const desired=Math.atan2(target.x-p.x,target.z-p.z);
+        let diff=desired-model.root.rotation.y;
+        diff=Math.atan2(Math.sin(diff),Math.cos(diff));
+        model.root.rotation.y+=reduced?diff:diff*Math.min(1,delta*.012);
+      }
       let gait=0;
       if(walk){
         if(walk.first)walk.first=false;

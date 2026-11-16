@@ -20,14 +20,14 @@ test('valida turno, ruta, puntos, visibilidad y escalado',()=>{
   const [archer]=s.units;
   assert.throws(()=>act(s,'p1',{type:'end'}),/turno/);
   assert.throws(()=>act(s,'p0',{type:'move',pos:-1}),/alcance/);
-  const to=archer.pos+3;
-  assert.deepEqual(paths(s,archer,3).get(to),[to-2,to-1,to]);
+  const to=archer.pos-3;
+  assert.deepEqual(paths(s,archer,3).get(to),[to+2,to+1,to]);
   act(s,'p0',{type:'move',pos:to});
-  assert.deepEqual(s.events.at(-1).path,[to-2,to-1,to]);
+  assert.deepEqual(s.events.at(-1).path,[to+2,to+1,to]);
   assert.equal(s.mp,0);
   const enemy=s.units.find(u=>u.enemy);
-  enemy.pos=to+3;
-  s.walls=[to+1];
+  enemy.pos=to-3;
+  s.walls=[to-1];
   assert.equal(lineOfSight(s,to,enemy.pos),false);
   assert.equal(hasRange(s,archer,enemy.pos,classes.tirador.skills[0]),true);
   assert.equal(inRange(s,archer,enemy.pos,classes.tirador.skills[0]),false);
@@ -82,7 +82,7 @@ test('genera botín con afijos y permite equipar, engarzar, extraer y vender una
   const hero=s.units[s.turn];
   const enemy=s.units.find(u=>u.enemy);
   enemy.hp=1;
-  enemy.pos=hero.pos+3;
+  enemy.pos=hero.pos-3;
   s.walls=[];
   let index=0;
   const random=()=>[.3,.3,.9,.1,.8,.2,.4,.7,.03,.6][index++%10];
@@ -168,6 +168,9 @@ test('los pisos alternan diseños y todas las casillas libres están conectadas'
       assert.equal(paths({...s,units:[]},{pos:start},s.width*s.height).size,s.width*s.height-s.walls.length-s.voids.length-1);
       assert.equal(new Set(s.units.map(u=>u.pos)).size,s.units.length);
       assert.ok(s.units.every(u=>onBoard(s,u.pos)&&!s.walls.includes(u.pos)));
+      const heroes=s.units.filter(u=>!u.enemy);
+      const enemies=s.units.filter(u=>u.enemy);
+      assert.ok(Math.min(...heroes.map(u=>u.pos%s.width))>Math.max(...enemies.map(u=>u.pos%s.width)));
       if(floor===6)break;
       const previous=s.layoutName;
       const previousSize=[s.width,s.height];
@@ -195,6 +198,19 @@ test('el botín se puede equipar al elegirlo y devuelve la pieza anterior a la m
   assert.equal(p.equipment.gloves,item);
   assert.deepEqual(p.bag,[old]);
   assert.deepEqual(s.picks,['p0']);
+});
+test('la victoria conserva el daño crítico del último golpe y amplía el tiempo para elegir botín',()=>{
+  const s=battle('guardia');
+  const hero=s.units.find(u=>!u.enemy);
+  const enemy=s.units.find(u=>u.enemy);
+  enemy.pos=hero.pos-1;
+  enemy.hp=9;
+  act(s,'p0',{type:'skill',skill:0,pos:enemy.pos},()=>.01);
+  assert.equal(s.phase,'reward');
+  assert.equal(s.events.at(-1).kind,'damage');
+  assert.equal(s.events.at(-1).amount,9);
+  assert.equal(s.events.at(-1).critical,true);
+  assert.equal(s.deadline-s.turnStarted,62500);
 });
 test('dos clientes reciben la misma trayectoria completa y el cambio de turno', {timeout:10000}, async t=>{
   server.listen(0,'127.0.0.1');
@@ -225,10 +241,10 @@ test('dos clientes reciben la misma trayectoria completa y el cambio de turno', 
   const started=await request(path+'/action',{type:'start'},host.key);
   assert.equal(started.state.phase,'combat');
   const origin=started.state.units.find(u=>u.id===host.id).pos;
-  const moved=await request(path+'/action',{type:'move',pos:origin+2},host.key);
+  const moved=await request(path+'/action',{type:'move',pos:origin-2},host.key);
   const next=await request(path,null,peer.key);
   const event=next.state.events.find(e=>e.kind==='move');
-  assert.deepEqual(event.path,[origin+1,origin+2]);
+  assert.deepEqual(event.path,[origin-1,origin-2]);
   assert.deepEqual(event,moved.state.events.at(-1));
   assert.equal(next.state.mp,1);
   assert.ok(!JSON.stringify(next).includes(host.key));

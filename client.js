@@ -1,10 +1,15 @@
-import {classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard} from './engine.js?v=8';
+import {classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard} from './engine.js?v=9';
 import {portrait,spellIcon,equipmentIcon} from './art.js?v=8';
 import {setupSfx} from './music.js?v=8';
 
 const el=id=>document.getElementById(id);
 let state,session,selected=null,busy=false,polling=false,generation=0,revision=0,rendered='';
 let pending=[],playing=null,lastSeq=0,animationEpoch=0;
+let holdLoot=false,lastDamageUntil=0;
+const hitDuration=2000;
+function lootReady(){
+  return state?.phase==='reward'&&(!holdLoot||(!playing&&!pending.length&&performance.now()>=lastDamageUntil));
+}
 const onPages=location.hostname.endsWith('.github.io');
 el('server').value=localStorage.getItem('amber-server')||(onPages?'https://cripta-del-tusi.onrender.com':location.origin);
 const error=message=>{el('error').textContent=message;};
@@ -55,7 +60,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=8').then(({createIso})=>{
+import('./isometric.js?v=9').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -290,7 +295,7 @@ function inventorySlot(item,label,actions=[],fallback=''){
 function renderInventory(player){
   const holder=el('inventory');
   const rewards=el('rewards');
-  const trading=state.phase==='reward';
+  const trading=lootReady();
   holder.hidden=state.phase==='lobby'||!bagShown;
   el('field-shop').hidden=!trading;
   const choosing=trading&&!state.picks.includes(player.id);
@@ -365,9 +370,9 @@ function pawnName(name){
   tag.textContent=name;
   return tag;
 }
-function boardPoint(pos){
+function boardPoint(pos,height){
   if(iso?.active){
-    const p=iso.anchor(pos);
+    const p=iso.anchor(pos,height);
     const rect=worldMount.getBoundingClientRect();
     return {left:(p.left-rect.left+14)+'px',top:(p.top-rect.top)+'px'};
   }
@@ -384,6 +389,8 @@ function resetAnimation(){
   pending=[];
   playing=null;
   lastSeq=0;
+  holdLoot=false;
+  lastDamageUntil=0;
   el('animations').replaceChildren();
 }
 function impact(event){
@@ -416,11 +423,16 @@ function impact(event){
     return;
   }
   const tag=document.createElement('span');
-  tag.className='impact '+event.kind;
-  tag.textContent=(event.kind==='heal'?'+':'−')+event.amount+(event.critical?' ✷':'');
-  Object.assign(tag.style,boardPoint(event.pos));
+  const damage=event.kind!=='heal';
+  tag.className=['impact',event.kind,damage&&'damage-number',event.critical&&'critical'].filter(Boolean).join(' ');
+  tag.textContent=(damage?'':'+')+event.amount+(event.critical?'!':'');
+  Object.assign(tag.style,boardPoint(event.pos,damage?1.48:undefined));
+  const stack=el('animations').querySelectorAll('.impact[data-cell="'+event.pos+'"]').length;
+  tag.dataset.cell=event.pos;
+  tag.style.setProperty('--float-offset',String(-25*stack)+'px');
   el('animations').append(tag);
-  setTimeout(()=>tag.remove(),700);
+  if(damage)lastDamageUntil=performance.now()+hitDuration;
+  setTimeout(()=>tag.remove(),damage?hitDuration:850);
 }
 async function animate(){
   if(playing||!pending.length||!state)return;
@@ -469,7 +481,12 @@ function setState(next,initial=false){
     resetAnimation();
     lastSeq=next.seq||0;
   }else{
-    pending.push(...(next.events||[]).filter(e=>e.seq>lastSeq&&e.floor===next.floor));
+    const fresh=(next.events||[]).filter(e=>e.seq>lastSeq&&e.floor===next.floor);
+    if(next.phase==='reward'&&previous?.phase==='combat'){
+      holdLoot=true;
+      lastDamageUntil=Math.max(lastDamageUntil,performance.now()+hitDuration);
+    }
+    pending.push(...fresh);
     lastSeq=next.seq||lastSeq;
   }
   if(newFloor||previous?.turn!==next.turn||previous?.phase!==next.phase||previous?.rounds!==next.rounds){
@@ -588,11 +605,12 @@ function render(){
   const turn=state.units[state.turn];
   const mine=state.phase==='combat'&&turn?.id===session.id;
   const host=state.players[0]?.id===session.id;
-  const title={lobby:'Sala de expedición',combat:'Piso '+state.floor+' · '+state.layoutName+' · '+turn?.name+(mine?' (tú)':''),reward:'Botín y mercader',won:'Expedición completada',lost:'El grupo ha caído'}[state.phase];
+  const rewardReady=lootReady();
+  const title={lobby:'Sala de expedición',combat:'Piso '+state.floor+' · '+state.layoutName+' · '+turn?.name+(mine?' (tú)':''),reward:rewardReady?'Botín y mercader':'Victoria',won:'Expedición completada',lost:'El grupo ha caído'}[state.phase];
   el('phase').textContent=title;
-  el('turn-bar').hidden=!['combat','reward'].includes(state.phase);
+  el('turn-bar').hidden=state.phase!=='combat'&&!rewardReady;
   if(!el('turn-bar').hidden)paintClock();
-  const signature=JSON.stringify([state,selected]);
+  const signature=JSON.stringify([state,selected,rewardReady]);
   if(signature===rendered)return;
   rendered=signature;
   el('room').textContent=session.code?'Sala '+session.code:'En solitario';
@@ -610,7 +628,7 @@ function render(){
   el('pa').textContent=state.phase==='combat'&&!turn.enemy?state.ap:'—';
   el('pm').textContent=state.phase==='combat'&&!turn.enemy?state.mp:'—';
   if(state.phase==='lobby'&&host)controls.append(actionButton('Iniciar expedición','start'));
-  if(state.phase==='reward'&&host){
+  if(rewardReady&&host){
     const next=actionButton('Siguiente piso','next');
     next.disabled=state.picks.length!==state.players.length;
     controls.append(next);

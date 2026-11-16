@@ -206,8 +206,9 @@ function openFloor(s,rng) {
   s.layoutName=layout.name;
   s.walls=layout.walls;
   const free=Array.from({length:w*s.height},(_,pos)=>pos).filter(pos=>onBoard(s,pos)&&!s.walls.includes(pos));
-  const heroPositions=s.floor===1?[0,-1,1,-2].map(y=>w*(mid+y)+1):
-    [...free].sort((a,b)=>((a%w)*4+Math.abs(Math.floor(a/w)-mid))-((b%w)*4+Math.abs(Math.floor(b/w)-mid))).slice(0,s.players.length);
+  const rightScore=pos=>(pos%w)*4-Math.abs(Math.floor(pos/w)-mid);
+  const heroPositions=s.floor===1?[0,-1,1,-2].map(y=>w*(mid+y)+w-2):
+    [...free].sort((a,b)=>rightScore(b)-rightScore(a)).slice(0,s.players.length);
   const heroes=s.players.map((p,i)=>{
     const previous=s.units.find(u=>u.id===p.id);
     const level=s.floor;
@@ -221,8 +222,8 @@ function openFloor(s,rng) {
       pos:heroPositions[i],effects:{}};
   });
   const lineup=encounter(s.floor,s.players.length);
-  const spawns=s.floor===1?Array.from({length:(s.height-2)*2},(_,i)=>w*(1+Math.floor(i/2))+w-2-i%2):
-    free.filter(pos=>!heroPositions.includes(pos)).sort((a,b)=>b%w-a%w).slice(0,Math.max(12,lineup.length*2));
+  const spawns=s.floor===1?Array.from({length:(s.height-2)*2},(_,i)=>w*(1+Math.floor(i/2))+1+i%2):
+    free.filter(pos=>!heroPositions.includes(pos)).sort((a,b)=>a%w-b%w).slice(0,Math.max(12,lineup.length*2));
   const foes=lineup.map(u=>{
     const pos=spawns.splice(roll(0,spawns.length-1,mapRng),1)[0];
     return {...u,max:u.hp,pos};
@@ -329,7 +330,7 @@ function finish(s,rng) {
   s.offers={};
   s.stock=[];
   s.turnStarted=Date.now();
-  s.deadline=s.turnStarted+60000;
+  s.deadline=s.turnStarted+62500;
   if(s.phase==='reward'){
     for(const p of s.players){
       p.gold+=10+s.floor*4;

@@ -143,3 +143,20 @@ main{max-width:1440px}
 .spell-burst.slow,.spell-burst.arcane,.spell-burst.dash{background:radial-gradient(#efeaff,#9d9dfd,transparent 68%)}
 @media(max-width:690px){.loot-cards{grid-template-columns:1fr}.loot-card{display:grid;grid-template-columns:44px 1fr 1fr;align-items:center}.loot-card h4,.loot-card small,.loot-comparison{grid-column:2/-1}.loot-icon{grid-row:span 3}.loot-card ul{grid-column:2/-1;min-height:0}.loot-card button{grid-column:auto}.loot-card button:last-child{grid-column:3}}
 
+
+.impact.damage-number{
+  color:#fff;font-size:clamp(1.65rem,4vw,2.7rem);font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;
+  font-weight:800;font-variant-numeric:tabular-nums;line-height:1;white-space:nowrap;letter-spacing:.025em;
+  -webkit-text-stroke:1px #1b1420;paint-order:stroke fill;
+  text-shadow:0 2px 0 #180e19,0 0 4px #0f0e19,0 0 9px #19101f;
+  animation:damage-rise 2s ease-out both;
+}
+.impact.damage-number.critical{color:#ffe35e;text-shadow:0 2px 0 #27150a,0 0 6px #472408,0 0 11px #e49d4470}
+@keyframes damage-rise{
+  0%{opacity:1;translate:0 var(--float-offset,0px);scale:.89}
+  13%{opacity:1;scale:1.07}
+  66%{opacity:1}
+  100%{opacity:0;translate:0 calc(var(--float-offset,0px) - 43px);scale:1}
+}
+@media(prefers-reduced-motion:reduce){.impact.damage-number{animation:none;translate:0 var(--float-offset,0px)}}
+

@@ -240,11 +240,11 @@ export function createIso(mount,onCell){
     world.set(x,y,z).project(camera);
     return {x:(world.x*.5+.5)*viewWidth,y:(.5-world.y*.5)*viewHeight};
   }
-  function anchor(pos){
+  function anchor(pos,height){
     const u=state.units.find(candidate=>candidate.hp>0&&candidate.pos===pos);
     const model=u&&models.get(u.id);
     const coords=model?.root.position||logical(state,pos);
-    const p=projected(coords.x,model?.head||.06,coords.z);
+    const p=projected(coords.x,height??model?.head??.06,coords.z);
     const rect=mount.getBoundingClientRect();
     return {left:rect.left+p.x-14,top:rect.top+p.y,bottom:rect.top+p.y+18};
   }

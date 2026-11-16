@@ -152,7 +152,7 @@ export function encounter(floor,size,elite=false) {
     const boss=floor%3===0&&i===0;
     const ranged=!boss&&floor>1&&i%2===1;
     const elite=!boss&&!ranged&&floor>=4;
-    const species=boss?'boss':ranged?'skull':elite?'worm':(i+floor)%2?'bat':'slime';
+    const species=boss?(floor===3?'oracle':'umbralking'):ranged?'skull':elite?'worm':(i+floor)%2?'bat':'slime';
     return {id:'enemy'+i,name:boss?(floor===3?'Oráculo de Ceniza':'Rey del Umbral'):monsterNames[species],
       look:species,boss,elite,enemy:true,initiative:boss?16:ranged?11:species==='bat'?9:6,
       range:boss?4:ranged?8:1,
@@ -477,7 +477,7 @@ function finish(s,rng) {
       s.offers[p.id]=Array.from({length:3},(_,i)=>rollItem(s,rng,elite?{bonus:.35,gear:i===0}:{}));
     }
     s.stock=Array.from({length:4},()=>rollItem(s,rng));
-    note(s,elite?'Victoria de élite · Botín mejorado y más oro.':'Victoria · Elige botín y prepara tu equipo.');
+    note(s,elite?'Victoria de élite · Botín mejorado y más tusi.':'Victoria · Elige botín y prepara tu equipo.');
   }else for(const p of s.players)p.xp=100;
   return true;
 }
@@ -548,7 +548,7 @@ export function planEnemy(s,unit,heroes){
 // ───────────── Camino entre pisos, eventos y votaciones ─────────────
 export const nodeKinds={
   combat:{name:'Combate',description:'Enemigos normales y botín estándar.'},
-  elite:{name:'Élite',description:'Enemigos más duros y un custodio extra. Botín mejor y 50 % más de oro.'},
+  elite:{name:'Élite',description:'Enemigos más duros y un limo colosal extra. Botín mejor y 50 % más de tusi.'},
   event:{name:'Evento',description:'Un encuentro sin combate. El grupo vota entre varias opciones.'},
   boss:{name:'Jefe',description:'Cámara del jefe con glifos.'}
 };
@@ -654,21 +654,21 @@ const events={
   fountain:{title:'Fuente de aguas negras',text:'Un manantial oscuro brota entre las losas. El agua huele a hierro y a promesas.',needsHeroes:true,options:[
     {label:'Beber',detail:'Todo el grupo se cura por completo, pero tiene −1 PM en el próximo combate.',apply:s=>{healParty(s,1);addMod(s,'mp',-1);}},
     {label:'Llenar los odres',detail:'Todo el grupo recupera un 30 % de su vida.',apply:s=>healParty(s,.3)},
-    {label:'Seguir adelante',detail:'Cada jugador recibe 8 de oro.',apply:s=>{for(const p of s.players)p.gold+=8;}}]},
+    {label:'Seguir adelante',detail:'Cada jugador recibe 8 de tusi.',apply:s=>{for(const p of s.players)p.gold+=8;}}]},
   altar:{title:'Altar de sangre',text:'Un altar antiguo exige un tributo. Las runas talladas laten al acercaros.',options:[
     {label:'Ofrecer sangre',detail:'Todos pierden un 25 % de su vida actual y reciben un objeto raro o mejor.',apply:(s,rng)=>{hurtParty(s,.25);giveAll(s,()=>rollItem(s,rng,{bonus:.6,gear:true}));}},
     {label:'Rezar',detail:'+1 PA en el próximo combate, pero los enemigos tendrán un 15 % más de vida.',apply:s=>{addMod(s,'ap',1);s.pending.enemyHp=(s.pending.enemyHp||1)*1.15;}},
     {label:'Marcharse',detail:'No ocurre nada.',apply:()=>{}}]},
   chest:{title:'Cofre encadenado',text:'Un cofre cubierto de cadenas. Algo dentro tintinea… y algo en la oscuridad os observa.',options:[
     {label:'Forzar el cofre',detail:'Cada uno recibe un objeto épico, pero los enemigos del próximo combate tendrán un 25 % más de vida.',apply:(s,rng)=>{giveAll(s,()=>rollItem(s,rng,{bonus:1.2,gear:true}));s.pending.enemyHp=(s.pending.enemyHp||1)*1.25;}},
-    {label:'Buscar la llave',detail:'Cada uno recibe 15 de oro.',apply:s=>{for(const p of s.players)p.gold+=15;}}]},
+    {label:'Buscar la llave',detail:'Cada uno recibe 15 de tusi.',apply:s=>{for(const p of s.players)p.gold+=15;}}]},
   camp:{title:'Campamento abandonado',text:'Restos de una hoguera todavía tibia. Alguien estuvo aquí hace poco.',needsHeroes:true,options:[
     {label:'Descansar',detail:'Todo el grupo recupera un 50 % de su vida.',apply:s=>healParty(s,.5)},
     {label:'Entrenar',detail:'+1 PA y +1 PM en el próximo combate, pero empezáis con el 80 % de la vida.',apply:s=>{addMod(s,'ap',1);addMod(s,'mp',1);s.pending.startHpPct=Math.min(s.pending.startHpPct||1,.8);}}]},
   peddler:{title:'Buhonero errante',text:'Un mercader encapuchado arrastra un carro lleno de baratijas brillantes.',options:[
-    {label:'Comprar runas',detail:'Cada uno paga hasta 10 de oro y recibe una runa.',apply:(s,rng)=>{for(const p of s.players){p.gold=Math.max(0,p.gold-10);let rune;do rune=rollItem(s,rng);while(rune.kind!=='rune');p.bag.push(rune);}}},
+    {label:'Comprar runas',detail:'Cada uno paga hasta 10 de tusi y recibe una runa.',apply:(s,rng)=>{for(const p of s.players){p.gold=Math.max(0,p.gold-10);let rune;do rune=rollItem(s,rng);while(rune.kind!=='rune');p.bag.push(rune);}}},
     {label:'Pedir consejo',detail:'+1 PM en el próximo combate.',apply:s=>addMod(s,'mp',1)},
-    {label:'Robarle',detail:'Cada uno recibe 25 de oro, pero empezáis el próximo combate con el 75 % de la vida.',apply:s=>{for(const p of s.players)p.gold+=25;s.pending.startHpPct=Math.min(s.pending.startHpPct||1,.75);}}]},
+    {label:'Robarle',detail:'Cada uno recibe 25 de tusi, pero empezáis el próximo combate con el 75 % de la vida.',apply:s=>{for(const p of s.players)p.gold+=25;s.pending.startHpPct=Math.min(s.pending.startHpPct||1,.75);}}]},
   library:{title:'Biblioteca olvidada',text:'Estanterías podridas guardan tomos de técnicas perdidas.',options:[
     {label:'Estudiar',detail:'Cada jugador mejora al azar una habilidad que ya conoce (máximo 3/3).',apply:(s,rng)=>{
       for(const p of s.players){
@@ -680,7 +680,7 @@ const events={
         if(hero)hero.skillRanks=[...p.skillRanks];
         note(s,p.name+' mejora '+choice.name+' a '+(choice.rank+1)+'/3.');
       }}},
-    {label:'Saquear',detail:'Cada uno recibe 12 de oro.',apply:s=>{for(const p of s.players)p.gold+=12;}}]}
+    {label:'Saquear',detail:'Cada uno recibe 12 de tusi.',apply:s=>{for(const p of s.players)p.gold+=12;}}]}
 };
 function startEvent(s,rng){
   const hasHeroes=heroesOf(s).length>0;
@@ -780,7 +780,7 @@ function gearAction(s,p,a,rng) {
   }else if(a.type==='buy'){
     const i=s.stock.findIndex(listing=>listing.id===a.item);
     if(i<0)fail('Ya no está a la venta.');
-    if(p.gold<s.stock[i].price)fail('Oro insuficiente.');
+    if(p.gold<s.stock[i].price)fail('No tienes suficiente tusi.');
     const [bought]=s.stock.splice(i,1);
     p.gold-=bought.price;
     p.bag.push(bought);

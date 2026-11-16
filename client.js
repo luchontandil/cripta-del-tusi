@@ -1,8 +1,8 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement,nodeKinds,modText,trapInfo} from './engine.js?v=14';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=14';
-import {setupSfx} from './music.js?v=14';
-import {icon} from './icons.js?v=14';
+  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement,nodeKinds,modText,trapInfo} from './engine.js?v=16';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=16';
+import {setupSfx} from './music.js?v=16';
+import {icon} from './icons.js?v=16';
 
 const el=id=>document.getElementById(id);
 let state,session,selected=null,busy=false,polling=false,generation=0,revision=0,rendered='';
@@ -86,7 +86,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=15').then(({createIso})=>{
+import('./isometric.js?v=16').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -547,7 +547,7 @@ function renderInventory(player){
       else for(const [slot,label] of Object.entries(slots)){
         if(player.equipment[slot])actions.push(actionButton('Engarzar en '+label.toLowerCase(),'socket',{item:item.id,slot}));
       }
-      actions.push(actionButton('Vender · '+(Math.floor(item.price/2)+(item.socket?Math.floor(item.socket.price/2):0))+' oro','sell',{item:item.id}));
+      actions.push(actionButton('Vender · '+(Math.floor(item.price/2)+(item.socket?Math.floor(item.socket.price/2):0))+' tusi','sell',{item:item.id}));
     }
     const tile=inventorySlot(item,'',actions);
     if(trading)draggable(tile,{from:'bag',item:item.id,slot:item.slot,kind:item.kind});
@@ -559,14 +559,14 @@ function renderInventory(player){
   bag.append(bagGrid);
   const gold=document.createElement('div');
   gold.className='bag-gold';
-  gold.replaceChildren(icon('gold'),h('b',null,String(player.gold)),' oro');
+  gold.replaceChildren(icon('gold'),h('b',null,String(player.gold)),' tusi');
   bag.append(gold);
   holder.replaceChildren(gear,bag);
   if(rewards.hidden){rewards.replaceChildren();return;}
   const shop=panel('Mercader','shop');
   if(!state.stock.length)shop.append('Todo vendido');
   for(const item of state.stock){
-    const buy=actionButton('Comprar · '+item.price+' oro','buy',{item:item.id});
+    const buy=actionButton('Comprar · '+item.price+' tusi','buy',{item:item.id});
     buy.disabled=player.gold<item.price;
     shop.append(itemRow(item,'',[buy]));
   }

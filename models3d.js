@@ -50,7 +50,163 @@ function staff(parent,color,arcane){
   piece(parent,'gem',color,0,.42,0,.19,.26,.19,true);
   if(arcane)piece(parent,'ring','#93c7ff',0,.42,0,.29,.29,.29,true);
 }
-const creatures={slime:slime,slimeking:slime,bat:bat,skull:skull,worm:worm};
+const creatures={slime:slime,slimeking:slime,bat:bat,skull:skull,worm:worm,oracle:oracle,umbralking:umbralKing};
+const glow=(color,opacity=1)=>new T.MeshBasicMaterial({color,transparent:opacity<1,opacity,depthWrite:opacity>=1});
+/** Oráculo de Ceniza: un gran ojo flotante de obsidiana con corona de brasas y fragmentos en órbita. */
+function oracle(){
+  const root=new T.Group(),figure=new T.Group(),core=new T.Group();
+  root.add(figure);figure.add(core);
+  const obsidian=new T.MeshStandardMaterial({color:'#2a1d26',roughness:.35,metalness:.4,emissive:'#3a0d08',emissiveIntensity:.5});
+  const ember=new T.MeshStandardMaterial({color:'#ff7a2e',emissive:'#ff5a1a',emissiveIntensity:1.4,roughness:.4});
+  // Manto hecho jirones bajo el ojo.
+  const mantle=add(core,'cone',new T.MeshStandardMaterial({color:'#5a1f22',roughness:.9,side:T.DoubleSide}),0,-.42,0,.7,.7,.7);
+  mantle.rotation.x=Math.PI;
+  for(let i=0;i<6;i++){
+    const a=i/6*Math.PI*2;
+    const strip=add(core,'cone',solid('#6e2626'),Math.sin(a)*.25,-.78,Math.cos(a)*.25,.12,.35,.12);
+    strip.rotation.x=Math.PI;
+  }
+  // Cuerpo: esfera facetada con grietas de lava.
+  const body=add(core,'orb',obsidian,0,0,0,.92,.88,.92);
+  for(let i=0;i<5;i++){
+    const crack=add(core,'cube',ember,Math.sin(i*1.3)*.32,Math.cos(i*2.1)*.25,-.2-Math.abs(Math.sin(i))*.2,.04,.22,.04);
+    crack.rotation.z=i*.9;
+  }
+  // El ojo.
+  const eye=new T.Group();
+  eye.position.set(0,.02,.36);
+  core.add(eye);
+  add(eye,'orb',new T.MeshStandardMaterial({color:'#fff1d6',roughness:.2,emissive:'#ffcf8a',emissiveIntensity:.25}),0,0,0,.46,.42,.22);
+  const iris=new T.Group();
+  eye.add(iris);
+  const irisMat=new T.MeshStandardMaterial({color:'#ff9a2e',emissive:'#ff6a00',emissiveIntensity:1.2,roughness:.3});
+  add(iris,'orb',irisMat,0,0,.08,.24,.24,.1);
+  add(iris,'orb',glow('#120808'),0,0,.12,.1,.17,.05);
+  for(const side of [-1,1]){
+    const lid=add(eye,'cube',obsidian,0,side*.2,.02,.52,.08,.24);
+    lid.rotation.x=side*.25;
+  }
+  // Corona de brasas y fragmentos en órbita.
+  const flames=Array.from({length:7},(_,i)=>add(figure,'gem',glow(i%2?'#ffd36b':'#ff7a2e',.9),0,0,0,.12,.24,.12));
+  const shards=Array.from({length:4},(_,i)=>add(figure,'gem',obsidian,0,0,0,.18,.3,.14));
+  const halo=add(figure,'ring',glow('#ff8a3d',.6),0,.02,0,1.6,1.6,1.6);
+  halo.rotation.x=-Math.PI/2;halo.castShadow=false;
+  figure.scale.setScalar(1.45);
+  const animate=(t,{swing,walking,phase})=>{
+    core.position.y=1.15+Math.sin(t*1.6+phase)*.1+swing*.1;
+    core.rotation.z=Math.sin(t*.9+phase)*.08;
+    core.rotation.x=-swing*.35+(walking?.15:0);
+    // El ojo mira a su alrededor y parpadea de vez en cuando.
+    iris.position.x=Math.sin(t*.8+phase)*.08;
+    iris.position.y=Math.sin(t*1.3+phase)*.04;
+    const blink=Math.max(0,Math.sin(t*.7+phase)-.97)*30;
+    eye.scale.y=Math.max(.1,1-blink);
+    irisMat.emissiveIntensity=1.2+swing*3+Math.sin(t*3)*.2;
+    flames.forEach((flame,i)=>{
+      const a=t*1.4+i/flames.length*Math.PI*2;
+      flame.position.set(Math.cos(a)*.42,core.position.y+.62+Math.sin(t*6+i)*.05,Math.sin(a)*.42);
+      flame.scale.y=.24+Math.sin(t*9+i*2)*.06;
+    });
+    shards.forEach((shard,i)=>{
+      const a=-t*.8+i/shards.length*Math.PI*2;
+      shard.position.set(Math.cos(a)*.95,core.position.y-.1+Math.sin(t*2+i)*.15,Math.sin(a)*.95);
+      shard.rotation.set(t+i,t*1.5,0);
+    });
+    halo.rotation.z=t*.5;
+    halo.material.opacity=.35+Math.sin(t*2)*.15+swing*.4;
+  };
+  return {root,figure,legs:[],arms:[],head:2.35,animate};
+}
+/** Rey del Umbral: un liche coronado con guadaña, hombreras, capa y cadenas que orbitan. */
+function umbralKing(){
+  const root=new T.Group(),figure=new T.Group(),body=new T.Group();
+  root.add(figure);figure.add(body);
+  const robe=new T.MeshStandardMaterial({color:'#2b1d45',roughness:.85});
+  const trim=new T.MeshStandardMaterial({color:'#d9a441',roughness:.35,metalness:.7});
+  const bone=new T.MeshStandardMaterial({color:'#e3dccb',roughness:.55});
+  const soul=new T.MeshStandardMaterial({color:'#6fd7ff',emissive:'#36b7ff',emissiveIntensity:1.6});
+  // Túnica y ribetes dorados.
+  add(body,'cone',robe,0,.62,0,.95,1.15,.8);
+  add(body,'column',trim,0,.08,0,.9,.06,.76);
+  add(body,'cube',trim,0,.72,.3,.1,.9,.04);
+  // Capa.
+  const cape=new T.Group();
+  cape.position.set(0,1.25,-.22);
+  body.add(cape);
+  const capeMesh=add(cape,'cube',new T.MeshStandardMaterial({color:'#5a1730',roughness:.8}),0,-.55,0,.85,1.1,.05);
+  // Torso, hombreras con pinchos y cráneo.
+  add(body,'orb',robe,0,1.22,0,.62,.42,.48);
+  for(const side of [-1,1]){
+    add(body,'orb',trim,side*.34,1.3,0,.34,.24,.34);
+    for(const k of [0,1,2])add(body,'cone',trim,side*(.32+k*.06),1.46,(k-1)*.09,.06,.2,.06).rotation.z=side*-.5;
+  }
+  const head=new T.Group();
+  head.position.set(0,1.62,.03);
+  body.add(head);
+  add(head,'orb',bone,0,0,0,.36,.38,.36);
+  add(head,'cube',bone,0,-.16,.06,.22,.1,.2);
+  for(const x of [-.08,.08]){
+    add(head,'orb',solid('#0c0812'),x,.02,.15,.1,.1,.05);
+    add(head,'orb',soul,x,.02,.17,.05,.05,.03);
+  }
+  // Corona flotante.
+  const crown=new T.Group();
+  head.add(crown);
+  add(crown,'column',trim,0,0,0,.42,.08,.42);
+  for(let i=0;i<7;i++){
+    const a=i/7*Math.PI*2;
+    add(crown,'cone',trim,Math.sin(a)*.19,.12,Math.cos(a)*.19,.07,.2,.07);
+  }
+  add(crown,'gem',soul,0,.06,.21,.08,.1,.05);
+  // Brazo con guadaña.
+  const arm=new T.Group();
+  arm.position.set(.42,1.2,.05);
+  body.add(arm);
+  add(arm,'cube',robe,0,-.18,0,.16,.4,.16);
+  add(arm,'orb',bone,0,-.4,.02,.1,.1,.1);
+  const scythe=new T.Group();
+  scythe.position.set(0,-.4,.06);
+  arm.add(scythe);
+  add(scythe,'column',solid('#3a2a24'),0,.2,0,.05,1.6,.05);
+  const blade=add(scythe,'cone',new T.MeshStandardMaterial({color:'#b9c6d6',roughness:.25,metalness:.8,emissive:'#2a5a7a',emissiveIntensity:.4}),.28,.96,0,.12,.62,.04);
+  blade.rotation.z=-1.6;
+  add(scythe,'gem',soul,0,1,0,.09,.12,.09);
+  // Otro brazo, con la mano en alto.
+  const left=new T.Group();
+  left.position.set(-.42,1.2,.05);
+  body.add(left);
+  add(left,'cube',robe,0,-.15,.05,.16,.36,.16);
+  add(left,'orb',soul,0,-.38,.12,.13,.13,.13);
+  // Cadenas en órbita y círculo rúnico.
+  const chains=Array.from({length:10},()=>add(figure,'ring',trim,0,0,0,.22,.22,.22));
+  const rune=add(figure,'ring',glow('#6fd7ff',.55),0,.03,0,1.9,1.9,1.9);
+  rune.rotation.x=-Math.PI/2;rune.castShadow=false;
+  const rune2=add(figure,'ring',glow('#b58cff',.4),0,.035,0,1.35,1.35,1.35);
+  rune2.rotation.x=-Math.PI/2;rune2.castShadow=false;
+  figure.scale.setScalar(1.3);
+  const animate=(t,{swing,walking,phase})=>{
+    body.position.y=.12+Math.sin(t*1.4+phase)*.05;
+    body.rotation.z=Math.sin(t*.7+phase)*.03;
+    head.rotation.y=Math.sin(t*.6+phase)*.3;
+    head.rotation.x=Math.sin(t*1.1)*.05;
+    crown.position.y=.32+Math.sin(t*2.2+phase)*.04;
+    crown.rotation.y=t*.4;
+    cape.rotation.x=.12+Math.sin(t*1.8+phase)*.08+(walking?.25:0);
+    capeMesh.rotation.z=Math.sin(t*1.3)*.04;
+    arm.rotation.x=-swing*1.8+Math.sin(t*1.2+phase)*.08;
+    arm.rotation.z=-.15-swing*.4;
+    left.rotation.x=-.6+Math.sin(t*1.7+phase)*.12;
+    soul.emissiveIntensity=1.4+Math.sin(t*3)*.4+swing*2;
+    chains.forEach((link,i)=>{
+      const a=t*.9+i/chains.length*Math.PI*2;
+      link.position.set(Math.cos(a)*.85,.9+Math.sin(a*2+t)*.18,Math.sin(a)*.85);
+      link.rotation.set(a,i%2?Math.PI/2:0,0);
+    });
+    rune.rotation.z=t*.35;rune2.rotation.z=-t*.6;
+    rune.material.opacity=.4+Math.sin(t*2)*.12+swing*.4;
+  };
+  return {root,figure,legs:[],arms:[],head:2.75,animate};
+}
 const glass=(color,opacity=.82)=>new T.MeshStandardMaterial({color,roughness:.25,metalness:.05,transparent:true,opacity,emissive:color,emissiveIntensity:.18});
 function add(parent,shape,material,x,y,z,sx,sy,sz){
   const mesh=new T.Mesh(shapes[shape],material);
@@ -77,7 +233,7 @@ function slime(kind){
   const size=king?1.5:1;
   figure.scale.setScalar(size);
   const animate=(t,{gait,swing,walking,reduced})=>{
-    const breath=reduced?0:Math.sin(t*3.1);
+    const breath=Math.sin(t*3.1);
     const hop=walking?Math.abs(gait):0;
     body.position.y=hop*.28;
     const squash=1+breath*.07-hop*.12+swing*.25;
@@ -114,13 +270,13 @@ function bat(){
   body.position.y=.72;
   figure.scale.setScalar(1.55);
   const animate=(t,{gait,swing,walking,reduced,phase})=>{
-    const flap=reduced?.3:Math.sin(t*(walking?20:13)+phase);
+    const flap=Math.sin(t*(walking?20:13)+phase);
     wings[0].rotation.y=flap*.9;wings[1].rotation.y=-flap*.9;
     wings[0].rotation.z=-flap*.25;wings[1].rotation.z=flap*.25;
-    body.position.y=.72+(reduced?0:Math.sin(t*4+phase)*.07)-swing*.3;
+    body.position.y=.72+Math.sin(t*4+phase)*.07-swing*.3;
     body.position.z=swing*.35;
     body.rotation.x=walking?.35:swing*.6;
-    body.rotation.z=reduced?0:Math.sin(t*2.2+phase)*.12;
+    body.rotation.z=Math.sin(t*2.2+phase)*.12;
   };
   return {root,figure,legs:[],arms:[],head:1.05*1.55,animate};
 }
@@ -148,7 +304,7 @@ function skull(){
   head.position.y=.68;
   figure.scale.setScalar(1.35);
   const animate=(t,{swing,walking,reduced,phase})=>{
-    const r=reduced?0:t;
+    const r=t;
     head.position.y=.68+Math.sin(r*2.1+phase)*.08;
     head.rotation.z=Math.sin(r*1.3+phase)*.14;
     head.rotation.x=-swing*.45+(walking?.2:0);
@@ -185,7 +341,7 @@ function worm(){
   figure.scale.setScalar(1.15);
   const animate=(t,{gait,swing,walking,reduced,phase})=>{
     const speed=walking?7:2.6;
-    const r=reduced?0:t;
+    const r=t;
     segments.forEach((seg,i)=>{
       const wave=Math.sin(r*speed-i*.9+phase);
       seg.position.x=wave*.06*(i+1)*.5;

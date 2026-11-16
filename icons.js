@@ -22,7 +22,7 @@ const paths={
   expose:'<path d="M12 3.2 19 6v5.4c0 4.6-3 7.9-7 9.4-4-1.5-7-4.8-7-9.4V6Z"/><path d="m13 6.5-2.5 5 3 1-2 5"/>',
   slow:'<rect x="3.5" y="9" width="8" height="6" rx="3"/><rect x="12.5" y="9" width="8" height="6" rx="3"/><path d="M9.5 12h5"/>',
   glyph:'<path d="M12 2.8 20.5 12 12 21.2 3.5 12Z"/><path d="M12 7.5v9M7.5 12h9"/>',
-  gold:'<circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity=".25"/><path d="M12 7.5v9M14.5 9.2c-.6-.8-1.5-1.2-2.6-1.2-1.4 0-2.4.7-2.4 1.9 0 2.6 5.2 1.3 5.2 4 0 1.2-1 2-2.6 2-1.2 0-2.2-.5-2.8-1.3"/>',
+  gold:'<path d="M3.5 19.5c1.2-3.6 4.4-6.8 8.5-6.8s7.3 3.2 8.5 6.8Z" fill="currentColor" fill-opacity=".55"/><path d="M3 19.5h18"/><circle cx="7.5" cy="10" r=".9" fill="currentColor"/><circle cx="16.5" cy="8.5" r=".8" fill="currentColor"/><circle cx="12" cy="6" r="1" fill="currentColor"/><circle cx="9.5" cy="15.5" r=".6" fill="#fff"/><circle cx="14" cy="16.2" r=".5" fill="#fff"/>',
   xp:'<path d="M12 3.5 14.5 9l6 .6-4.5 4 1.3 6-5.3-3.1-5.3 3.1 1.3-6-4.5-4 6-.6Z" fill="currentColor" fill-opacity=".25"/>',
   bag:'<path d="M5 9h14l-1 11H6Z" fill="currentColor" fill-opacity=".2"/><path d="M9 9V7a3 3 0 0 1 6 0v2M9.5 13h5"/>',
   sound:'<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4Z" fill="currentColor" fill-opacity=".25"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>',

@@ -1,5 +1,5 @@
 import * as T from './three.module.js';
-import {miniature,obstacle,piece,solid} from './models3d.js?v=14';
+import {miniature,obstacle,piece,solid} from './models3d.js?v=16';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -17,18 +17,41 @@ function makeWater(clockUniform){
   if(waterMaterial)return waterMaterial;
   waterMaterial=new T.ShaderMaterial({
     uniforms:{time:clockUniform},
-    vertexShader:`uniform float time; varying vec2 vUv; varying vec3 vWorld; varying float vWave;
+    vertexShader:`uniform float time; varying vec2 vUv; varying vec3 vWorld;
       void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.);
-        float wave=sin(w.x*3.1+time*1.7)*.5+sin(w.z*2.7-time*1.3)*.5;
-        w.y+=wave*.018;vWave=wave;vWorld=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,
-    fragmentShader:`uniform float time; varying vec2 vUv; varying vec3 vWorld; varying float vWave;
+        w.y+=(sin(w.x*2.6+time*1.6)+sin(w.z*3.1-time*1.2)+sin((w.x+w.z)*4.3+time*2.1)*.5)*.012;
+        vWorld=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,
+    fragmentShader:`uniform float time; varying vec2 vUv; varying vec3 vWorld;
+      float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+      float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+        return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
+      float waves(vec2 p){
+        return noise(p*3.+vec2(time*.35,time*.22))*.55+noise(p*6.5-vec2(time*.5,-time*.3))*.3+noise(p*13.+time*.8)*.15;
+      }
       void main(){
-        vec3 deep=vec3(.05,.2,.32),shallow=vec3(.16,.52,.68);
-        float caustic=pow(abs(sin(vWorld.x*5.+time*1.1)*sin(vWorld.z*5.3-time*.9)),3.);
-        vec3 c=mix(deep,shallow,.45+vWave*.25)+caustic*.22;
-        vec2 q=min(vUv,1.-vUv);float edge=smoothstep(.09,.0,min(q.x,q.y));
-        c=mix(c,vec3(.75,.92,1.),edge*.35);
-        gl_FragColor=vec4(c,.92);
+        vec2 p=vWorld.xz;
+        float e=.04;
+        float h=waves(p);
+        vec3 n=normalize(vec3(waves(p-vec2(e,0))-waves(p+vec2(e,0)),.12,waves(p-vec2(0,e))-waves(p+vec2(0,e))));
+        vec3 view=normalize(vec3(.62,.64,.66));
+        vec3 light=normalize(vec3(-.4,.85,.3));
+        float fresnel=pow(1.-max(dot(n,view),0.),3.);
+        float spec=pow(max(dot(reflect(-light,n),view),0.),60.);
+        vec3 deep=vec3(.02,.13,.24),mid=vec3(.06,.36,.52),sky=vec3(.55,.75,.95);
+        vec3 c=mix(deep,mid,smoothstep(.25,.85,h));
+        c=mix(c,sky,fresnel*.55);
+        // Cáusticas: líneas brillantes que se mueven.
+        float caustic=pow(1.-abs(sin((noise(p*4.+time*.4)+noise(p*5.-time*.3))*6.2832)),8.);
+        c+=caustic*vec3(.25,.45,.5)*.5;
+        c+=spec*vec3(1.,.95,.85)*1.4;
+        // Destellos.
+        float sparkle=step(.985,hash(floor(p*24.)+floor(time*3.)))*smoothstep(.6,.9,h);
+        c+=sparkle*.8;
+        // Espuma en los bordes de la casilla.
+        vec2 q=min(vUv,1.-vUv);float d=min(q.x,q.y);
+        float foam=smoothstep(.12,.0,d)*smoothstep(.35,.65,noise(p*14.+time*.6));
+        c=mix(c,vec3(.85,.95,1.),foam*.65);
+        gl_FragColor=vec4(c,.9);
       }`,
     transparent:true
   });
@@ -248,7 +271,8 @@ export function createIso(mount,onCell){
       }
       if(state.water?.includes(pos)){
         // Hundimos la losa y ponemos la superficie del agua encima.
-        piece(stage,'cube','#0d1a26',coord.x,-.14,coord.z,1,.1,1);
+        piece(stage,'cube','#08131d',coord.x,-.2,coord.z,1,.1,1);
+        piece(stage,'cube','#1f3a44',coord.x,-.12,coord.z,.98,.04,.98);
         const surface=new T.Mesh(waterGeometry,makeWater(clock));
         surface.position.set(coord.x,-.02,coord.z);
         surface.renderOrder=1;
@@ -530,7 +554,7 @@ export function createIso(mount,onCell){
     if(!active)return;
     const delta=previousFrame?Math.min(45,Math.max(0,now-previousFrame)):0;
     previousFrame=now;
-    clock.value=reduced?0:now/1000;
+    clock.value=now/1000;
     for(const [index,light] of torchLights.entries()){
       light.intensity=reduced?14:12.5+Math.sin(now*.011+index*2.1)*1.6+Math.sin(now*.027+index)*1.1;
     }
@@ -571,16 +595,24 @@ export function createIso(mount,onCell){
       }
       const strike=Math.max(0,1-(now-(model.strike??-10000))/285);
       const swing=Math.sin(strike*Math.PI);
-      const breath=reduced?0:Math.sin(now*.003+model.phase);
+      // Las animaciones de reposo se mantienen siempre (son suaves), incluso con movimiento reducido.
+      const breath=Math.sin(now*.0028+model.phase);
       if(model.animate){
-        model.animate(now/1000,{gait,swing,walking:!!walk,reduced,phase:model.phase});
+        model.animate(now/1000,{gait,swing,walking:!!walk,reduced:false,phase:model.phase});
       }else{
-      model.figure.position.y=reduced?0:Math.abs(gait)*.055+breath*.024;
-      model.figure.rotation.z=walk?gait*.055:breath*.035;
-      model.arms[0].rotation.x=gait*.36+breath*.12;
-      model.arms[1].rotation.x=-gait*.36-swing*.97-breath*.10;
-      model.legs[0].rotation.x=-gait*.43;
-      model.legs[1].rotation.x=gait*.43;
+        const t=now/1000+model.phase;
+        const idle=walk?0:1;
+        model.figure.position.y=Math.abs(gait)*.055+breath*.035*idle;
+        model.figure.scale.y=model.figure.scale.x*(1+breath*.018*idle);
+        model.figure.rotation.z=walk?gait*.055:breath*.04;
+        // Mira a su alrededor de vez en cuando.
+        model.figure.rotation.y=idle*Math.sin(t*.45)*Math.max(0,Math.sin(t*.21))*.35;
+        model.arms[0].rotation.x=gait*.36+breath*.16*idle;
+        model.arms[0].rotation.z=idle*(.06+Math.sin(t*1.1)*.04);
+        model.arms[1].rotation.x=-gait*.36-swing*.97-(breath*.14+.12)*idle;
+        model.arms[1].rotation.z=-idle*(.06+Math.sin(t*1.3)*.04);
+        model.legs[0].rotation.x=-gait*.43;
+        model.legs[1].rotation.x=gait*.43;
       }
       if(model.ring.visible&&!reduced){
         model.ring.rotation.y=now*.0012;

@@ -50,7 +50,7 @@ p{margin:0}
 .icon-attack,.icon-physical,.icon-sword{color:var(--physical)}.icon-fire,.icon-blast{color:var(--fire)}.icon-ice{color:var(--ice)}
 .icon-arcane{color:var(--arcane)}.icon-shadow,.icon-dash{color:var(--shadow)}.icon-reach,.icon-range{color:#f3b5d0}
 .icon-critical{color:#ffe35e}.icon-poison,.icon-venom{color:var(--poison)}.icon-expose{color:#e4b3ff}.icon-slow{color:#9fc3ff}
-.icon-gold{color:var(--gold)}.icon-xp,.icon-level{color:#d5b8ff}.icon-heal{color:var(--good)}.icon-cleanse{color:#fff0b5}
+.icon-gold{color:#ff8fd6;filter:drop-shadow(0 0 3px #ff6fc8aa)}.icon-xp,.icon-level{color:#d5b8ff}.icon-heal{color:var(--good)}.icon-cleanse{color:#fff0b5}
 
 /* ───────────── Controles ───────────── */
 button,input,select{font:inherit;color:inherit}
@@ -246,9 +246,19 @@ summary{cursor:pointer}
 .cell.glyph-damage{background:repeating-linear-gradient(45deg,#a24f38,#a24f38 5px,#6b301f 5px,#6b301f 9px)}
 .cell.glyph-poison{background:repeating-linear-gradient(45deg,#6b8143,#6b8143 5px,#3c482d 5px,#3c482d 9px)}
 .cell.glyph-slow{background:repeating-linear-gradient(45deg,#526e97,#526e97 5px,#283c59 5px,#283c59 9px)}
-.cell.water{background:linear-gradient(135deg,#1f5a7a,#123247);box-shadow:inset 0 0 12px #6fc6ff44;cursor:not-allowed;overflow:hidden}
-.cell.water::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(170deg,transparent 0 7px,#9fe0ff26 7px 9px);animation:ripple 3s linear infinite}
-@keyframes ripple{to{background-position:0 36px}}
+.cell.water{cursor:not-allowed;overflow:hidden;border-color:#7fd0ff33;
+  background:radial-gradient(ellipse at 30% 20%,#5fb8e0 0,transparent 55%),linear-gradient(160deg,#1d6a92,#0b2f45 75%);
+  box-shadow:inset 0 0 14px #001522cc,inset 0 0 0 1px #8fe0ff22}
+.cell.water::before,.cell.water::after{content:"";position:absolute;inset:-50%;pointer-events:none}
+.cell.water::before{background:
+  radial-gradient(ellipse 18% 6% at 30% 40%,#d8f6ff66,transparent 70%),
+  radial-gradient(ellipse 14% 5% at 70% 65%,#d8f6ff55,transparent 70%),
+  radial-gradient(ellipse 10% 4% at 55% 20%,#ffffff55,transparent 70%);
+  animation:water-glint 4s ease-in-out infinite}
+.cell.water::after{background:repeating-radial-gradient(circle at 40% 60%,transparent 0 6px,#9fe0ff1f 7px 8px,transparent 9px 14px);
+  animation:water-ripple 5s linear infinite;mix-blend-mode:screen}
+@keyframes water-glint{0%,100%{transform:translate(0,0)}50%{transform:translate(8%,-6%)}}
+@keyframes water-ripple{from{transform:scale(.8) rotate(0)}to{transform:scale(1.2) rotate(25deg)}}
 .cell.trap::before{content:"";position:absolute;inset:22%;opacity:.85;background:currentColor;
   -webkit-mask:var(--trap-mask) center/contain no-repeat;mask:var(--trap-mask) center/contain no-repeat}
 .cell.trap-spikes{color:#d9d2c4;--trap-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 20h18L19 11l-2 9-2-12-3 12-3-12-2 12-2-9Z'/%3E%3C/svg%3E")}
@@ -264,6 +274,14 @@ summary{cursor:pointer}
 .pawn.look-bat canvas{animation:bat-idle .5s ease-in-out infinite alternate}
 .pawn.look-skull canvas{animation:skull-idle 2.6s ease-in-out infinite}
 .pawn.look-worm canvas{transform-origin:20% 90%;animation:worm-idle 1.4s ease-in-out infinite}
+/* Reposo: todos respiran; cada criatura y jefe tiene su propio movimiento. */
+.pawn canvas{transform-origin:50% 92%;animation:hero-idle 2.6s ease-in-out infinite}
+.pawn.foe canvas{animation-duration:2s}
+.pawn.look-oracle canvas{animation:oracle-idle 3s ease-in-out infinite;filter:drop-shadow(0 0 6px #ff7a2e88) drop-shadow(0 2px 2px #0a0710)}
+.pawn.look-umbralking canvas{animation:king-idle 3.4s ease-in-out infinite;filter:drop-shadow(0 0 6px #6fd7ff77) drop-shadow(0 2px 2px #0a0710)}
+@keyframes hero-idle{0%,100%{transform:translateY(-14%) scale(1,1)}50%{transform:translateY(-16%) scale(1.02,1.045)}}
+@keyframes oracle-idle{0%,100%{transform:translateY(-22%) rotate(-3deg)}50%{transform:translateY(-34%) rotate(3deg)}}
+@keyframes king-idle{0%,100%{transform:translateY(-16%) scale(1.15)}50%{transform:translateY(-22%) scale(1.15,1.19)}}
 @keyframes slime-idle{0%,100%{transform:translateY(-14%) scale(1,1)}50%{transform:translateY(-14%) scale(1.08,.9)}}
 @keyframes bat-idle{from{transform:translateY(-26%) scaleX(1)}to{transform:translateY(-34%) scaleX(.88)}}
 @keyframes skull-idle{0%,100%{transform:translateY(-22%) rotate(-5deg)}50%{transform:translateY(-32%) rotate(5deg)}}
@@ -387,7 +405,7 @@ summary{cursor:pointer}
 .dragging{cursor:grabbing}
 .inventory-slot.drop-target,.bag-grid.drop-target{outline:2px solid var(--gold);outline-offset:-2px;box-shadow:0 0 14px var(--gold-glow)}
 .item-ghost{position:fixed;z-index:50;pointer-events:none;transform:translate(10px,12px);background:var(--bg-3);border:1px solid var(--gold-2);color:#ffe5ad;padding:4px 8px;border-radius:6px;font-size:.75rem;font-weight:700;box-shadow:0 6px 16px #000a}
-.bag-gold{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin-top:8px;color:var(--gold);font-size:.85rem}
+.bag-gold{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin-top:8px;color:#ffb3e4;font-size:.85rem}
 .bag-gold b{font-size:1rem;font-variant-numeric:tabular-nums}
 
 /* Fila de objeto (desplegables y tienda) */
@@ -653,7 +671,6 @@ summary{cursor:pointer}
   #clock{width:50px;height:50px}#seconds{width:36px;height:36px}
 }
 @media(prefers-reduced-motion:reduce){
-  .pawn canvas{animation:none!important}
   .moving canvas,.impact,#clock.urgent,.tip{animation:none}
   .impact.damage-number{animation:none;translate:0 var(--float-offset,0px)}
 }

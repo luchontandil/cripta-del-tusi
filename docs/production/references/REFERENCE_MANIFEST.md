@@ -36,8 +36,12 @@ La lista completa, vistas, observaciones y huecos de auditoría está en [ASSET_
 | Asset | Categoría | Archivo | Vistas previstas | Estado | Observaciones |
 |---|---|---|---|---|---|
 | Style guide / lineup / materiales | Dirección visual | `00_style_guide.png`, `01_class_lineup.png`, `02_palette_materials.png` | Paneles de muestras y escala común | Pendiente | Proporciones chibi y materiales PBR simplificados de la biblia local |
-| Guardián | Personaje | `hero_guardian.png`, `hero_guardian_ingame.png`, `hero_guardian.md` | T-pose frontal, lateral, trasera, 3/4, cenital, isométrico, escala | **Propuesta v2** (17-11-2026) | Render del modelo PS1 `ps1Hero('guardia')`; 1 060 tris, 7 draw calls, 1 material. Correcciones aplicadas: sin cara, maza, más bajo. Pendiente de revisión |
-| Arquero, Clérigo, Mago, Ninja | Personajes | `hero_archer.png`, `hero_cleric.png`, `hero_mage.png`, `hero_ninja.png` | Igual que el Guardián | Pendiente | Se harán con el mismo método cuando se apruebe la dirección del Guardián |
+| Guardián | Personaje | `hero_guardian.png`, `hero_guardian_ingame.png`, `hero_guardian.md` | T-pose frontal, lateral, trasera, 3/4, cenital, isométrico, escala | **Propuesta v2** (17-11-2026) | Render del modelo PS1 `ps1Hero('guardia')`; 1 036 tris, 7 draw calls, 1 material. Correcciones aplicadas: sin cara, maza, más bajo. Pendiente de revisión |
+| Arquero | Personaje | `hero_archer.png`, `hero_archer.md` | Igual que el Guardián | **Propuesta** (17-11-2026) | 864 tris, 6 draw calls, 1 material |
+| Clérigo | Personaje | `hero_cleric.png`, `hero_cleric.md` | Igual que el Guardián | **Propuesta** (17-11-2026) | 884 tris, 6 draw calls, 1 material |
+| Mago | Personaje | `hero_mage.png`, `hero_mage.md` | Igual que el Guardián | **Propuesta** (17-11-2026) | 680 tris, 7 draw calls, 2 materiales (cristal emisivo) |
+| Ninja | Personaje | `hero_ninja.png`, `hero_ninja.md` | Igual que el Guardián | **Propuesta** (17-11-2026) | 852 tris, 7 draw calls, 1 material |
+| Lineup de clases | Dirección visual | `01_class_lineup.png` | Frontal a escala común + isométrico con colores de jugador | **Propuesta** (17-11-2026) | Las cinco clases juntas; sustituye a STY-02 |
 | Monstruos y jefes | Bestiario | Ver inventario | Ortho F/L/T, top-down, escala, articulaciones y ataque | Pendiente | Cobertura enumerada en inventario; diseño final requiere hojas aprobadas |
 | Mazmorra, Jungla, Infierno | Entorno | `act_crypt.png`, `act_jungle.png`, `act_hell.png` | Room top-down/isométrico + kit modular/footprints | Pendiente | No fijar metros ni tile sin medida de código |
 | Slots, runas, rarezas | Equipo | `equipment/`, `props/rune_token.png` | Frente/lado/arriba/3-4, punto de agarre | Pendiente | Confirmar bases en el código de loot antes de crear ítems individuales |

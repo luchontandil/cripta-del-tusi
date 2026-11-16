@@ -706,7 +706,6 @@ function plant(kind){
 export function miniature(kind,tint=null) {
   if(creatures[kind])return creatures[kind](kind);
   if(ps1Kits[kind])return ps1Hero(kind,tint);
-  if(heroKits[kind])return chibiHero(kind,tint);
   let [body,accent,dark,skin]=looks[kind]||looks.enemy;
   // Color del jugador: la ropa toma el color de su puesto (J1 rojo, J2 azul...).
   if(tint){body=tint.hex;dark=tint.dark;}
@@ -873,212 +872,6 @@ function hellObstacle(root){
   root.traverse(mesh=>{if(mesh.isMesh&&mesh.material.isMeshStandardMaterial)mesh.castShadow=true;});
 }
 
-// ───────────── Héroes chibi (rework según docs/art/STYLE_GUIDE.md) ─────────────
-// Escala: 1 casilla = 1 unidad. Altura ≈1,13 (sin sombrero), cabeza 0,45 → 2,5 cabezas.
-// Formas suaves y redondeadas, cara expresiva, manos/pies/armas algo exagerados.
-const smooth={
-  ball:new T.SphereGeometry(.5,16,11),
-  dome:new T.SphereGeometry(.5,16,7,0,Math.PI*2,0,Math.PI/2),
-  cyl:new T.CylinderGeometry(.5,.5,1,12),
-  taper:new T.CylinderGeometry(.38,.5,1,16),
-  cone:new T.ConeGeometry(.5,1,14),
-  torus:new T.TorusGeometry(.5,.07,6,20),
-  arc:new T.TorusGeometry(.5,.045,5,14,Math.PI),
-  box:new T.BoxGeometry(1,1,1),
-  gem:new T.OctahedronGeometry(.5,0),
-  disc:new T.CylinderGeometry(.5,.5,1,20)
-};
-const heroMats=new Map();
-/** Material PBR simplificado: mate por defecto, satinado para metal, emisivo solo para magia. */
-function mat(color,{metal=0,rough=.72,glow=0}={}){
-  const key=color+metal+rough+glow;
-  if(!heroMats.has(key))heroMats.set(key,new T.MeshStandardMaterial({color,metalness:metal,roughness:rough,emissive:glow?color:'#000000',emissiveIntensity:glow}));
-  return heroMats.get(key);
-}
-function part(parent,shape,material,x,y,z,sx,sy,sz){
-  const mesh=new T.Mesh(smooth[shape],typeof material==='string'?mat(material):material);
-  mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);
-  mesh.castShadow=true;mesh.receiveShadow=true;
-  parent.add(mesh);
-  return mesh;
-}
-/** Paletas de clase (anclas de models3d.js): tela, acento, oscuro, piel, metal, pelo. */
-const heroKits={
-  guardia:{cloth:'#3f7a74',accent:'#e0a84f',dark:'#24403f',skin:'#f0c09c',metal:'#9fb3b0',hair:'#6b3f2a'},
-  tirador:{cloth:'#3f7a4f',accent:'#d9a04f',dark:'#2a3f2c',skin:'#e8b48c',metal:'#b8a07a',hair:'#c9873a'},
-  mistico:{cloth:'#7a54a0',accent:'#f2cd6a',dark:'#46305e',skin:'#f3c7a6',metal:'#f2d58a',hair:'#d9a441'},
-  mago:{cloth:'#3f5fae',accent:'#7fe0ff',dark:'#26385e',skin:'#f1bf9c',metal:'#c0c8d8',hair:'#9a6ad0'},
-  sombra:{cloth:'#4d3466',accent:'#ff8a6e',dark:'#241a33',skin:'#d9a07e',metal:'#cfd6de',hair:'#1c1626'}
-};
-/** Cara: ojos grandes con brillo, cejas, boca y rubor. Se ve desde arriba y en isométrico. */
-function face(head,kit,{mask=false,angry=false,z=0}={}){
-  const eyes=[];
-  for(const side of [-1,1]){
-    const eye=new T.Group();eye.position.set(side*.085,-.005,.19+z);head.add(eye);
-    part(eye,'ball','#fbf7f0',0,0,0,.085,.105,.05);
-    part(eye,'ball','#1d1626',0,-.006,.016,.058,.075,.03);
-    part(eye,'ball',mat('#ffffff',{glow:.6}),side*-.012,.018,.03,.02,.024,.012);
-    eyes.push(eye);
-    const brow=part(head,'box',kit.hair,side*.088,.085,.205+z,.07,.018,.02);
-    brow.rotation.z=side*(angry?.32:-.12);
-    if(!mask)part(head,'ball',mat('#ff8f8f',{rough:.9}),side*.135,-.07,.17+z,.06,.035,.02);
-  }
-  if(!mask){
-    const mouth=part(head,'arc','#5a2a2a',0,-.085,.205+z,.07,.06,.06);
-    mouth.rotation.z=Math.PI;
-  }
-  return eyes;
-}
-function chibiHero(kind,tint){
-  const kit={...heroKits[kind]};
-  if(tint){kit.cloth=tint.hex;kit.dark=tint.dark;}
-  const root=new T.Group(),figure=new T.Group();root.add(figure);
-  const robe=kind==='mistico'||kind==='mago';
-  // Piernas cortas con botas grandes.
-  const legs=[-1,1].map(side=>{
-    const leg=new T.Group();leg.position.set(side*.085,.34,0);figure.add(leg);
-    if(!robe)part(leg,'ball',kit.dark,0,-.12,0,.12,.24,.12);
-    const boot=part(leg,'ball',kind==='guardia'?mat(kit.metal,{metal:.55,rough:.38}):'#4a3428',0,-.3,.03,.15,.1,.22);
-    if(kind==='guardia')part(leg,'torus',mat(kit.accent,{metal:.5,rough:.4}),0,-.25,.0,.13,.13,.6).rotation.x=Math.PI/2;
-    return leg;
-  });
-  // Torso compacto con cinturón.
-  const torso=new T.Group();figure.add(torso);
-  if(robe){
-    part(torso,'taper',kit.cloth,0,.27,0,.42,.5,.38);
-    part(torso,'torus',mat(kit.accent,{metal:.4,rough:.45}),0,.03,0,.42,.38,.5).rotation.x=Math.PI/2;
-  }
-  part(torso,'ball',kit.cloth,0,.5,0,.34,.36,.28);
-  part(torso,'torus','#4a3428',0,.38,0,.34,.28,.5).rotation.x=Math.PI/2;
-  part(torso,'box',mat(kit.accent,{metal:.5,rough:.4}),0,.38,.14,.07,.06,.03);
-  // Cabeza grande.
-  const head=new T.Group();head.position.set(0,.9,0);figure.add(head);
-  part(head,'ball',kit.skin,0,0,0,.45,.43,.42);
-  for(const side of [-1,1])part(head,'ball',kit.skin,side*.22,-.01,0,.06,.09,.06);
-  const eyes=kind==='tirador'||kind==='sombra'?[]:face(head,kit,{angry:kind==='guardia'});
-  // Brazos con manos grandes; el objeto se sujeta en "held".
-  const arms=[-1,1].map(side=>{
-    const arm=new T.Group();arm.position.set(side*.2,.62,0);figure.add(arm);
-    part(arm,'ball',kit.cloth,0,-.08,0,.11,.2,.11);
-    part(arm,'ball',kit.skin,0,-.2,.02,.12,.12,.12);
-    const held=new T.Group();held.position.set(0,-.21,.06);held.name='held';arm.add(held);
-    return arm;
-  });
-  const [left,right]=arms;
-  const hand=arm=>arm.getObjectByName('held');
-  const gold=mat(kit.accent,{metal:.6,rough:.35});
-  const steel=mat(kit.metal,{metal:.65,rough:.32});
-  let top=1.13;
-  if(kind==='guardia'){
-    // Casco con visera y cresta, hombreras, peto con tabardo y gran escudo.
-    part(head,'dome',steel,0,.03,0,.5,.44,.47);
-    part(head,'torus',gold,0,.04,0,.47,.47,.6).rotation.x=Math.PI/2;
-    part(head,'box',mat(kit.cloth),0,.26,-.02,.06,.17,.38);
-    for(const side of [-1,1])part(head,'box',steel,side*.2,-.07,.06,.05,.16,.14);
-    top=1.2;
-    part(torso,'ball',steel,0,.53,.05,.33,.3,.22);
-    part(torso,'box',kit.cloth,0,.36,.13,.17,.22,.04);
-    for(const arm of arms){part(arm,'dome',steel,0,0,0,.2,.16,.2);part(arm,'torus',gold,0,-.01,0,.2,.2,.5).rotation.x=Math.PI/2;}
-    const shield=new T.Group();shield.position.set(-.05,.04,.12);hand(left).add(shield);
-    part(shield,'disc',steel,0,0,0,.44,.06,.52).rotation.x=Math.PI/2;
-    part(shield,'disc',kit.cloth,0,0,.025,.36,.04,.43).rotation.x=Math.PI/2;
-    part(shield,'torus',gold,0,0,.03,.44,.52,.6);
-    part(shield,'gem',gold,0,.02,.06,.12,.16,.06);
-    const sword=hand(right);
-    sword.rotation.x=1.15;
-    part(sword,'box',steel,0,.24,0,.07,.42,.025);
-    part(sword,'cone',steel,0,.48,0,.07,.07,.025);
-    part(sword,'box',gold,0,.04,0,.2,.04,.05);
-    part(sword,'ball','#4a3428',0,-.04,0,.05,.08,.05);
-    part(sword,'ball',gold,0,-.1,0,.06,.06,.06);
-  }else if(kind==='tirador'){
-    // Capucha con pico, capa corta, carcaj a la espalda y arco curvo.
-    part(head,'ball',kit.cloth,0,.04,-.04,.5,.48,.48);
-    part(head,'ball',kit.skin,0,-.02,.07,.4,.36,.34);
-    eyes.push(...face(head,kit,{z:.03}));
-    const tip=part(head,'cone',kit.cloth,0,.1,-.28,.16,.24,.16);tip.rotation.x=-1.9;
-    part(head,'ball',kit.hair,.06,.13,.16,.14,.06,.08);
-    top=1.16;
-    const cape=part(torso,'box',kit.cloth,0,.48,-.15,.36,.38,.04);cape.rotation.x=.12;
-    part(torso,'cyl','#7a4a30',-.1,.62,-.2,.11,.4,.11).rotation.z=-.35;
-    for(const dx of [-.04,0,.04]){const a=part(torso,'gem',mat('#f2f0e6'),-.17+dx,.86,-.22,.05,.09,.02);a.rotation.z=-.35;}
-    const bow=new T.Group();bow.position.set(0,.05,.05);bow.rotation.y=Math.PI/2;hand(left).add(bow);
-    part(bow,'arc',mat('#8a5a34',{rough:.6}),0,0,0,.36,.62,.9).rotation.z=Math.PI/2;
-    part(bow,'box',mat('#f2ead6'),.0,0,0,.008,.62,.008);
-    part(bow,'box',gold,-.18,0,0,.05,.08,.05);
-    part(arms[0],'cyl','#7a4a30',0,-.14,0,.12,.08,.12);
-  }else if(kind==='mistico'){
-    // Manto claro, diadema solar y báculo con disco de sol.
-    part(head,'ball',kit.hair,0,.06,-.05,.48,.42,.46);
-    for(const side of [-1,1])part(head,'ball',kit.hair,side*.17,-.12,-.04,.12,.26,.14);
-    part(head,'ball',kit.hair,.05,.15,.15,.2,.08,.1);
-    part(head,'torus',gold,0,.12,0,.44,.44,.5).rotation.x=Math.PI/2.3;
-    part(head,'gem',mat(kit.accent,{glow:.5}),0,.16,.2,.08,.1,.04);
-    top=1.18;
-    part(torso,'dome',mat('#f2ead6'),0,.6,0,.42,.2,.36);
-    part(torso,'box',gold,0,.3,.17,.06,.36,.02);
-    const staff=hand(right);
-    part(staff,'cyl','#8a6a44',0,.25,0,.04,.85,.04);
-    part(staff,'torus',gold,0,.72,0,.22,.22,.6);
-    part(staff,'ball',mat(kit.accent,{glow:.7}),0,.72,0,.11,.11,.11);
-    for(let i=0;i<8;i++){const ray=part(staff,'cone',gold,Math.sin(i*Math.PI/4)*.15,.72+Math.cos(i*Math.PI/4)*.15,0,.035,.07,.035);ray.rotation.z=-i*Math.PI/4;}
-  }else if(kind==='mago'){
-    // Gran sombrero de ala ancha con punta doblada y báculo de cristal.
-    const hat=new T.Group();hat.position.set(0,.14,0);head.add(hat);
-    part(hat,'disc',kit.dark,0,0,0,.72,.035,.68);
-    part(hat,'cone',kit.cloth,0,.2,-.02,.42,.42,.4);
-    const tip=part(hat,'cone',kit.cloth,.06,.43,-.08,.2,.2,.2);tip.rotation.z=-.6;
-    part(hat,'torus',gold,0,.04,0,.42,.42,.6).rotation.x=Math.PI/2;
-    part(hat,'gem',mat(kit.accent,{glow:.8}),.0,.12,.2,.07,.08,.03);
-    part(head,'ball',kit.hair,0,-.02,-.13,.4,.3,.22);
-    top=1.62;
-    const staff=hand(right);
-    part(staff,'cyl','#5a3a2a',0,.25,0,.045,.85,.045);
-    part(staff,'torus',gold,0,.66,0,.12,.12,.4).rotation.x=Math.PI/2;
-    const crystal=part(staff,'gem',mat(kit.accent,{glow:.9,rough:.2}),0,.8,0,.18,.28,.18);
-    crystal.name='crystal';
-  }else if(kind==='sombra'){
-    // Capucha ceñida, máscara bajo los ojos, cinta con colas, bufanda coral y dos dagas.
-    part(head,'ball',kit.cloth,0,.05,-.03,.48,.45,.46);
-    part(head,'ball',kit.skin,0,0,.08,.38,.22,.32);
-    eyes.push(...face(head,kit,{mask:true,angry:true,z:.02}));
-    part(head,'ball',mat(kit.dark),0,-.135,.11,.4,.15,.32);
-    part(head,'torus',mat(kit.accent),0,.06,0,.47,.47,.4).rotation.x=Math.PI/2;
-    for(const side of [-1,1]){const tail=part(head,'box',mat(kit.accent),side*.05,.0,-.27,.05,.04,.22);tail.rotation.set(-.6,side*.3,0);}
-    top=1.14;
-    part(torso,'torus',mat(kit.accent),0,.62,0,.3,.3,1.1).rotation.x=Math.PI/2;
-    part(torso,'gem',steel,.14,.36,.12,.08,.08,.02);
-    for(const arm of arms){
-      const dagger=hand(arm);
-      part(dagger,'box',steel,0,-.12,.0,.04,.24,.02).rotation.x=.2;
-      part(dagger,'box',mat(kit.accent),0,.0,0,.1,.03,.04);
-    }
-  }
-  const size=1.12;
-  figure.scale.setScalar(size);
-  const blinkAt=Math.random()*4;
-  const crystal=figure.getObjectByName('crystal');
-  const animate=(t,{gait,swing,walking,phase})=>{
-    const breath=Math.sin(t*2.8+phase);
-    const idle=walking?0:1;
-    figure.position.y=Math.abs(gait)*.06+breath*.02*idle;
-    torso.scale.y=1+breath*.025*idle;
-    head.position.y=.9+breath*.012*idle;
-    head.rotation.y=idle*Math.sin(t*.45+phase)*Math.max(0,Math.sin(t*.21+phase))*.4;
-    head.rotation.z=walking?gait*.06:Math.sin(t*1.3+phase)*.04;
-    figure.rotation.z=walking?gait*.05:0;
-    left.rotation.x=gait*.5+breath*.08*idle;
-    right.rotation.x=-gait*.5-swing*1.6-(.15+breath*.06)*idle;
-    left.rotation.z=-.08-idle*.04;right.rotation.z=.08+idle*.04;
-    legs[0].rotation.x=-gait*.6;legs[1].rotation.x=gait*.6;
-    // Parpadeo cada pocos segundos.
-    const blink=((t+blinkAt)%3.6)<.12?.15:1;
-    for(const eye of eyes)eye.scale.y=blink;
-    if(crystal){crystal.rotation.y=t*1.5;crystal.material.emissiveIntensity=.7+Math.sin(t*3)*.25+swing;}
-  };
-  return {root,figure,legs,arms,head:top*size,animate};
-}
-
 // ───────────── Héroes estilo PS1 (decisión de Lucho, 17-11-2026: ~4–5 cabezas) ─────────────
 // Low-poly facetado con color por vértice (una sola textura pequeña para la cara).
 // Escala: 1 casilla = 1 unidad; altura ≈1,35; cabeza ≈0,3 → 4,5 cabezas.
@@ -1145,97 +938,217 @@ function faceTexture(skin,hair,{scar=false}={}){
   return t;
 }
 const ps1Kits={
-  guardia:{cloth:'#3f7a74',clothDark:'#2a5450',steel:'#a9b8b6',steelDark:'#5f6f70',brass:'#c9963f',leather:'#5a3a26',skin:'#d9a07c',hair:'#4a2e1e'}
+  guardia:{cloth:'#3f7a74',clothDark:'#2a5450',steel:'#a9b8b6',steelDark:'#5f6f70',brass:'#c9963f',leather:'#5a3a26',skin:'#d9a07c',hair:'#4a2e1e'},
+  tirador:{cloth:'#3f6e3a',clothDark:'#2a4a28',steel:'#9a8a6a',steelDark:'#5a4a36',brass:'#b88a3a',leather:'#6a4428',skin:'#c9906a',hair:'#3a2a1a'},
+  mistico:{cloth:'#6a4a94',clothDark:'#46305e',steel:'#e8dcc0',steelDark:'#b8a888',brass:'#d9b25a',leather:'#5a3a2a',skin:'#d9a07c',hair:'#3a2a1a'},
+  mago:{cloth:'#34509a',clothDark:'#22345e',steel:'#c0c8d8',steelDark:'#6a7488',brass:'#c9a04f',leather:'#4a3428',skin:'#d9a07c',hair:'#3a2a1a',glow:'#7fe0ff'},
+  sombra:{cloth:'#3e2c52',clothDark:'#241a33',steel:'#c8d0d8',steelDark:'#5a6270',brass:'#ff7a5a',leather:'#2a2030',skin:'#c9906a',hair:'#1c1626'}
+};
+const SHADOW='#100e14';
+/** Capucha con la cara en sombra (las caras van ocultas por decisión de Lucho). */
+function hood(body,cloth,dark,{tip=false,y=1.2}={}){
+  lp(body,P.taper8,cloth,[0,y-.04,-.01],[0,Math.PI/8,0],[.3,.22,.3]);             // cuello de la capucha
+  lp(body,P.ball,cloth,[0,y+.06,-.02],[0,Math.PI/8,0],[.31,.3,.32]);             // bóveda redondeada
+  lp(body,P.prism6,SHADOW,[0,y-.01,.118],[Math.PI/2,0,0],[.17,.02,.2]);           // hueco en sombra (a ras)
+  lp(body,P.box,dark,[0,y+.1,.13],[-.45,0,0],[.2,.04,.06]);                      // visera de la capucha
+  if(tip)lp(body,P.cone6,cloth,[0,y+.1,-.2],[-1.9,0,0],[.12,.24,.12]);
+  else lp(body,P.box,cloth,[0,y-.08,-.15],[.2,0,0],[.24,.2,.06]);
+}
+/** Base común: cadera, torso, piernas y brazos. Cada clase añade su equipo antes de fusionar. */
+function ps1Base(k,{robe=false,armored=false,lean=0}={}){
+  const root=new T.Group(),figure=new T.Group();root.add(figure);
+  const body=[];
+  lp(body,P.taper8,k.leather,[0,.62,0],[0,Math.PI/8,0],[.3,.1,.22]);
+  lp(body,P.box,k.brass,[0,.665,.105],[0,0,0],[.08,.06,.03]);
+  lp(body,P.taper8,armored?k.steel:k.cloth,[0,.86,0],[Math.PI,Math.PI/8,0],[.38,.34,.26]);
+  lp(body,P.prism6,armored?k.steelDark:k.clothDark,[0,1.05,0],[0,0,0],[.12,.08,.12]);
+  if(robe){
+    lp(body,P.taper8,k.cloth,[0,.36,0],[0,Math.PI/8,0],[.44,.56,.36]);            // falda larga
+    lp(body,P.prism6,k.brass,[0,.1,0],[0,Math.PI/6,0],[.45,.035,.37]);              // ribete
+  }
+  const legs=[-1,1].map(s=>{
+    const leg=new T.Group();leg.position.set(s*.09,.6,0);figure.add(leg);
+    const p=[];
+    if(!robe)lp(p,P.taper6,k.clothDark,[0,-.13,0],[Math.PI,0,0],[.13,.26,.13]);
+    lp(p,P.taper6,armored?k.steel:k.leather,[0,-.4,0],[Math.PI,0,0],[.12,.26,.12]);
+    if(armored)lp(p,P.oct,k.steel,[0,-.27,.04],[0,0,0],[.11,.1,.09]);
+    lp(p,P.box,k.leather,[0,-.565,.035],[0,0,0],[.13,.07,.21]);
+    leg.add(fuse(p,'leg'));
+    return leg;
+  });
+  const arms=[-1,1].map(s=>{
+    const arm=new T.Group();arm.position.set(s*.21,.99,0);figure.add(arm);
+    const held=new T.Group();held.name='held';held.position.set(0,-.45,.04);arm.add(held);
+    return arm;
+  });
+  return {root,figure,body,legs,arms};
+}
+/** Brazo básico: hombro, brazo, antebrazo y mano. */
+function ps1Arm(arm,s,k,{armored=false,sleeve=null,bracer=null}={}){
+  const p=[];
+  if(armored){lp(p,P.dome,k.steel,[s*.02,0,0],[0,0,s*-.35],[.2,.15,.2]);lp(p,P.box,k.brass,[s*.06,-.02,0],[0,0,s*-.35],[.13,.025,.2]);}
+  else lp(p,P.ball,sleeve||k.cloth,[0,-.02,0],[0,0,0],[.15,.13,.15]);
+  lp(p,P.taper6,sleeve||k.clothDark,[0,-.13,0],[Math.PI,0,0],[.1,.22,.1]);
+  lp(p,P.taper6,armored?k.steel:(bracer||k.leather),[0,-.32,0],[Math.PI,0,0],[.11,.2,.11]);
+  lp(p,P.box,k.leather,[0,-.45,.01],[0,0,0],[.09,.08,.09]);
+  arm.add(fuse(p,'arm'));
+}
+const ps1Builders={
+  guardia(b,k){
+    const {body,arms}=b;
+    lp(body,P.box,k.steelDark,[0,.86,.125],[0,0,0],[.04,.3,.03]);
+    lp(body,P.box,k.cloth,[0,.6,.12],[.08,0,0],[.2,.3,.03]);
+    lp(body,P.box,k.cloth,[0,.6,-.12],[-.08,0,0],[.22,.3,.03]);
+    lp(body,P.box,k.brass,[0,.74,.135],[0,0,0],[.2,.025,.02]);
+    lp(body,P.taper6,k.steelDark,[0,1.04,0],[0,Math.PI/6,0],[.28,.06,.24]);
+    lp(body,P.head,k.steel,[0,1.2,0],[0,Math.PI/8,0],[.27,.28,.27]);
+    lp(body,P.box,SHADOW,[0,1.215,.128],[0,0,0],[.19,.03,.02]);
+    lp(body,P.box,k.steelDark,[0,1.13,.125],[0,0,0],[.14,.07,.02]);
+    for(const x of [-.04,0,.04])lp(body,P.box,SHADOW,[x,1.13,.137],[0,0,0],[.012,.04,.01]);
+    lp(body,P.dome,k.steel,[0,1.27,0],[0,Math.PI/8,0],[.31,.24,.31]);
+    lp(body,P.prism6,k.brass,[0,1.275,0],[0,Math.PI/6,0],[.31,.03,.31]);
+    lp(body,P.box,k.steel,[0,1.19,.135],[0,0,0],[.03,.1,.02]);
+    lp(body,P.box,k.steel,[0,1.15,-.1],[.15,0,0],[.27,.2,.07]);
+    lp(body,P.box,k.cloth,[0,1.42,-.02],[0,0,0],[.04,.12,.28]);
+    lp(body,P.box,k.clothDark,[0,1.44,-.17],[.5,0,0],[.04,.08,.1]);
+    arms.forEach((arm,i)=>ps1Arm(arm,i?1:-1,k,{armored:true}));
+    const shieldShape=new T.Shape();
+    shieldShape.moveTo(-.2,.2);shieldShape.lineTo(.2,.2);shieldShape.lineTo(.2,-.02);shieldShape.lineTo(0,-.26);shieldShape.lineTo(-.2,-.02);shieldShape.closePath();
+    const shieldGeo=new T.ExtrudeGeometry(shieldShape,{depth:.04,bevelEnabled:false});
+    const sp=[];
+    lp(sp,shieldGeo,k.steelDark,[0,0,0],[0,0,0],[1.08,1.08,1]);
+    lp(sp,shieldGeo,k.cloth,[0,.005,.035],[0,0,0],[.9,.9,.4]);
+    lp(sp,P.box,k.brass,[0,.03,.06],[0,0,0],[.05,.3,.02]);
+    lp(sp,P.box,k.brass,[0,.08,.06],[0,0,0],[.24,.05,.02]);
+    lp(sp,P.oct,k.brass,[0,.08,.075],[0,0,0],[.07,.07,.04]);
+    const shield=fuse(sp,'shield');shield.position.set(-.06,.02,.08);shield.rotation.y=-.35;
+    arms[0].getObjectByName('held').add(shield);
+    const wp=[];
+    lp(wp,P.prism6,'#6a4a30',[0,.17,0],[0,0,0],[.04,.4,.04]);
+    lp(wp,P.prism6,k.leather,[0,0,0],[0,0,0],[.05,.12,.05]);
+    lp(wp,P.oct,k.brass,[0,-.08,0],[0,0,0],[.06,.06,.06]);
+    lp(wp,P.prism6,k.steelDark,[0,.43,0],[0,0,0],[.09,.16,.09]);
+    for(let i=0;i<6;i++){const a=i*Math.PI/3;lp(wp,P.box,k.steel,[Math.sin(a)*.065,.43,Math.cos(a)*.065],[0,a,0],[.025,.17,.07]);}
+    lp(wp,P.cone6,k.steel,[0,.55,0],[0,0,0],[.06,.07,.06]);
+    lp(wp,P.prism6,k.brass,[0,.33,0],[0,0,0],[.07,.025,.07]);
+    const holder=arms[1].getObjectByName('held');holder.add(fuse(wp,'mace'));holder.rotation.x=1.25;
+    return {height:1.46};
+  },
+  tirador(b,k){
+    const {body,arms}=b;
+    lp(body,P.box,k.leather,[0,.82,.12],[0,0,0],[.26,.3,.03]);                     // jubón
+    for(const y of [.74,.84,.94])lp(body,P.box,k.steelDark,[0,y,.137],[0,0,0],[.2,.015,.01]);
+    lp(body,P.box,k.leather,[0,.82,0],[0,0,.6],[.04,.42,.25]);                    // correa
+    hood(body,k.cloth,k.clothDark,{tip:true});
+    lp(body,P.box,k.cloth,[0,.8,-.15],[.12,0,0],[.38,.42,.03]);                    // capa corta
+    lp(body,P.box,k.clothDark,[0,1.02,0],[0,0,0],[.36,.06,.3]);                    // cuello de la capa
+    lp(body,P.prism6,k.leather,[.1,.9,-.17],[0,0,-.35],[.1,.38,.1]);              // carcaj
+    for(const dx of [-.03,0,.03]){lp(body,P.box,'#d9cfb4',[.18+dx,1.14,-.17],[0,0,-.35],[.012,.12,.012]);lp(body,P.cone6,'#c84a3a',[.21+dx,1.2,-.17],[0,0,-.35],[.04,.06,.015]);}
+    arms.forEach((arm,i)=>ps1Arm(arm,i?1:-1,k,{bracer:k.leather}));
+    // Arco largo curvo: segmentos que siguen un arco.
+    const bp=[];
+    const seg=7,R=.42;
+    for(let i=0;i<seg;i++){
+      const a0=-1+2*i/seg,a1=-1+2*(i+1)/seg;
+      const p0=[Math.cos(a0*.8)*R-R*.75,Math.sin(a0*.8)*R],p1=[Math.cos(a1*.8)*R-R*.75,Math.sin(a1*.8)*R];
+      const len=Math.hypot(p1[0]-p0[0],p1[1]-p0[1]);
+      lp(bp,P.box,i===3?k.leather:'#7a5232',[(p0[0]+p1[0])/2,(p0[1]+p1[1])/2,0],[0,0,Math.atan2(p1[0]-p0[0],p1[1]-p0[1])*-1],[.035,len+.01,.03]);
+    }
+    lp(bp,P.box,'#e8e2d0',[Math.cos(.8)*R-R*.75,0,0],[0,0,0],[.006,Math.sin(.8)*R*2,.006]);
+    const bow=fuse(bp,'bow');bow.rotation.y=Math.PI/2;bow.position.set(0,.05,.02);
+    arms[0].getObjectByName('held').add(bow);
+    return {height:1.36};
+  },
+  mistico(b,k){
+    const {body,arms}=b;
+    lp(body,P.dome,k.steel,[0,.98,0],[0,Math.PI/8,0],[.42,.18,.34]);               // esclavina clara
+    lp(body,P.box,k.steel,[-.08,.75,.13],[0,0,0],[.06,.5,.02]);                    // estola
+    lp(body,P.box,k.steel,[.08,.75,.13],[0,0,0],[.06,.5,.02]);
+    for(const x of [-.08,.08])lp(body,P.box,k.brass,[x,.62,.142],[0,0,0],[.04,.04,.01]);
+    hood(body,k.steel,k.steelDark);
+    lp(body,P.prism6,k.brass,[0,1.3,0],[0,Math.PI/6,0],[.26,.03,.26]);             // diadema
+    lp(body,P.oct,k.brass,[0,1.34,.12],[0,0,0],[.06,.08,.03]);
+    arms.forEach((arm,i)=>ps1Arm(arm,i?1:-1,k,{sleeve:k.cloth,bracer:k.cloth}));
+    const sp=[];
+    lp(sp,P.prism6,'#8a6a44',[0,.3,0],[0,0,0],[.04,.95,.04]);
+    lp(sp,P.prism6,k.brass,[0,.78,0],[Math.PI/2,0,0],[.2,.03,.2]);
+    for(let i=0;i<8;i++){const a=i*Math.PI/4;lp(sp,P.cone6,k.brass,[Math.sin(a)*.14,.78+Math.cos(a)*.14,0],[0,0,-a],[.04,.07,.03]);}
+    lp(sp,P.oct,'#fff0b0',[0,.78,0],[0,0,0],[.08,.08,.05]);
+    arms[1].getObjectByName('held').add(fuse(sp,'staff'));
+    return {height:1.4};
+  },
+  mago(b,k){
+    const {body,arms}=b;
+    lp(body,P.box,k.brass,[0,.8,.125],[0,0,0],[.05,.36,.02]);
+    lp(body,P.head,SHADOW,[0,1.19,0],[0,Math.PI/8,0],[.26,.26,.26]);               // cara en sombra
+    lp(body,P.box,k.steel,[0,1.07,.12],[.3,0,0],[.16,.12,.06]);                    // barba gris
+    for(const x of [-.05,.05])lp(body,P.box,k.glow,[x,1.2,.13],[0,0,0],[.03,.015,.01]); // ojos que brillan
+    lp(body,P.prism6,k.clothDark,[0,1.31,0],[0,0,0],[.62,.03,.62]);               // ala
+    lp(body,P.cone6,k.cloth,[0,1.5,-.02],[-.1,0,0],[.3,.4,.3]);                     // copa
+    lp(body,P.cone6,k.cloth,[.05,1.72,-.09],[-.2,0,-.7],[.12,.18,.12]);           // punta doblada
+    lp(body,P.prism6,k.brass,[0,1.34,0],[0,0,0],[.31,.03,.31]);
+    arms.forEach((arm,i)=>ps1Arm(arm,i?1:-1,k,{sleeve:k.cloth,bracer:k.cloth}));
+    const sp=[];
+    lp(sp,P.prism6,'#4a3022',[0,.3,0],[0,0,0],[.045,.95,.045]);
+    for(const a of [0,2.1,4.2])lp(sp,P.box,'#4a3022',[Math.sin(a)*.05,.82,Math.cos(a)*.05],[Math.cos(a)*.4,0,-Math.sin(a)*.4],[.025,.16,.025]);
+    const staff=fuse(sp,'staff');
+    const crystal=new T.Mesh(P.oct,new T.MeshStandardMaterial({color:k.glow,emissive:k.glow,emissiveIntensity:.9,flatShading:true,roughness:.3}));
+    crystal.position.set(0,.92,0);crystal.scale.set(.13,.22,.13);crystal.name='crystal';
+    staff.add(crystal);
+    arms[1].getObjectByName('held').add(staff);
+    return {height:1.78,crystal};
+  },
+  sombra(b,k){
+    const {body,arms}=b;
+    lp(body,P.box,k.clothDark,[0,.85,.12],[0,0,0],[.3,.3,.03]);                    // peto acolchado
+    for(const y of [.76,.86,.96])lp(body,P.box,k.cloth,[0,y,.135],[0,0,.1],[.28,.02,.01]);
+    lp(body,P.taper8,k.brass,[0,.66,0],[0,Math.PI/8,0],[.32,.06,.24]);            // faja coral
+    lp(body,P.box,k.brass,[.12,.58,.1],[0,0,.3],[.06,.16,.02]);
+    lp(body,P.head,k.cloth,[0,1.2,0],[0,Math.PI/8,0],[.27,.28,.27]);               // capucha ceñida
+    lp(body,P.box,SHADOW,[0,1.22,.13],[0,0,0],[.18,.045,.02]);                     // rendija de ojos
+    lp(body,P.box,k.clothDark,[0,1.12,.12],[0,0,0],[.22,.1,.04]);                  // máscara
+    lp(body,P.prism6,k.brass,[0,1.29,0],[0,Math.PI/6,0],[.29,.035,.29]);           // cinta
+    for(const s of [-1,1])lp(body,P.box,k.brass,[s*.04,1.24,-.2],[-.7,s*.3,0],[.04,.03,.2]);
+    lp(body,P.taper6,k.brass,[0,1.04,0],[0,Math.PI/6,0],[.3,.07,.26]);            // bufanda
+    lp(body,P.box,k.brass,[.06,.96,-.15],[.3,0,.2],[.08,.18,.02]);
+    // Shuriken a la espalda.
+    for(let i=0;i<4;i++)lp(body,P.cone6,k.steel,[Math.sin(i*Math.PI/2)*.05,.9+Math.cos(i*Math.PI/2)*.05,-.15],[0,0,-i*Math.PI/2],[.04,.09,.01]);
+    arms.forEach((arm,i)=>{
+      ps1Arm(arm,i?1:-1,k,{sleeve:k.cloth,bracer:k.clothDark});
+      const dp=[];
+      lp(dp,P.box,k.steel,[0,-.14,0],[0,0,0],[.035,.26,.012]);
+      lp(dp,P.cone6,k.steel,[0,-.29,0],[Math.PI,0,0],[.035,.05,.012]);
+      lp(dp,P.box,k.brass,[0,0,0],[0,0,0],[.1,.025,.03]);
+      lp(dp,P.prism6,k.leather,[0,.05,0],[0,0,0],[.03,.08,.03]);
+      const dagger=fuse(dp,'dagger');dagger.rotation.x=.3;
+      arm.getObjectByName('held').add(dagger);
+    });
+    return {height:1.36,lean:.12};
+  }
 };
 function ps1Hero(kind,tint){
   const k={...ps1Kits[kind]};
   if(tint){k.cloth=tint.hex;k.clothDark=tint.dark;}
-  const root=new T.Group(),figure=new T.Group();root.add(figure);
-  // ── Torso, cadera y cabeza (una malla) ──
-  const body=[];
-  lp(body,P.taper8,k.leather,[0,.62,0],[0,Math.PI/8,0],[.3,.1,.22]);              // cadera
-  lp(body,P.box,k.brass,[0,.665,.105],[0,0,0],[.08,.06,.03]);                     // hebilla
-  lp(body,P.taper8,k.steel,[0,.86,0],[Math.PI,Math.PI/8,0],[.4,.34,.27]);          // peto (ancho arriba)
-  lp(body,P.box,k.steelDark,[0,.86,.125],[0,0,0],[.04,.3,.03]);                    // cresta del peto
-  lp(body,P.box,k.cloth,[0,.6,.12],[.08,0,0],[.2,.3,.03]);                         // tabardo delantero
-  lp(body,P.box,k.cloth,[0,.6,-.12],[-.08,0,0],[.22,.3,.03]);                      // tabardo trasero
-  lp(body,P.box,k.brass,[0,.74,.135],[0,0,0],[.2,.025,.02]);
-  lp(body,P.prism6,k.steelDark,[0,1.05,0],[0,0,0],[.12,.08,.12]);                  // cuello (cota)
-  lp(body,P.taper6,k.steelDark,[0,1.04,0],[0,Math.PI/6,0],[.28,.06,.24]);          // gorjal
-  lp(body,P.head,k.steel,[0,1.2,0],[0,Math.PI/8,0],[.27,.28,.27]);                 // yelmo cerrado
-  lp(body,P.box,'#141218',[0,1.215,.128],[0,0,0],[.19,.03,.02]);                   // ranura de visión
-  lp(body,P.box,k.steelDark,[0,1.13,.125],[0,0,0],[.14,.07,.02]);                  // respiradero
-  for(const x of [-.04,0,.04])lp(body,P.box,'#141218',[x,1.13,.137],[0,0,0],[.012,.04,.01]);
-  lp(body,P.dome,k.steel,[0,1.27,0],[0,Math.PI/8,0],[.31,.24,.31]);                // casco
-  lp(body,P.prism6,k.brass,[0,1.275,0],[0,Math.PI/6,0],[.31,.03,.31]);             // aro del casco
-  lp(body,P.box,k.steel,[0,1.19,.135],[0,0,0],[.03,.1,.02]);                       // refuerzo central
-  lp(body,P.box,k.steel,[0,1.15,-.1],[.15,0,0],[.27,.2,.07]);                      // cubrenuca
-
-
-  lp(body,P.box,k.cloth,[0,1.42,-.02],[0,0,0],[.04,.12,.28]);                      // cimera
-  lp(body,P.box,k.clothDark,[0,1.44,-.17],[.5,0,0],[.04,.08,.1]);
-  const torso=fuse(body,'body');figure.add(torso);
-  // ── Piernas ──
-  const legs=[-1,1].map(s=>{
-    const leg=new T.Group();leg.position.set(s*.09,.6,0);figure.add(leg);
-    const p=[];
-    lp(p,P.taper6,k.clothDark,[0,-.13,0],[Math.PI,0,0],[.13,.26,.13]);             // muslo
-    lp(p,P.oct,k.steel,[0,-.27,.04],[0,0,0],[.11,.1,.09]);                          // rodillera
-    lp(p,P.taper6,k.steel,[0,-.42,0],[Math.PI,0,0],[.12,.24,.12]);                  // greba
-    lp(p,P.box,k.leather,[0,-.565,.035],[0,0,0],[.13,.07,.21]);                      // bota
-    lp(p,P.box,k.steelDark,[0,-.55,.13],[.5,0,0],[.12,.04,.05]);                     // puntera
-    leg.add(fuse(p,'leg'));
-    return leg;
-  });
-  // ── Brazos (hombrera, brazo, guantelete, mano) ──
-  const arms=[-1,1].map(s=>{
-    const arm=new T.Group();arm.position.set(s*.22,.99,0);figure.add(arm);
-    const p=[];
-    lp(p,P.dome,k.steel,[s*.02,.0,0],[0,0,s*-.35],[.2,.15,.2]);                     // hombrera
-    lp(p,P.box,k.brass,[s*.06,-.02,0],[0,0,s*-.35],[.13,.025,.2]);
-    lp(p,P.taper6,k.clothDark,[0,-.13,0],[Math.PI,0,0],[.1,.22,.1]);               // brazo
-    lp(p,P.taper6,k.steel,[0,-.32,0],[Math.PI,0,0],[.11,.2,.11]);                   // antebrazo
-    lp(p,P.box,k.leather,[0,-.45,.01],[0,0,0],[.09,.08,.09]);                       // mano
-    arm.add(fuse(p,'arm'));
-    const held=new T.Group();held.name='held';held.position.set(0,-.45,.04);arm.add(held);
-    return arm;
-  });
-  // ── Escudo heráldico (mano izquierda) ──
-  const shieldShape=new T.Shape();
-  shieldShape.moveTo(-.2,.2);shieldShape.lineTo(.2,.2);shieldShape.lineTo(.2,-.02);shieldShape.lineTo(0,-.26);shieldShape.lineTo(-.2,-.02);shieldShape.closePath();
-  const shieldGeo=new T.ExtrudeGeometry(shieldShape,{depth:.04,bevelEnabled:false});
-  const sp=[];
-  lp(sp,shieldGeo,k.steelDark,[0,0,0],[0,0,0],[1.08,1.08,1]);
-  lp(sp,shieldGeo,k.cloth,[0,.005,.035],[0,0,0],[.9,.9,.4]);
-  lp(sp,P.box,k.brass,[0,.03,.06],[0,0,0],[.05,.3,.02]);
-  lp(sp,P.box,k.brass,[0,.08,.06],[0,0,0],[.24,.05,.02]);
-  lp(sp,P.oct,k.brass,[0,.08,.075],[0,0,0],[.07,.07,.04]);
-  const shield=fuse(sp,'shield');
-  shield.position.set(-.06,.02,.08);shield.rotation.y=-.35;
-  arms[0].getObjectByName('held').add(shield);
-  // ── Espada (mano derecha) ──
-  const wp=[];
-  lp(wp,P.prism6,'#6a4a30',[0,.17,0],[0,0,0],[.04,.4,.04]);                       // mango
-  lp(wp,P.prism6,k.leather,[0,.0,0],[0,0,0],[.05,.12,.05]);                       // empuñadura
-  lp(wp,P.oct,k.brass,[0,-.08,0],[0,0,0],[.06,.06,.06]);                          // pomo
-  lp(wp,P.prism6,k.steelDark,[0,.43,0],[0,0,0],[.09,.16,.09]);                    // cabeza de la maza
-  for(let i=0;i<6;i++){const a=i*Math.PI/3;lp(wp,P.box,k.steel,[Math.sin(a)*.065,.43,Math.cos(a)*.065],[0,a,0],[.025,.17,.07]);} // pestañas
-  lp(wp,P.cone6,k.steel,[0,.55,0],[0,0,0],[.06,.07,.06]);                          // punta
-  lp(wp,P.prism6,k.brass,[0,.33,0],[0,0,0],[.07,.025,.07]);                       // collar
-  const sword=fuse(wp,'mace');
-  const swordHolder=arms[1].getObjectByName('held');
-  swordHolder.add(sword);swordHolder.rotation.x=1.25;
+  const robe=kind==='mistico'||kind==='mago';
+  const b=ps1Base(k,{robe,armored:kind==='guardia'});
+  const info=ps1Builders[kind](b,k);
+  const {root,figure,legs,arms}=b;
+  const torso=fuse(b.body,'body');figure.add(torso);
+  const lean=info.lean||0;
   const animate=(t,{gait,swing,walking,phase})=>{
     const breath=Math.sin(t*2.4+phase);
     const idle=walking?0:1;
     figure.position.y=Math.abs(gait)*.05+breath*.008*idle;
+    figure.rotation.x=lean*idle;
     torso.rotation.y=idle*Math.sin(t*.4+phase)*.08;
     figure.rotation.z=walking?gait*.035:0;
     arms[0].rotation.x=gait*.4-.1*idle;
     arms[1].rotation.x=-gait*.4-swing*1.5-(.18+breath*.04)*idle;
     arms[0].rotation.z=-.1;arms[1].rotation.z=.1;
     legs[0].rotation.x=-gait*.55;legs[1].rotation.x=gait*.55;
+    if(info.crystal){info.crystal.rotation.y=t*1.4;info.crystal.material.emissiveIntensity=.8+Math.sin(t*3)*.2+swing;}
   };
   figure.scale.set(.92,.86,.92);
-  return {root,figure,legs,arms,head:1.46*.86,animate,pose:{T:()=>{arms[0].rotation.set(0,0,-Math.PI/2);arms[1].rotation.set(0,0,Math.PI/2);legs.forEach(l=>l.rotation.set(0,0,0));}}};
+  return {root,figure,legs,arms,head:info.height*.86,animate,
+    pose:{T:()=>{figure.rotation.x=0;arms[0].rotation.set(0,0,-Math.PI/2);arms[1].rotation.set(0,0,Math.PI/2);legs.forEach(l=>l.rotation.set(0,0,0));}}};
 }

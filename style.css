@@ -1,4 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Jacquard+12&family=Pixelify+Sans:wght@400;500;600;700&family=Silkscreen&display=swap');
+/* Números: los dígitos de Pixelify Sans se confunden (2/3/8); se dibujan con Jersey 10, solo 0-9. */
+@font-face{font-family:'Cripta Digits';src:url(https://fonts.gstatic.com/s/jersey10/v4/GftH7vZKsggXMf9n_J5n_5jh.woff2) format('woff2');unicode-range:U+0030-0039;size-adjust:124%;font-display:swap}
 
 /* ───────────── Tokens ───────────── */
 :root{
@@ -711,8 +713,8 @@ summary{cursor:pointer}
 /* ═════════════ Tema Loop Hero: pixel art oscuro, paleta corta, marcos con bisel duro ═════════════ */
 :root{
   --font-title:'Jacquard 12','Pixelify Sans',monospace;
-  --font-display:'Pixelify Sans','Silkscreen',monospace;
-  --font-ui:'Pixelify Sans','Silkscreen',monospace;
+  --font-display:'Cripta Digits','Pixelify Sans','Silkscreen',monospace;
+  --font-ui:'Cripta Digits','Pixelify Sans','Silkscreen',monospace;
   --bg-0:#060507;--bg-1:#0c0a0d;--bg-2:#151114;--bg-3:#1e181b;--bg-4:#2a2124;
   --line:#3a2f2c;--line-strong:#5c4a40;--line-gold:#8c6a2e;
   --paper:#ece2cf;--muted:#a8998a;--faint:#6f6458;

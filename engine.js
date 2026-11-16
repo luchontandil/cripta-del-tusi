@@ -20,6 +20,11 @@ export const classes = {
     ['Descarga arcana',2,6,6,9,'damage','✦'],
     ['Bola de fuego',3,5,7,11,'blast','✹',2],
     ['Escarcha',2,5,3,6,'slow','❄']
+  ]},
+  sombra: {name:'Acechante', hp:35, initiative:15, skills:[
+    ['Hoja umbría',2,1,8,11,'damage','⚔'],
+    ['Cuchilla envenenada',2,4,3,5,'venom','✧'],
+    ['Paso de sombra',2,3,0,0,'dash','↢',1]
   ]}
 };
 export const slots = {weapon:'Arma', armor:'Armadura', boots:'Botas', charm:'Talismán'};
@@ -89,7 +94,7 @@ function emit(s,event) {
 export function join(s,id,name,classId) {
   if(s.phase!=='lobby'||s.players.length>=4) fail('La sala no admite más jugadores.');
   if(!Object.hasOwn(classes,classId)) fail('Elige una clase válida.');
-  s.players.push({id,name:String(name||'Aventurero').trim().slice(0,22)||'Aventurero',classId,bag:[],equipment:{},gold:0});
+  s.players.push({id,name:String(name||'Aventurero').trim().slice(0,22)||'Aventurero',classId,bag:[],equipment:{},gold:0,level:1});
 }
 export function encounter(floor,size) {
   const count=Math.min(7,size+Math.floor(floor/2));
@@ -165,9 +170,13 @@ function openFloor(s,rng) {
   const mid=Math.floor(s.height/2);
   const heroes=s.players.map((p,i)=>{
     const previous=s.units.find(u=>u.id===p.id);
+    const level=s.floor;
+    p.level=level;
     const stats=sumStats(p.equipment);
-    const max=classes[p.classId].hp+stats.vitality;
-    return {id:p.id,name:p.name,classId:p.classId,initiative:classes[p.classId].initiative,stats,max,
+    stats.power+=Math.floor(level/2);
+    stats.healing+=Math.floor(level/2);
+    const max=classes[p.classId].hp+stats.vitality+(level-1)*4;
+    return {id:p.id,name:p.name,classId:p.classId,level,initiative:classes[p.classId].initiative,stats,max,
       hp:previous?Math.min(max,Math.max(previous.hp,0)+Math.ceil(max*.45)):max,
       pos:w*(mid+[0,-1,1,-2][i])+1,effects:{}};
   });
@@ -184,12 +193,12 @@ function openFloor(s,rng) {
   note(s,'Piso '+s.floor+' · '+s.layoutName+(s.floor%3===0?' · Cámara del jefe':''));
   beginTurn(s);
 }
-export function lineOfSight(s,from,to) {
+export function lineOfSight(s,from,to,ignoreId) {
   let x=from%s.width,y=Math.floor(from/s.width);
   const tx=to%s.width,ty=Math.floor(to/s.width);
   const dx=Math.abs(tx-x),dy=Math.abs(ty-y);
   const sx=Math.sign(tx-x),sy=Math.sign(ty-y);
-  const blocked=new Set([...s.walls,...s.units.filter(u=>alive(u)&&u.pos!==from&&u.pos!==to).map(u=>u.pos)]);
+  const blocked=new Set([...s.walls,...s.units.filter(u=>alive(u)&&u.id!==ignoreId&&u.pos!==from&&u.pos!==to).map(u=>u.pos)]);
   let ix=0,iy=0;
   while(ix<dx||iy<dy) {
     const cross=(1+2*ix)*dy-(1+2*iy)*dx;
@@ -258,6 +267,7 @@ function move(s,unit,path,voluntary=true) {
 }
 function beginTurn(s) {
   const u=s.units[s.turn];
+  s.enemyPlan=null;
   s.ap=4;
   s.mp=Math.max(0,3+(u.stats?.movement||0)-(u.effects.slow?.value||0));
   s.turnStarted=Date.now();
@@ -323,6 +333,27 @@ function castGlyph(s,boss,heroes,rng) {
   }
   note(s,boss.name+' anuncia glifos de brasas, veneno y cadenas.');
 }
+function attackOptions(s,unit,heroes,pos){
+  return heroes.filter(h=>distance(s,pos,h.pos)<=unit.range&&lineOfSight(s,pos,h.pos,unit.id))
+    .sort((a,b)=>a.hp-b.hp||distance(s,pos,a.pos)-distance(s,pos,b.pos));
+}
+export function planEnemy(s,unit,heroes){
+  const routes=paths(s,unit,s.width*s.height);
+  const firing=[];
+  for(const [pos,path] of [[unit.pos,[]],...routes]){
+    const target=attackOptions(s,unit,heroes,pos)[0];
+    if(!target)continue;
+    const nearest=Math.min(...heroes.map(h=>distance(s,pos,h.pos)));
+    const lethal=target.hp<=unit.damage?5:0;
+    const rangedSafety=unit.range>1?Math.min(nearest,unit.range)*2:0;
+    const score=lethal+rangedSafety-target.hp*.13-path.length*.54;
+    firing.push({path,score});
+  }
+  const local=firing.filter(option=>option.path.length<=s.mp).sort((a,b)=>b.score-a.score);
+  if(local.length)return local[0].path;
+  const approach=firing.sort((a,b)=>a.path.length-b.path.length||b.score-a.score)[0];
+  return approach?.path.slice(0,s.mp)||[];
+}
 export function tick(s,rng=Math.random) {
   if(Date.now()<s.deadline)return false;
   if(s.phase==='reward'){openFloor(s,rng);return true;}
@@ -330,27 +361,35 @@ export function tick(s,rng=Math.random) {
   const unit=s.units[s.turn];
   if(unit.enemy){
     const heroes=s.units.filter(u=>!u.enemy&&alive(u));
-    if(unit.boss)castGlyph(s,unit,heroes,rng);
-    const targetAt=pos=>heroes.filter(h=>distance(s,pos,h.pos)<=unit.range&&lineOfSight(s,pos,h.pos)).sort((a,b)=>a.hp-b.hp)[0];
-    if(!targetAt(unit.pos)){
-      const closest=pos=>Math.min(...heroes.map(h=>distance(s,pos,h.pos)));
-      const routes=paths(s,unit,Math.min(3,s.mp));
-      const positions=[unit.pos,...routes.keys()];
-      const next=positions.sort((a,b)=>Number(!!targetAt(b))-Number(!!targetAt(a))||closest(a)-closest(b))[0];
-      if(routes.has(next))move(s,unit,routes.get(next));
+    if(!s.enemyPlan){
+      if(unit.boss)castGlyph(s,unit,heroes,rng);
+      const route=planEnemy(s,unit,heroes);
+      if(route.length){
+        move(s,unit,route);
+        s.enemyPlan=unit.id;
+        s.deadline=Date.now()+route.length*220+400;
+        return true;
+      }
     }
-    const target=targetAt(unit.pos);
+    const target=attackOptions(s,unit,heroes,unit.pos)[0];
     if(target)hit(s,unit,target,unit.damage+roll(0,2,rng));
   }else note(s,unit.name+' se quedó sin tiempo.');
   advance(s,rng);
   return true;
 }
 const support=kind=>kind==='heal'||kind==='cleanse';
-export function inRange(s,unit,pos,skill) {
+export function hasRange(s,unit,pos,skill) {
   const [,cost,range,,,,,min=0]=skill;
   if(!Number.isInteger(pos)||pos<0||pos>=s.width*s.height||s.walls.includes(pos)||cost>s.ap)return false;
   const d=distance(s,unit.pos,pos);
-  return d>=min&&d<=range+(range>1?(unit.stats?.reach||0):0)&&lineOfSight(s,unit.pos,pos);
+  return d>=min&&d<=range+(range>1?(unit.stats?.reach||0):0);
+}
+export function inRange(s,unit,pos,skill) {
+  return hasRange(s,unit,pos,skill)&&lineOfSight(s,unit.pos,pos);
+}
+export function castableCell(s,unit,pos,skill){
+  if(!inRange(s,unit,pos,skill))return false;
+  return skill[5]==='blast'||(skill[5]==='dash'&&!s.units.some(u=>alive(u)&&u.pos===pos)&&paths(s,unit,skill[2]+unit.stats.reach).has(pos));
 }
 export function spellArea(s,pos,skill) {
   return skill[5]==='blast'?[pos,...adjacent(s,pos)].filter(cell=>!s.walls.includes(cell)):[pos];
@@ -391,6 +430,7 @@ function gearAction(s,p,a,rng) {
   }else{
     if(!item)fail('Objeto no encontrado.');
     if(a.type==='equip'&&item.kind==='gear'){
+      if(a.slot!==undefined&&a.slot!==item.slot)fail('Ese objeto no encaja en la ranura.');
       p.bag.splice(bagIndex,1);
       if(p.equipment[item.slot])p.bag.push(p.equipment[item.slot]);
       p.equipment[item.slot]=item;
@@ -411,7 +451,7 @@ export function act(s,id,a,rng=Math.random) {
   const host=s.players[0].id===id;
   if(a.type==='start'&&s.phase==='lobby'&&host){openFloor(s,rng);return;}
   if(a.type==='restart'&&['won','lost'].includes(s.phase)&&host){
-    Object.assign(s,create(),{players:s.players.map(p=>({...p,equipment:{},bag:[],gold:0})),seq:s.seq});
+    Object.assign(s,create(),{players:s.players.map(p=>({...p,equipment:{},bag:[],gold:0,level:1})),seq:s.seq});
     return;
   }
   if(s.phase==='reward'){gearAction(s,player,a,rng);return;}
@@ -430,8 +470,15 @@ export function act(s,id,a,rng=Math.random) {
   const [name,cost,,min,max,kind]=skill;
   if(cost>s.ap)fail('No te quedan suficientes puntos de acción.');
   const target=s.units.find(u=>alive(u)&&u.pos===a.pos);
+  if(kind==='dash'){
+    if(!castableCell(s,unit,a.pos,skill))fail('No hay una ruta libre a esa casilla.');
+    s.ap-=cost;
+    move(s,unit,paths(s,unit,skill[2]+unit.stats.reach).get(a.pos),false);
+    if(!alive(unit))advance(s,rng);
+    return;
+  }
   if(kind==='blast'){
-    if(!inRange(s,unit,a.pos,skill))fail('Casilla fuera de alcance o sin línea de visión.');
+    if(!castableCell(s,unit,a.pos,skill))fail('Casilla fuera de alcance o sin línea de visión.');
     s.ap-=cost;
     const area=spellArea(s,a.pos,skill);
     emit(s,{kind:'blast',pos:a.pos,area});
@@ -457,6 +504,10 @@ export function act(s,id,a,rng=Math.random) {
       note(s,target.name+' queda vulnerable: todos los atacantes infligen +3.');
     }
     if(alive(target)&&kind==='slow')effect(target,'slow',2,1);
+    if(alive(target)&&kind==='venom'){
+      effect(target,'poison',3,2);
+      note(s,target.name+' queda envenenado.');
+    }
     if(alive(target)&&kind==='push'){
       const to=target.pos+(target.pos-unit.pos);
       if(adjacent(s,target.pos).includes(to)&&!s.walls.includes(to)&&!s.units.some(u=>alive(u)&&u.pos===to))move(s,target,[to],false);

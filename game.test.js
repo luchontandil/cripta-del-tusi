@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {create,join,act,tick,encounter,paths,lineOfSight,inRange,spellArea,classes} from './engine.js';
+import {create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -29,6 +29,8 @@ test('valida turno, ruta, puntos, visibilidad y escalado',()=>{
   enemy.pos=to+3;
   s.walls=[to+1];
   assert.equal(lineOfSight(s,to,enemy.pos),false);
+  assert.equal(hasRange(s,archer,enemy.pos,classes.tirador.skills[0]),true);
+  assert.equal(inRange(s,archer,enemy.pos,classes.tirador.skills[0]),false);
   assert.throws(()=>act(s,'p0',{type:'skill',skill:0,pos:enemy.pos}),/visión/);
   assert.equal(s.ap,4);
   s.walls=[];
@@ -69,8 +71,8 @@ test('los jefes anuncian tres tipos de glifo y cadenas resta PM a quien empieza 
   assert.ok(s.glyphs.every(g=>g.warn));
   const hero=s.units.find(u=>u.id==='p0');
   hero.pos=s.glyphs.find(g=>g.kind==='slow').cells[0];
-  while(s.units[s.turn]!==boss)timeout(s);
-  timeout(s);
+  for(let i=0;i<16&&s.glyphs.some(g=>g.warn);i++)timeout(s);
+  while(s.units[s.turn]===boss&&s.enemyPlan)timeout(s);
   assert.equal(s.glyphs.every(g=>!g.warn),true);
   assert.equal(s.units[s.turn],hero);
   assert.equal(s.mp,1);
@@ -92,6 +94,10 @@ test('genera botín con afijos y permite equipar, engarzar, extraer y vender una
   assert.ok(Object.keys(gear.stats).length);
   if(s.offers.p0.includes(gear))act(s,'p0',{type:'reward',item:gear.id},rng);
   else {act(s,'p0',{type:'reward',item:null},rng);p.gold=200;act(s,'p0',{type:'buy',item:gear.id},rng);}
+  assert.throws(()=>act(s,'p0',{type:'equip',item:gear.id,slot:gear.slot==='weapon'?'armor':'weapon'},rng),/ranura/);
+  act(s,'p0',{type:'equip',item:gear.id,slot:gear.slot},rng);
+  act(s,'p0',{type:'unequip',slot:gear.slot},rng);
+  assert.ok(p.bag.includes(gear));
   act(s,'p0',{type:'equip',item:gear.id},rng);
   const rune={kind:'rune',id:999,stats:{power:2},price:10};
   p.bag.push(rune);
@@ -103,6 +109,27 @@ test('genera botín con afijos y permite equipar, engarzar, extraer y vender una
   assert.equal(p.gold,gold+5);
   act(s,'p0',{type:'next'},rng);
   assert.equal(s.floor,2);
+  assert.equal(p.level,2);
+  const raised=s.units.find(u=>u.id==='p0');
+  assert.ok(raised.max>=hero.max+4);
+  assert.ok(raised.stats.power>=1);
+});
+test('la IA rodea un muro y publica el trayecto antes de atacar',()=>{
+  const s=battle('tirador');
+  const hero=s.units[0], foe=s.units[1];
+  hero.pos=17;
+  foe.pos=13;
+  s.walls=[2,3,4,14,15,16,26,27,28];
+  act(s,'p0',{type:'end'},rng);
+  const route=planEnemy(s,foe,[hero]);
+  assert.deepEqual(route,[25,37,38]);
+  const hp=hero.hp;
+  timeout(s);
+  assert.equal(s.units[s.turn],foe);
+  assert.equal(hero.hp,hp);
+  assert.deepEqual(s.events.at(-1).path,route);
+  timeout(s);
+  assert.equal(s.units[s.turn],hero);
 });
 test('el Mago puede lanzar a una casilla vacía y dañar a dos enemigos en cruz',()=>{
   const s=battle('mago','guardia');

@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#171917">
   <title>Cripta del tusi</title>
-  <link rel="stylesheet" href="./style.css?v=6">
+  <link rel="stylesheet" href="./style.css?v=7">
 </head>
 <body><main>
   <header><div class="crest" aria-hidden="true">◆</div><h1>Cripta del tusi</h1><button id="music" type="button" aria-pressed="false">Música</button></header>
   <section id="entry" class="panel gateway">
     <h2>Entrar a la cripta</h2>
     <label>Nombre <input id="name" maxlength="22" placeholder="Aventurero"></label>
-    <label>Clase <select id="class"><option value="guardia">Guardián</option><option value="tirador">Arquero</option><option value="mistico">Clérigo</option><option value="mago">Mago</option></select></label>
+    <label>Clase <select id="class"><option value="guardia">Guardián</option><option value="tirador">Arquero</option><option value="mistico">Clérigo</option><option value="mago">Mago</option><option value="sombra">Acechante</option></select></label>
     <div id="class-preview"></div>
     <button id="solo" class="primary">Jugar en solitario</button>
     <details><summary>Jugar con amigos</summary>
@@ -31,7 +31,16 @@
       <aside class="panel combat-log"><h2>Registro</h2><ol id="log"></ol></aside>
       <section class="arena">
         <ol id="turns" class="initiative" aria-label="Orden de iniciativa"></ol>
-        <div id="battlefield"><div id="iso-world" hidden></div><div id="board"></div><div id="animations" aria-hidden="true"></div></div>
+        <div id="battlefield">
+          <div id="iso-world" hidden></div><div id="board"></div><div id="animations" aria-hidden="true"></div>
+          <div class="field-menu" aria-label="Controles del tablero">
+            <button id="field-bag" type="button" title="Mostrar u ocultar equipo y mochila" aria-pressed="true">Equipo</button>
+            <button id="field-music" type="button" title="Activar o silenciar música" aria-pressed="false">♫</button>
+            <button id="field-view" type="button" title="Cambiar vista" aria-pressed="true">3D</button>
+            <button id="field-shop" type="button" hidden>Mercader</button>
+          </div>
+          <section id="rewards" aria-label="Botín y mercader" hidden></section>
+        </div>
         <div id="glyph-legend" hidden class="legend"><span>◆ Brasas · daño</span><span>◆ Veneno · daño por turno</span><span>◆ Cadenas · −2 PM</span></div>
         <div id="controls" class="actionbar"></div>
         <div id="turn-bar" class="panel" hidden>
@@ -39,10 +48,9 @@
           <div id="clock" role="progressbar" aria-label="Tiempo de turno" aria-valuemin="0"><span id="seconds"></span></div>
           <button id="end-turn" class="primary" aria-keyshortcuts="F1">Terminar turno <kbd>F1</kbd></button>
         </div>
-        <div id="rewards" hidden></div>
       </section>
       <aside id="inventory" hidden></aside>
     </div>
   </section>
-</main><script type="module" src="./client.js?v=6"></script></body>
+</main><script type="module" src="./client.js?v=7"></script></body>
 </html>

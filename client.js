@@ -1,6 +1,6 @@
-import {classes,create,join,act,tick,paths,targetable,inRange,spellArea,slots,statNames} from './engine.js?v=5';
-import {portrait,spellIcon} from './art.js?v=3';
-import {setupMusic} from './music.js?v=3';
+import {classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames} from './engine.js?v=7';
+import {portrait,spellIcon} from './art.js?v=7';
+import {setupMusic} from './music.js?v=7';
 
 const el=id=>document.getElementById(id);
 let state,session,selected=null,busy=false,polling=false,generation=0,revision=0,rendered='';
@@ -9,8 +9,9 @@ const onPages=location.hostname.endsWith('.github.io');
 el('server').value=localStorage.getItem('amber-server')||(onPages?'https://cripta-del-tusi.onrender.com':location.origin);
 const error=message=>{el('error').textContent=message;};
 const iconName={expose:'Vulnerable',slow:'−PM',poison:'Veneno'};
-const specs={guardia:'Primera línea · debilita al enemigo',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha'};
-const musicMode=setupMusic(el('music'));
+const specs={guardia:'Primera línea · debilita al enemigo',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
+const musicMode=setupMusic(el('music'),el('field-music'));
+let bagShown=true,shopShown=false,drag=null,dropTarget=null,suppressInventoryClick=0;
 let iso=null;
 let useIso=localStorage.getItem('cripta-view')!=='2d';
 const battlefield=el('battlefield');
@@ -23,6 +24,9 @@ function syncViewport(){
   toggle.hidden=!iso||!state?.units.length;
   toggle.setAttribute('aria-pressed',String(shown));
   toggle.textContent=shown?'Vista isométrica':'Vista cenital';
+  el('field-view').hidden=!iso;
+  el('field-view').setAttribute('aria-pressed',String(shown));
+  el('field-view').textContent=shown?'3D':'2D';
 }
 el('view-toggle').onclick=()=>{
   useIso=!useIso;
@@ -33,12 +37,22 @@ el('view-toggle').onclick=()=>{
     iso.highlight(el('board').children);
   }
 };
+el('field-view').onclick=()=>el('view-toggle').click();
+el('field-bag').onclick=()=>{
+  bagShown=!bagShown;
+  el('inventory').hidden=!bagShown;
+  el('field-bag').setAttribute('aria-pressed',String(bagShown));
+};
+el('field-shop').onclick=()=>{
+  shopShown=!shopShown;
+  renderInventory(state.players.find(p=>p.id===session.id));
+};
 worldMount.addEventListener('graphicslost',()=>{
   iso?.show(false);
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=6').then(({createIso})=>{
+import('./isometric.js?v=7').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -96,6 +110,7 @@ function inspectUnit(unit,cell){
     'Iniciativa: '+unit.initiative,
     'Movimiento base: '+(3+(unit.stats?.movement||0))+' PM'
   ];
+  if(unit.level)rows.push('Nivel: '+unit.level);
   if(unit.enemy)rows.push('Ataque: '+unit.damage+'–'+(unit.damage+2),'Alcance: '+unit.range+' casillas');
   else rows.push(...Object.entries(unit.stats||{}).filter(([key,value])=>value&&!['ward','movement','vitality'].includes(key)).map(([key,value])=>statNames[key]+': +'+value));
   rows.push(effects.length?'Efectos: '+effects.join(' / '):'Sin efectos activos');
@@ -148,6 +163,60 @@ function itemRow(item,title,actions=[]){
   return row;
 }
 const slotIcons={weapon:'⚔',armor:'⛨',boots:'➟',charm:'◇'};
+const dropTargets=new WeakMap();
+function draggable(tile,payload){
+  const face=tile.querySelector('summary');
+  face.classList.add('draggable-item');
+  face.addEventListener('pointerdown',event=>{
+    if(event.button!==0)return;
+    drag={payload,x:event.clientX,y:event.clientY,id:event.pointerId,label:face.title};
+  });
+}
+function dropZone(tile,accept,drop){
+  dropTargets.set(tile,{accept,drop});
+}
+function inventoryTarget(event){
+  let node=document.elementFromPoint(event.clientX,event.clientY);
+  while(node&&node!==el('inventory')){
+    if(dropTargets.get(node)?.accept(drag.payload))return node;
+    node=node.parentElement;
+  }
+  return null;
+}
+document.addEventListener('pointermove',event=>{
+  if(!drag||event.pointerId!==drag.id)return;
+  if(!drag.ghost&&Math.hypot(event.clientX-drag.x,event.clientY-drag.y)<5)return;
+  if(!drag.ghost){
+    drag.ghost=document.createElement('span');
+    drag.ghost.className='item-ghost';
+    drag.ghost.textContent=drag.label;
+    document.body.append(drag.ghost);
+    el('inventory').classList.add('dragging');
+  }
+  drag.ghost.style.left=event.clientX+'px';
+  drag.ghost.style.top=event.clientY+'px';
+  const next=inventoryTarget(event);
+  dropTarget?.classList.remove('drop-target');
+  dropTarget=next;
+  dropTarget?.classList.add('drop-target');
+});
+function finishDrag(event){
+  if(!drag||event.pointerId!==drag.id)return;
+  const active=drag;
+  const target=event.type==='pointerup'&&active.ghost?inventoryTarget(event):null;
+  drag=null;
+  dropTarget?.classList.remove('drop-target');
+  dropTarget=null;
+  active.ghost?.remove();
+  el('inventory').classList.remove('dragging');
+  if(active.ghost)suppressInventoryClick=performance.now()+310;
+  if(target)dropTargets.get(target).drop(active.payload);
+}
+document.addEventListener('pointerup',finishDrag);
+document.addEventListener('pointercancel',finishDrag);
+el('inventory').addEventListener('click',event=>{
+  if(performance.now()<suppressInventoryClick){event.preventDefault();event.stopImmediatePropagation();}
+},true);
 function inventorySlot(item,label,actions=[],fallback=''){
   const tile=document.createElement(item?'details':'div');
   tile.className='inventory-slot '+(item?'filled grade'+(item.grade||0):'empty');
@@ -170,17 +239,25 @@ function renderInventory(player){
   const holder=el('inventory');
   const rewards=el('rewards');
   const trading=state.phase==='reward';
-  holder.hidden=state.phase==='lobby';
-  rewards.hidden=!trading;
-  if(holder.hidden){holder.replaceChildren();rewards.replaceChildren();return;}
-  const gear=panel('Equipo · '+player.gold+' oro');
+  holder.hidden=state.phase==='lobby'||!bagShown;
+  el('field-shop').hidden=!trading;
+  const choosing=trading&&!state.picks.includes(player.id);
+  rewards.hidden=!choosing&&!(trading&&shopShown);
+  if(state.phase==='lobby'){holder.replaceChildren();rewards.replaceChildren();return;}
+  const gear=panel('Nivel '+player.level+' · '+player.gold+' oro');
   const gearGrid=document.createElement('div');
   gearGrid.className='equipment-grid';
   for(const [slot,label] of Object.entries(slots)){
     const item=player.equipment[slot];
     const actions=item&&trading?[actionButton('Quitar','unequip',{slot})]:[];
     if(trading&&item?.socket)actions.push(actionButton('Extraer runa','unsocket',{slot}));
-    gearGrid.append(inventorySlot(item,label,actions,slotIcons[slot]));
+    const tile=inventorySlot(item,label,actions,slotIcons[slot]);
+    if(trading){
+      if(item)draggable(tile,{from:'gear',slot});
+      dropZone(tile,p=>p.from==='bag'&&(p.slot===slot||(p.kind==='rune'&&!!item)),
+        p=>send({type:p.kind==='rune'?'socket':'equip',slot,item:p.item}));
+    }
+    gearGrid.append(tile);
   }
   gear.append(gearGrid);
   const bag=panel('Mochila');
@@ -195,13 +272,16 @@ function renderInventory(player){
       }
       actions.push(actionButton('Vender · '+(Math.floor(item.price/2)+(item.socket?Math.floor(item.socket.price/2):0))+' oro','sell',{item:item.id}));
     }
-    bagGrid.append(inventorySlot(item,'',actions));
+    const tile=inventorySlot(item,'',actions);
+    if(trading)draggable(tile,{from:'bag',item:item.id,slot:item.slot,kind:item.kind});
+    bagGrid.append(tile);
   }
   const visibleSlots=Math.max(12,Math.ceil(player.bag.length/4)*4);
   for(let index=player.bag.length;index<visibleSlots;index++)bagGrid.append(inventorySlot(null,''));
+  if(trading)dropZone(bagGrid,p=>p.from==='gear',p=>send({type:'unequip',slot:p.slot}));
   bag.append(bagGrid);
   holder.replaceChildren(gear,bag);
-  if(!trading){rewards.replaceChildren();return;}
+  if(rewards.hidden){rewards.replaceChildren();return;}
   const shop=panel('Mercader');
   if(!state.stock.length)shop.append('Todo vendido');
   for(const item of state.stock){
@@ -216,7 +296,11 @@ function renderInventory(player){
     for(const item of choices)loot.append(itemRow(item,'',[actionButton('Elegir','reward',{item:item.id})]));
     loot.append(actionButton('Pasar','reward',{item:null}));
   }
-  rewards.replaceChildren(loot,shop);
+  if(shopShown)shop.prepend(btn('Cerrar',()=>{
+    shopShown=false;
+    renderInventory(player);
+  }));
+  rewards.replaceChildren(...(choosing?[loot]:[]),...(shopShown?[shop]:[]));
 }
 function pawnName(name){
   const tag=document.createElement('span');
@@ -293,7 +377,7 @@ async function animate(){
     let from=boardPoint(event.from);
     for(const square of event.path){
       const to=boardPoint(square);
-      const motion=pawn.animate([from,to],{duration:135,easing:'ease-in-out',fill:'forwards'});
+      const motion=pawn.animate([from,to],{duration:220,easing:'ease-in-out',fill:'forwards'});
       await motion.finished.catch(()=>{});
       if(epoch!==animationEpoch)break;
       Object.assign(pawn.style,to);
@@ -320,6 +404,7 @@ function setState(next,initial=false){
   if(newFloor||previous?.turn!==next.turn||previous?.phase!==next.phase||previous?.rounds!==next.rounds){
     selected=null;
   }
+  if(next.phase!=='reward')shopShown=false;
   state=next;
   musicMode(next.phase==='combat');
   render();
@@ -373,8 +458,9 @@ function drawBoard(turn,walking,skill){
     const wall=state.walls.includes(pos);
     const glyph=state.glyphs.find(g=>g.cells.includes(pos));
     const castRange=skill&&inRange(state,turn,pos,skill);
+    const blocked=skill&&hasRange(state,turn,pos,skill)&&!castRange;
     const blast=skill?.[5]==='blast';
-    const aim=castRange&&(blast||targetable(state,turn,unit,skill));
+    const aim=castRange&&(castableCell(state,turn,pos,skill)||(!['dash','blast'].includes(skill[5])&&targetable(state,turn,unit,skill)));
     const path=walking.get(pos);
     const cell=btn('',()=>{
       if(aim){send({type:'skill',pos,skill:selected});return;}
@@ -382,7 +468,7 @@ function drawBoard(turn,walking,skill){
     });
     const shadesIndex=((Math.imul(pos+1,2654435761)^state.mapSeed)>>>6)%shades.length;
     cell.style.setProperty('--tile',shades[shadesIndex]);
-    cell.className=['cell',wall&&'wall',path&&'walk',castRange&&'cast-range',aim&&'aim',glyph&&'glyph-'+glyph.kind,glyph?.warn&&'warn'].filter(Boolean).join(' ');
+    cell.className=['cell',wall&&'wall',path&&'walk',blocked&&'no-sight',castRange&&'cast-range',aim&&'aim',glyph&&'glyph-'+glyph.kind,glyph?.warn&&'warn'].filter(Boolean).join(' ');
     cell.setAttribute('aria-label',(unit?.name||(wall?'Muro':'Casilla'))+' '+(pos%state.width+1)+', '+(Math.floor(pos/state.width)+1));
     if(path){
       cell.onpointerenter=cell.onfocus=()=>{
@@ -471,13 +557,13 @@ function render(){
       shortcut.setAttribute('aria-hidden','true');
       b.append(shortcut);
       b.setAttribute('aria-keyshortcuts',String(i+1));
-      b.title=cost+' PA · alcance '+minRange+'–'+(range+(range>1?turn.stats.reach:0))+' · '+min+'–'+max+' '+(['heal','cleanse'].includes(kind)?'cura':'daño base');
+      b.title=cost+' PA · alcance '+minRange+'–'+(range+(range>1?turn.stats.reach:0))+(kind==='dash'?' · movimiento sin gastar PM':' · '+min+'–'+max+' '+(['heal','cleanse'].includes(kind)?'cura':'daño base'));
       b.disabled=cost>state.ap;
       controls.append(b);
     });
     const hint=document.createElement('small');
     hint.id='path-status';
-    hint.textContent=selected===null?'Azul: casillas a las que puedes moverte.':skill[5]==='blast'?'Morado: puntos de lanzamiento. Naranja: área de impacto.':'Morado: alcance. Dorado: objetivos válidos.';
+    hint.textContent=selected===null?'Azul: casillas a las que puedes moverte.':'Morado: alcance · Rojo: sin visión · Dorado: objetivo válido'+(skill[5]==='blast'?' · Naranja: área de impacto':'');
     controls.append(hint);
   }
   drawBoard(turn,walking,skill);

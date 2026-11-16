@@ -8,8 +8,10 @@ const melody=[
   [69,null,70,74,null,72,69,null],[67,null,64,61,null,64,69,null]
 ];
 const hz=n=>440*2**((n-69)/12);
-export function setupMusic(button) {
-  let ctx,master,timer,next,bar=0,battle=false;
+export function setupMusic(button,fieldButton) {
+  let ctx,master,timer,next,bar=0,battle=false,starting=false,muted=false;
+  try{muted=localStorage.getItem('cripta-muted')==='yes';}catch{}
+  const buttons=[button,fieldButton];
   function voice(note,time,length,volume,type='sine',attack=.035){
     const tone=ctx.createOscillator();
     const gain=ctx.createGain();
@@ -31,6 +33,7 @@ export function setupMusic(button) {
       const chord=chords[pattern];
       voice(chord[0],next,step*7,.33,'sine',.14);
       voice(chord[2]-12,next,step*6,.12,'triangle',.14);
+      for(const note of chord.slice(1))voice(note+12,next,step*7.7,.045,'sine',step*1.8);
       for(let i=0;i<8;i++){
         const time=next+i*step;
         const harmony=chord[[0,2,1,3,0,1,2,3][i]]+12;
@@ -46,32 +49,52 @@ export function setupMusic(button) {
       bar++;
     }
   }
-  button.onclick=async()=>{
-    button.disabled=true;
+  function reflect(enabled){
+    for(const control of buttons)control.setAttribute('aria-pressed',String(enabled));
+    button.textContent=enabled?'Silenciar música':'Activar música';
+    fieldButton.textContent=enabled?'♫':'♪';
+  }
+  async function start(){
+    if(timer||starting)return;
+    starting=true;
     try{
-      if(timer){
-        clearInterval(timer);
-        timer=null;
-        await ctx.close();
-        button.setAttribute('aria-pressed','false');
-        button.textContent='Música';
-      }else{
-        const Audio=window.AudioContext||window.webkitAudioContext;
-        if(!Audio)throw new Error('Audio no disponible');
-        ctx=new Audio();
-        master=ctx.createGain();
-        master.gain.value=.20;
-        master.connect(ctx.destination);
-        await ctx.resume();
-        next=ctx.currentTime+.05;
-        timer=setInterval(schedule,100);
-        schedule();
-        button.setAttribute('aria-pressed','true');
-        button.textContent='Música activa';
-      }
+      const Audio=window.AudioContext||window.webkitAudioContext;
+      if(!Audio)throw new Error('Audio no disponible');
+      ctx=new Audio();
+      master=ctx.createGain();
+      master.gain.value=.30;
+      master.connect(ctx.destination);
+      const echo=ctx.createDelay(.8);
+      const send=ctx.createGain();
+      echo.delayTime.value=.24;
+      send.gain.value=.15;
+      master.connect(echo).connect(send).connect(ctx.destination);
+      await ctx.resume();
+      if(muted){await ctx.close();return;}
+      next=ctx.currentTime+.05;
+      timer=setInterval(schedule,100);
+      schedule();
+      reflect(true);
     }catch{
       button.textContent='Audio no disponible';
-    }finally{button.disabled=false;}
+    }finally{starting=false;}
+  }
+  function toggle(){
+    muted=!!timer||starting;
+    try{localStorage.setItem('cripta-muted',muted?'yes':'no');}catch{}
+    if(muted){
+      clearInterval(timer);
+      timer=null;
+      if(ctx?.state==='running'&&!starting)ctx.close().catch(()=>{});
+      reflect(false);
+    }else start();
+  }
+  reflect(false);
+  for(const control of buttons)control.onclick=toggle;
+  document.addEventListener('click',event=>{
+    if(!muted&&!buttons.includes(event.target))start();
+  },{once:true,capture:true});
+  return value=>{
+    battle=value;
   };
-  return value=>{battle=value;};
 }

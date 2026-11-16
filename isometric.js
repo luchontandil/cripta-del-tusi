@@ -1,5 +1,5 @@
 import * as T from './three.module.js';
-import {miniature,obstacle,piece,solid} from './models3d.js';
+import {miniature,obstacle,piece,solid} from './models3d.js?v=7';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -7,7 +7,7 @@ const tilesets={
   crypt:['#3e485e','#4c506a','#41475c','#575970','#464d63'],
   roots:['#3c524e','#465c50','#384a4a','#4e5f55','#415450']
 };
-const overlayColors={walk:'#448ead',cast:'#725298',aim:'#f1bf71',route:'#b3efff',area:'#ed8855',damage:'#ea6a50',poison:'#9abe56',slow:'#719add'};
+const overlayColors={walk:'#448ead',cast:'#725298',aim:'#f1bf71',route:'#b3efff',area:'#ed8855',blocked:'#b34255',damage:'#ea6a50',poison:'#9abe56',slow:'#719add'};
 const ink='#121423';
 const logical=(state,pos)=>new T.Vector3(pos%state.width-(state.width-1)/2,0,Math.floor(pos/state.width)-(state.height-1)/2);
 const random=(seed,i)=>((Math.imul(i+7,2654435761)^seed)>>>0)/4294967296;
@@ -17,10 +17,12 @@ export function createIso(mount,onCell){
   let renderer;
   try{renderer=new T.WebGLRenderer({antialias:true,alpha:true,powerPreference:'low-power'});}
   catch{return null;}
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.65));
+  renderer.setPixelRatio(1);
   renderer.outputColorSpace=T.SRGBColorSpace;
   renderer.toneMapping=T.ACESFilmicToneMapping;
   renderer.toneMappingExposure=1.25;
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=T.PCFShadowMap;
   renderer.domElement.setAttribute('aria-hidden','true');
   const labels=document.createElement('div');
   labels.className='iso-labels';
@@ -35,11 +37,36 @@ export function createIso(mount,onCell){
   scene.add(new T.HemisphereLight('#d4e1ff','#322139',2.15));
   const key=new T.DirectionalLight('#ffd1a1',2.4);
   key.position.set(-5,10,6);
+  key.castShadow=true;
+  key.shadow.mapSize.set(1024,1024);
+  key.shadow.camera.left=key.shadow.camera.bottom=-12;
+  key.shadow.camera.right=key.shadow.camera.top=12;
+  key.shadow.camera.far=42;
+  key.shadow.normalBias=.025;
   scene.add(key);
   const fill=new T.DirectionalLight('#a3aaff',1.2);
   fill.position.set(5,6,-7);
   scene.add(fill);
   const camera=new T.OrthographicCamera(-1,1,1,-1,.1,100);
+  const pixels=new T.WebGLRenderTarget(1,1,{minFilter:T.NearestFilter,magFilter:T.NearestFilter});
+  const screen=new T.Scene();
+  const screenCamera=new T.OrthographicCamera(-1,1,1,-1,0,2);
+  screenCamera.position.z=1;
+  const pixelMaterial=new T.ShaderMaterial({
+    uniforms:{image:{value:pixels.texture},resolution:{value:new T.Vector2(1,1)}},
+    vertexShader:`varying vec2 tex; void main(){tex=uv;gl_Position=vec4(position.xy,0.,1.);}`,
+    fragmentShader:`uniform sampler2D image; uniform vec2 resolution; varying vec2 tex;
+      void main(){
+        vec2 p=floor(tex*resolution);
+        gl_FragColor=texture2D(image,(p+.5)/resolution);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+        float threshold=mod(p.x+p.y*2.,4.)/4.-.375;
+        gl_FragColor.rgb=clamp(floor(gl_FragColor.rgb*31.+.5+threshold)/31.,0.,1.);
+      }`,
+    transparent:true,depthTest:false
+  });
+  screen.add(new T.Mesh(new T.PlaneGeometry(2,2),pixelMaterial));
   const plane=new T.Plane(new T.Vector3(0,1,0),0);
   const ray=new T.Raycaster();
   const mouse=new T.Vector2();
@@ -52,6 +79,7 @@ export function createIso(mount,onCell){
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
   let stageKey='',state,active=false,hover=null,frame=0,viewWidth=0,viewHeight=0;
   let routeSignature='';
+  let previousFrame=0;
   const routeGroup=new T.Group();
   stage.add(routeGroup);
 
@@ -63,6 +91,8 @@ export function createIso(mount,onCell){
       viewWidth=lastRect.width;
       viewHeight=lastRect.height;
       renderer.setSize(viewWidth,viewHeight,false);
+      pixels.setSize(Math.max(1,Math.round(viewWidth*.68)),Math.max(1,Math.round(viewHeight*.68)));
+      pixelMaterial.uniforms.resolution.value.set(pixels.width,pixels.height);
     }
     camera.position.set(17,17.5,18);
     camera.lookAt(0,.25,0);
@@ -221,7 +251,7 @@ export function createIso(mount,onCell){
       if(!o)continue;
       const c=cell.classList;
       const glyph=['damage','poison','slow'].find(kind=>c.contains('glyph-'+kind));
-      const type=c.contains('area-preview')?'area':c.contains('route')?'route':glyph||(
+      const type=c.contains('area-preview')?'area':c.contains('route')?'route':c.contains('no-sight')?'blocked':glyph||(
         c.contains('aim')?'aim':c.contains('cast-range')?'cast':c.contains('walk')?'walk':null);
       o.visible=!!type;
       if(type)o.material=solid(overlayColors[type],true);
@@ -277,6 +307,7 @@ export function createIso(mount,onCell){
     active=value;
     mount.hidden=!value;
     if(value){
+      previousFrame=0;
       fit();
       frame=requestAnimationFrame(draw);
     }else{
@@ -290,12 +321,8 @@ export function createIso(mount,onCell){
     const model=models.get(event.unit);
     if(!model)return Promise.resolve();
     const points=[event.from,...event.path].map(pos=>logical(state,pos));
-    if(reduced){
-      model.root.position.copy(points.at(-1));
-      return Promise.resolve();
-    }
     model.root.position.copy(points[0]);
-    return new Promise(resolve=>steps.set(event.unit,{points,start:performance.now(),resolve,index:0}));
+    return new Promise(resolve=>steps.set(event.unit,{points,elapsed:0,first:true,resolve}));
   }
   function impact(event){
     if(!active)return;
@@ -323,6 +350,8 @@ export function createIso(mount,onCell){
   }
   function draw(now){
     if(!active)return;
+    const delta=previousFrame?Math.min(45,Math.max(0,now-previousFrame)):0;
+    previousFrame=now;
     for(const [index,flame] of torches.entries()){
       const t=reduced?0:now*.007+index;
       flame.scale.y=.34+Math.sin(t)*.065;
@@ -332,7 +361,9 @@ export function createIso(mount,onCell){
       const walk=steps.get(id);
       let gait=0;
       if(walk){
-        const t=(now-walk.start)/175;
+        if(walk.first)walk.first=false;
+        else walk.elapsed+=delta;
+        const t=walk.elapsed/(reduced?145:225);
         const i=Math.min(walk.points.length-2,Math.floor(t));
         const a=walk.points[i],b=walk.points[i+1];
         model.root.position.lerpVectors(a,b,ease(clamp(t-i,0,1)));
@@ -342,9 +373,11 @@ export function createIso(mount,onCell){
       }
       const strike=Math.max(0,1-(now-(model.strike??-10000))/285);
       const swing=Math.sin(strike*Math.PI);
-      model.figure.position.y=reduced?0:Math.abs(gait)*.055+Math.sin(now*.003+model.phase)*.018;
-      model.arms[0].rotation.x=gait*.36;
-      model.arms[1].rotation.x=-gait*.36-swing*.97;
+      const breath=reduced?0:Math.sin(now*.003+model.phase);
+      model.figure.position.y=reduced?0:Math.abs(gait)*.055+breath*.024;
+      model.figure.rotation.z=walk?gait*.055:breath*.035;
+      model.arms[0].rotation.x=gait*.36+breath*.12;
+      model.arms[1].rotation.x=-gait*.36-swing*.97-breath*.10;
       model.legs[0].rotation.x=-gait*.43;
       model.legs[1].rotation.x=gait*.43;
       model.shadow.position.x=model.root.position.x;
@@ -364,7 +397,10 @@ export function createIso(mount,onCell){
         fx.mesh.position.y=.56+Math.sin(t*Math.PI)*.52;
       }
     }
+    renderer.setRenderTarget(pixels);
     renderer.render(scene,camera);
+    renderer.setRenderTarget(null);
+    renderer.render(screen,screenCamera);
     frame=requestAnimationFrame(draw);
   }
   return {show,sync,anchor,highlight,move,impact,get active(){return active;}};

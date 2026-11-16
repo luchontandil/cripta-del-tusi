@@ -19,6 +19,7 @@ export function piece(parent,shape,color,x,y,z,sx,sy,sz,glow=false){
   const mesh=new T.Mesh(shapes[shape],solid(color,glow));
   mesh.position.set(x,y,z);
   mesh.scale.set(sx,sy,sz);
+  mesh.receiveShadow=!glow;
   parent.add(mesh);
   return mesh;
 }
@@ -27,6 +28,7 @@ const looks={
   tirador:['#47765b','#e7ae69','#314632','#ddb38d'],
   mistico:['#79548b','#ffd894','#493156','#efbc91'],
   mago:['#425c9a','#9dd6fd','#293858','#f1b490'],
+  sombra:['#4d355c','#ed9c79','#252137','#bf8978'],
   enemy:['#873f47','#ff9861','#4b2830','#8e6762'],
   ranged:['#793860','#f298b2','#39283d','#a77986'],
   elite:['#5c456e','#c8b1ff','#362d45','#7d658e'],
@@ -71,9 +73,23 @@ export function miniature(kind) {
   piece(figure,'cube',accent,0,.49,.179,.105,.064,.036);
   piece(figure,'orb',body,0,.675,0,.47,.32,.35);
   piece(figure,'orb',skin,0,.922,.015,.36,.34,.34);
-  if(robe||kind==='tirador'||kind==='ranged'){
+  if(robe||kind==='tirador'||kind==='ranged'||kind==='sombra'){
     piece(figure,'orb',dark,0,.994,-.043,.41,.33,.33);
     piece(figure,'cube',body,0,.733,-.175,.36,.47,.07).rotation.x=-.14;
+  }
+  if(kind==='sombra'){
+    piece(figure,'cube',dark,0,.872,.161,.27,.104,.079);
+    piece(figure,'cone',body,0,1.093,-.06,.40,.23,.34);
+    piece(figure,'gem',accent,0,.713,.201,.135,.093,.075);
+  }
+  if(kind==='tirador'){
+    piece(figure,'cone',body,0,.984,-.074,.44,.36,.40).rotation.x=-.46;
+    const quiver=piece(figure,'column','#6b4639',-.13,.67,-.235,.125,.51,.13);
+    quiver.rotation.z=-.28;
+    for(const x of [-.18,-.10,-.048]){
+      piece(figure,'cube','#d2af65',x,.93,-.241,.017,.21,.017);
+      piece(figure,'gem',accent,x,1.035,-.241,.069,.085,.046);
+    }
   }
   if(kind==='mago'){
     piece(figure,'disc',dark,0,1.036,.012,.53,.045,.48);
@@ -82,6 +98,13 @@ export function miniature(kind) {
   }else if(kind==='guardia'||mace){
     piece(figure,'orb',dark,0,1.014,0,.40,.26,.39);
     piece(figure,'cube',accent,0,.979,.182,.32,.058,.054);
+    if(kind==='guardia'){
+      piece(figure,'cube','#b1c4b8',0,.962,.204,.063,.19,.042);
+      piece(figure,'gem','#f6c889',0,1.145,-.018,.104,.139,.25);
+    }
+  }else if(kind==='mistico'){
+    piece(figure,'gem',accent,0,1.085,.162,.13,.21,.05);
+    for(const x of [-.15,.15])piece(figure,'cube','#d0b6d7',x,.622,.195,.048,.35,.045);
   }
   for(const side of [-1,1]){
     piece(figure,'cube',isMonster?'#ffad75':'#231d2d',side*.075,.931,.173,.031,.032,.022,isMonster);
@@ -90,17 +113,26 @@ export function miniature(kind) {
       horn.rotation.z=side*-.38;
     }
   }
-  if(kind==='boss'){
+  if(kind==='enemy'){
+    piece(figure,'orb',dark,0,.875,.094,.34,.22,.29);
+    piece(figure,'gem','#df9678',0,.82,.23,.15,.13,.06);
+    for(const x of [-.085,0,.085])piece(figure,'cube',accent,x,.685,.194,.042,.10,.045);
+  }else if(kind==='boss'){
     piece(figure,'column',accent,0,1.085,0,.38,.08,.38);
     for(const side of [-1,0,1])piece(figure,'cone',accent,side*.108,1.17,.134,.108,.19,.105);
     piece(figure,'gem','#f78882',0,.66,.202,.15,.19,.10,true);
+    for(const sign of [-1,1]){
+      const blade=piece(figure,'cone',accent,sign*.27,.868,-.073,.16,.45,.15);
+      blade.rotation.z=sign*-.63;
+    }
   }else if(robe)piece(figure,'gem',accent,0,.702,.194,.102,.10,.056,true);
 
   const arms=[-.24,.24].map((x,i)=>{
     const arm=new T.Group();
     arm.position.set(x,.718,.008);
     figure.add(arm);
-    piece(arm,'orb',mace?accent:body,0,-.006,0,.22,.18,.22);
+    piece(arm,'orb',mace||kind==='guardia'?accent:body,0,-.006,0,.22,.18,.22);
+    piece(arm,'cube',accent,0,-.187,.055,.131,.08,.116);
     piece(arm,'cube',body,0,-.14,.0,.130,.24,.154);
     piece(arm,'orb',skin,0,-.288,.025,.13,.13,.13);
     const held=new T.Group();
@@ -109,9 +141,10 @@ export function miniature(kind) {
     if(i===1){
       if(kind==='tirador'||kind==='ranged')bow(held,accent);
       else if(robe||kind==='boss')staff(held,accent,kind==='mago');
-      else if(kind==='guardia'||kind==='elite'){
-        piece(held,'cube','#c3cbd1',0,.23,0,.095,.45,.05);
-        piece(held,'cone','#d9dfe0',0,.50,0,.099,.11,.05);
+      else if(kind==='guardia'||kind==='elite'||kind==='sombra'){
+        const blade=kind==='sombra'?.61:1;
+        piece(held,'cube','#c3cbd1',0,.23*blade,0,.095,.45*blade,.05);
+        piece(held,'cone','#d9dfe0',0,.50*blade,0,.099,.11*blade,.05);
         piece(held,'cube',accent,0,.015,0,.18,.046,.054);
       }
     }else if(kind==='guardia'||kind==='elite'){
@@ -120,6 +153,7 @@ export function miniature(kind) {
     }
     return arm;
   });
+  figure.traverse(mesh=>{if(mesh.isMesh&&mesh.material.isMeshStandardMaterial)mesh.castShadow=true;});
   return {root,figure,legs,arms,head:(kind==='mago'?1.36:1.23)*size};
 }
 export function obstacle(root,kind,variant) {
@@ -141,5 +175,6 @@ export function obstacle(root,kind,variant) {
     piece(root,'gem',kind==='roots'?'#81997c':'#8595ad',.12,.72,-.10,.45,.39,.45);
     piece(root,'gem',dark,-.26,.45,.26,.35,.35,.31);
   }
+  root.traverse(mesh=>{if(mesh.isMesh&&mesh.material.isMeshStandardMaterial)mesh.castShadow=true;});
 }
 

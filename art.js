@@ -3,6 +3,7 @@ const palettes = {
   tirador:['#283e2d','#51865b','#b28455','#f2ce92'],
   mistico:['#4e3869','#8a6caf','#f3b363','#fff2bf'],
   mago:['#243451','#5675ad','#99b6ef','#f6d1ff'],
+  sombra:['#352840','#745273','#bf8978','#ffe0b2'],
   enemy:['#523237','#95565b','#c6846d','#ffdc92'],
   ranged:['#4d293b','#a45579','#d690a2','#ffd2a2'],
   elite:['#392c51','#755e91','#c69980','#ffe0a9'],
@@ -28,6 +29,9 @@ export function portrait(look) {
     rect(8,4,9,2,dark);rect(9,3,7,2,mid);rect(17,6,3,2,mid);
     rect(21,10,2,3,light);rect(23,13,2,8,light);rect(21,21,2,3,light);
     rect(21,13,1,8,shine);rect(17,16,6,1,shine);
+  }else if(look==='sombra'){
+    rect(7,4,12,4,dark);rect(8,3,10,2,mid);rect(10,10,6,2,dark);
+    rect(3,12,2,7,shine);rect(2,17,5,2,light);
   }else if(look==='mago'){
     rect(5,7,16,2,dark);rect(8,5,10,2,mid);rect(10,3,7,2,mid);rect(12,1,5,2,light);
     rect(8,20,11,5,mid);rect(21,9,2,15,light);rect(20,7,4,4,shine);

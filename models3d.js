@@ -705,6 +705,7 @@ function plant(kind){
 }
 export function miniature(kind,tint=null) {
   if(creatures[kind])return creatures[kind](kind);
+  if(heroKits[kind])return chibiHero(kind,tint);
   let [body,accent,dark,skin]=looks[kind]||looks.enemy;
   // Color del jugador: la ropa toma el color de su puesto (J1 rojo, J2 azul...).
   if(tint){body=tint.hex;dark=tint.dark;}
@@ -869,4 +870,210 @@ function hellObstacle(root){
   piece(root,'cube','#ff6a1a',0,.45,.2,.04,.5,.04,true);
   piece(root,'cube','#ffb347',-.12,.3,.18,.03,.28,.03,true);
   root.traverse(mesh=>{if(mesh.isMesh&&mesh.material.isMeshStandardMaterial)mesh.castShadow=true;});
+}
+
+// ───────────── Héroes chibi (rework según docs/art/STYLE_GUIDE.md) ─────────────
+// Escala: 1 casilla = 1 unidad. Altura ≈1,13 (sin sombrero), cabeza 0,45 → 2,5 cabezas.
+// Formas suaves y redondeadas, cara expresiva, manos/pies/armas algo exagerados.
+const smooth={
+  ball:new T.SphereGeometry(.5,16,11),
+  dome:new T.SphereGeometry(.5,16,7,0,Math.PI*2,0,Math.PI/2),
+  cyl:new T.CylinderGeometry(.5,.5,1,12),
+  taper:new T.CylinderGeometry(.38,.5,1,16),
+  cone:new T.ConeGeometry(.5,1,14),
+  torus:new T.TorusGeometry(.5,.07,6,20),
+  arc:new T.TorusGeometry(.5,.045,5,14,Math.PI),
+  box:new T.BoxGeometry(1,1,1),
+  gem:new T.OctahedronGeometry(.5,0),
+  disc:new T.CylinderGeometry(.5,.5,1,20)
+};
+const heroMats=new Map();
+/** Material PBR simplificado: mate por defecto, satinado para metal, emisivo solo para magia. */
+function mat(color,{metal=0,rough=.72,glow=0}={}){
+  const key=color+metal+rough+glow;
+  if(!heroMats.has(key))heroMats.set(key,new T.MeshStandardMaterial({color,metalness:metal,roughness:rough,emissive:glow?color:'#000000',emissiveIntensity:glow}));
+  return heroMats.get(key);
+}
+function part(parent,shape,material,x,y,z,sx,sy,sz){
+  const mesh=new T.Mesh(smooth[shape],typeof material==='string'?mat(material):material);
+  mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);
+  mesh.castShadow=true;mesh.receiveShadow=true;
+  parent.add(mesh);
+  return mesh;
+}
+/** Paletas de clase (anclas de models3d.js): tela, acento, oscuro, piel, metal, pelo. */
+const heroKits={
+  guardia:{cloth:'#3f7a74',accent:'#e0a84f',dark:'#24403f',skin:'#f0c09c',metal:'#9fb3b0',hair:'#6b3f2a'},
+  tirador:{cloth:'#3f7a4f',accent:'#d9a04f',dark:'#2a3f2c',skin:'#e8b48c',metal:'#b8a07a',hair:'#c9873a'},
+  mistico:{cloth:'#7a54a0',accent:'#f2cd6a',dark:'#46305e',skin:'#f3c7a6',metal:'#f2d58a',hair:'#d9a441'},
+  mago:{cloth:'#3f5fae',accent:'#7fe0ff',dark:'#26385e',skin:'#f1bf9c',metal:'#c0c8d8',hair:'#9a6ad0'},
+  sombra:{cloth:'#4d3466',accent:'#ff8a6e',dark:'#241a33',skin:'#d9a07e',metal:'#cfd6de',hair:'#1c1626'}
+};
+/** Cara: ojos grandes con brillo, cejas, boca y rubor. Se ve desde arriba y en isométrico. */
+function face(head,kit,{mask=false,angry=false,z=0}={}){
+  const eyes=[];
+  for(const side of [-1,1]){
+    const eye=new T.Group();eye.position.set(side*.085,-.005,.19+z);head.add(eye);
+    part(eye,'ball','#fbf7f0',0,0,0,.085,.105,.05);
+    part(eye,'ball','#1d1626',0,-.006,.016,.058,.075,.03);
+    part(eye,'ball',mat('#ffffff',{glow:.6}),side*-.012,.018,.03,.02,.024,.012);
+    eyes.push(eye);
+    const brow=part(head,'box',kit.hair,side*.088,.085,.205+z,.07,.018,.02);
+    brow.rotation.z=side*(angry?.32:-.12);
+    if(!mask)part(head,'ball',mat('#ff8f8f',{rough:.9}),side*.135,-.07,.17+z,.06,.035,.02);
+  }
+  if(!mask){
+    const mouth=part(head,'arc','#5a2a2a',0,-.085,.205+z,.07,.06,.06);
+    mouth.rotation.z=Math.PI;
+  }
+  return eyes;
+}
+function chibiHero(kind,tint){
+  const kit={...heroKits[kind]};
+  if(tint){kit.cloth=tint.hex;kit.dark=tint.dark;}
+  const root=new T.Group(),figure=new T.Group();root.add(figure);
+  const robe=kind==='mistico'||kind==='mago';
+  // Piernas cortas con botas grandes.
+  const legs=[-1,1].map(side=>{
+    const leg=new T.Group();leg.position.set(side*.085,.34,0);figure.add(leg);
+    if(!robe)part(leg,'ball',kit.dark,0,-.12,0,.12,.24,.12);
+    const boot=part(leg,'ball',kind==='guardia'?mat(kit.metal,{metal:.55,rough:.38}):'#4a3428',0,-.3,.03,.15,.1,.22);
+    if(kind==='guardia')part(leg,'torus',mat(kit.accent,{metal:.5,rough:.4}),0,-.25,.0,.13,.13,.6).rotation.x=Math.PI/2;
+    return leg;
+  });
+  // Torso compacto con cinturón.
+  const torso=new T.Group();figure.add(torso);
+  if(robe){
+    part(torso,'taper',kit.cloth,0,.27,0,.42,.5,.38);
+    part(torso,'torus',mat(kit.accent,{metal:.4,rough:.45}),0,.03,0,.42,.38,.5).rotation.x=Math.PI/2;
+  }
+  part(torso,'ball',kit.cloth,0,.5,0,.34,.36,.28);
+  part(torso,'torus','#4a3428',0,.38,0,.34,.28,.5).rotation.x=Math.PI/2;
+  part(torso,'box',mat(kit.accent,{metal:.5,rough:.4}),0,.38,.14,.07,.06,.03);
+  // Cabeza grande.
+  const head=new T.Group();head.position.set(0,.9,0);figure.add(head);
+  part(head,'ball',kit.skin,0,0,0,.45,.43,.42);
+  for(const side of [-1,1])part(head,'ball',kit.skin,side*.22,-.01,0,.06,.09,.06);
+  const eyes=kind==='tirador'||kind==='sombra'?[]:face(head,kit,{angry:kind==='guardia'});
+  // Brazos con manos grandes; el objeto se sujeta en "held".
+  const arms=[-1,1].map(side=>{
+    const arm=new T.Group();arm.position.set(side*.2,.62,0);figure.add(arm);
+    part(arm,'ball',kit.cloth,0,-.08,0,.11,.2,.11);
+    part(arm,'ball',kit.skin,0,-.2,.02,.12,.12,.12);
+    const held=new T.Group();held.position.set(0,-.21,.06);held.name='held';arm.add(held);
+    return arm;
+  });
+  const [left,right]=arms;
+  const hand=arm=>arm.getObjectByName('held');
+  const gold=mat(kit.accent,{metal:.6,rough:.35});
+  const steel=mat(kit.metal,{metal:.65,rough:.32});
+  let top=1.13;
+  if(kind==='guardia'){
+    // Casco con visera y cresta, hombreras, peto con tabardo y gran escudo.
+    part(head,'dome',steel,0,.03,0,.5,.44,.47);
+    part(head,'torus',gold,0,.04,0,.47,.47,.6).rotation.x=Math.PI/2;
+    part(head,'box',mat(kit.cloth),0,.26,-.02,.06,.17,.38);
+    for(const side of [-1,1])part(head,'box',steel,side*.2,-.07,.06,.05,.16,.14);
+    top=1.2;
+    part(torso,'ball',steel,0,.53,.05,.33,.3,.22);
+    part(torso,'box',kit.cloth,0,.36,.13,.17,.22,.04);
+    for(const arm of arms){part(arm,'dome',steel,0,0,0,.2,.16,.2);part(arm,'torus',gold,0,-.01,0,.2,.2,.5).rotation.x=Math.PI/2;}
+    const shield=new T.Group();shield.position.set(-.05,.04,.12);hand(left).add(shield);
+    part(shield,'disc',steel,0,0,0,.44,.06,.52).rotation.x=Math.PI/2;
+    part(shield,'disc',kit.cloth,0,0,.025,.36,.04,.43).rotation.x=Math.PI/2;
+    part(shield,'torus',gold,0,0,.03,.44,.52,.6);
+    part(shield,'gem',gold,0,.02,.06,.12,.16,.06);
+    const sword=hand(right);
+    sword.rotation.x=1.15;
+    part(sword,'box',steel,0,.24,0,.07,.42,.025);
+    part(sword,'cone',steel,0,.48,0,.07,.07,.025);
+    part(sword,'box',gold,0,.04,0,.2,.04,.05);
+    part(sword,'ball','#4a3428',0,-.04,0,.05,.08,.05);
+    part(sword,'ball',gold,0,-.1,0,.06,.06,.06);
+  }else if(kind==='tirador'){
+    // Capucha con pico, capa corta, carcaj a la espalda y arco curvo.
+    part(head,'ball',kit.cloth,0,.04,-.04,.5,.48,.48);
+    part(head,'ball',kit.skin,0,-.02,.07,.4,.36,.34);
+    eyes.push(...face(head,kit,{z:.03}));
+    const tip=part(head,'cone',kit.cloth,0,.1,-.28,.16,.24,.16);tip.rotation.x=-1.9;
+    part(head,'ball',kit.hair,.06,.13,.16,.14,.06,.08);
+    top=1.16;
+    const cape=part(torso,'box',kit.cloth,0,.48,-.15,.36,.38,.04);cape.rotation.x=.12;
+    part(torso,'cyl','#7a4a30',-.1,.62,-.2,.11,.4,.11).rotation.z=-.35;
+    for(const dx of [-.04,0,.04]){const a=part(torso,'gem',mat('#f2f0e6'),-.17+dx,.86,-.22,.05,.09,.02);a.rotation.z=-.35;}
+    const bow=new T.Group();bow.position.set(0,.05,.05);bow.rotation.y=Math.PI/2;hand(left).add(bow);
+    part(bow,'arc',mat('#8a5a34',{rough:.6}),0,0,0,.36,.62,.9).rotation.z=Math.PI/2;
+    part(bow,'box',mat('#f2ead6'),.0,0,0,.008,.62,.008);
+    part(bow,'box',gold,-.18,0,0,.05,.08,.05);
+    part(arms[0],'cyl','#7a4a30',0,-.14,0,.12,.08,.12);
+  }else if(kind==='mistico'){
+    // Manto claro, diadema solar y báculo con disco de sol.
+    part(head,'ball',kit.hair,0,.06,-.05,.48,.42,.46);
+    for(const side of [-1,1])part(head,'ball',kit.hair,side*.17,-.12,-.04,.12,.26,.14);
+    part(head,'ball',kit.hair,.05,.15,.15,.2,.08,.1);
+    part(head,'torus',gold,0,.12,0,.44,.44,.5).rotation.x=Math.PI/2.3;
+    part(head,'gem',mat(kit.accent,{glow:.5}),0,.16,.2,.08,.1,.04);
+    top=1.18;
+    part(torso,'dome',mat('#f2ead6'),0,.6,0,.42,.2,.36);
+    part(torso,'box',gold,0,.3,.17,.06,.36,.02);
+    const staff=hand(right);
+    part(staff,'cyl','#8a6a44',0,.25,0,.04,.85,.04);
+    part(staff,'torus',gold,0,.72,0,.22,.22,.6);
+    part(staff,'ball',mat(kit.accent,{glow:.7}),0,.72,0,.11,.11,.11);
+    for(let i=0;i<8;i++){const ray=part(staff,'cone',gold,Math.sin(i*Math.PI/4)*.15,.72+Math.cos(i*Math.PI/4)*.15,0,.035,.07,.035);ray.rotation.z=-i*Math.PI/4;}
+  }else if(kind==='mago'){
+    // Gran sombrero de ala ancha con punta doblada y báculo de cristal.
+    const hat=new T.Group();hat.position.set(0,.14,0);head.add(hat);
+    part(hat,'disc',kit.dark,0,0,0,.72,.035,.68);
+    part(hat,'cone',kit.cloth,0,.2,-.02,.42,.42,.4);
+    const tip=part(hat,'cone',kit.cloth,.06,.43,-.08,.2,.2,.2);tip.rotation.z=-.6;
+    part(hat,'torus',gold,0,.04,0,.42,.42,.6).rotation.x=Math.PI/2;
+    part(hat,'gem',mat(kit.accent,{glow:.8}),.0,.12,.2,.07,.08,.03);
+    part(head,'ball',kit.hair,0,-.02,-.13,.4,.3,.22);
+    top=1.62;
+    const staff=hand(right);
+    part(staff,'cyl','#5a3a2a',0,.25,0,.045,.85,.045);
+    part(staff,'torus',gold,0,.66,0,.12,.12,.4).rotation.x=Math.PI/2;
+    const crystal=part(staff,'gem',mat(kit.accent,{glow:.9,rough:.2}),0,.8,0,.18,.28,.18);
+    crystal.name='crystal';
+  }else if(kind==='sombra'){
+    // Capucha ceñida, máscara bajo los ojos, cinta con colas, bufanda coral y dos dagas.
+    part(head,'ball',kit.cloth,0,.05,-.03,.48,.45,.46);
+    part(head,'ball',kit.skin,0,0,.08,.38,.22,.32);
+    eyes.push(...face(head,kit,{mask:true,angry:true,z:.02}));
+    part(head,'ball',mat(kit.dark),0,-.135,.11,.4,.15,.32);
+    part(head,'torus',mat(kit.accent),0,.06,0,.47,.47,.4).rotation.x=Math.PI/2;
+    for(const side of [-1,1]){const tail=part(head,'box',mat(kit.accent),side*.05,.0,-.27,.05,.04,.22);tail.rotation.set(-.6,side*.3,0);}
+    top=1.14;
+    part(torso,'torus',mat(kit.accent),0,.62,0,.3,.3,1.1).rotation.x=Math.PI/2;
+    part(torso,'gem',steel,.14,.36,.12,.08,.08,.02);
+    for(const arm of arms){
+      const dagger=hand(arm);
+      part(dagger,'box',steel,0,-.12,.0,.04,.24,.02).rotation.x=.2;
+      part(dagger,'box',mat(kit.accent),0,.0,0,.1,.03,.04);
+    }
+  }
+  const size=1.12;
+  figure.scale.setScalar(size);
+  const blinkAt=Math.random()*4;
+  const crystal=figure.getObjectByName('crystal');
+  const animate=(t,{gait,swing,walking,phase})=>{
+    const breath=Math.sin(t*2.8+phase);
+    const idle=walking?0:1;
+    figure.position.y=Math.abs(gait)*.06+breath*.02*idle;
+    torso.scale.y=1+breath*.025*idle;
+    head.position.y=.9+breath*.012*idle;
+    head.rotation.y=idle*Math.sin(t*.45+phase)*Math.max(0,Math.sin(t*.21+phase))*.4;
+    head.rotation.z=walking?gait*.06:Math.sin(t*1.3+phase)*.04;
+    figure.rotation.z=walking?gait*.05:0;
+    left.rotation.x=gait*.5+breath*.08*idle;
+    right.rotation.x=-gait*.5-swing*1.6-(.15+breath*.06)*idle;
+    left.rotation.z=-.08-idle*.04;right.rotation.z=.08+idle*.04;
+    legs[0].rotation.x=-gait*.6;legs[1].rotation.x=gait*.6;
+    // Parpadeo cada pocos segundos.
+    const blink=((t+blinkAt)%3.6)<.12?.15:1;
+    for(const eye of eyes)eye.scale.y=blink;
+    if(crystal){crystal.rotation.y=t*1.5;crystal.material.emissiveIntensity=.7+Math.sin(t*3)*.25+swing;}
+  };
+  return {root,figure,legs,arms,head:top*size,animate};
 }

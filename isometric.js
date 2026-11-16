@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,obstacle,piece,solid} from './models3d.js?v=25';
-import {playerColors} from './engine.js?v=25';
+import {miniature,obstacle,piece,solid} from './models3d.js?v=26';
+import {playerColors} from './engine.js?v=26';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);

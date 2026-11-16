@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,obstacle,piece,solid} from './models3d.js?v=29';
-import {playerColors} from './engine.js?v=29';
+import {miniature,obstacle,piece,solid} from './models3d.js?v=30';
+import {playerColors} from './engine.js?v=30';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -236,6 +236,21 @@ export function createIso(mount,onCell){
   const observer=new ResizeObserver(fit);
   observer.observe(mount);
 
+  /** Cada modelo recibe copias de sus materiales: así puede destellar o desvanecerse solo. */
+  function ownMaterials(model){
+    const copies=new Map();
+    model.materials=[];
+    model.root.traverse(mesh=>{
+      if(!mesh.isMesh)return;
+      if(!copies.has(mesh.material)){const copy=mesh.material.clone();copies.set(mesh.material,copy);model.materials.push(copy);}
+      mesh.material=copies.get(mesh.material);
+    });
+    model.baseEmissive=model.materials.map(m=>m.emissive?{color:m.emissive.clone(),intensity:m.emissiveIntensity}:null);
+    // Grupo intermedio para las poses de acción (se reinicia en cada fotograma).
+    const layer=new T.Group();
+    model.root.remove(model.figure);layer.add(model.figure);model.root.add(layer);
+    model.layer=layer;
+  }
   function removeModel(id){
     const model=models.get(id);
     if(!model)return;
@@ -244,6 +259,82 @@ export function createIso(mount,onCell){
     model.shadow.parent?.remove(model.shadow);
     figures.remove(model.root);
     models.delete(id);
+  }
+  /** Poses de acción, golpe recibido y muerte, aplicadas encima de la animación de cada modelo. */
+  function actionLayer(model,now,type,at,walk){
+    const [left,right]=model.arms||[];
+    const L=model.layer;
+    L.position.set(0,0,0);L.rotation.set(0,0,0);L.scale.set(1,1,1);
+    const ease=x=>x<0?0:x>1?1:x*x*(3-2*x);
+    if(type&&left&&right){
+      const up=Math.sin(Math.min(1,at)*Math.PI);
+      if(type==='shoot'){                      // tensar y soltar
+        const draw=ease(at/.6),release=at>.62?ease((at-.62)/.38):0;
+        left.rotation.x=-1.45*(1-release*.6);left.rotation.z=-.1;
+        right.rotation.x=-1.3*draw*(1-release)+.3*release;right.rotation.z=.5*draw*(1-release);
+      }else if(type==='cast'){                 // alzar el báculo y descargar
+        const raise=ease(at/.45),thrust=at>.45?ease((at-.45)/.3):0;
+        right.rotation.x=-2.6*raise+1.1*thrust*(1-ease((at-.75)/.25));
+        left.rotation.x=-1.1*up;left.rotation.z=-.4*up;
+        L.position.y+=.06*up;
+      }else if(type==='support'){              // báculo al cielo y brazos abiertos
+        right.rotation.x=-2.9*up;left.rotation.x=-.5*up;left.rotation.z=-.9*up;
+        L.position.y+=.09*up;
+      }else if(type==='push'||type==='pull'){   // empujón o tirón con ambos brazos
+        const push=type==='push'?Math.sin(at*Math.PI):(at<.4?ease(at/.4):1-ease((at-.4)/.6)*1.3);
+        left.rotation.x=-1.5*push;right.rotation.x=-1.5*push;
+        L.position.z+=type==='push'?.12*push:-.1*Math.max(0,at-.4);
+      }else if(type==='melee'){                // giro del torso acompañando el golpe
+        L.rotation.y+=at<.35?.35*ease(at/.35):.35-.8*ease((at-.35)/.4);
+        L.position.z+=at>.35?.1*Math.sin((at-.35)/.65*Math.PI):0;
+      }else if(type==='dash'){
+        L.rotation.y+=Math.PI*2*ease(at);
+      }
+    }else if(type&&!left){                      // criaturas sin brazos: saltito y estirón
+      const up=Math.sin(Math.min(1,at)*Math.PI);
+      if(type==='cast'||type==='support'){L.position.y+=.12*up;L.scale.y=1+.12*up;}
+    }
+    // Golpe recibido: retroceso desde el atacante, inclinación y destello.
+    const hurt=model.hurt,ht=hurt?(now-hurt.start)/320:2;
+    let flash=0;
+    if(ht<1){
+      const k=Math.sin(ht*Math.PI),len=Math.hypot(hurt.dx,hurt.dz)||1,a=-model.root.rotation.y;
+      const wx=hurt.dx/len,wz=hurt.dz/len;
+      L.position.x+=(wx*Math.cos(a)-wz*Math.sin(a))*.14*k;
+      L.position.z+=(wx*Math.sin(a)+wz*Math.cos(a))*.14*k;
+      L.rotation.x-=.25*k;
+      flash=(1-ht)*(1-ht)*(hurt.crit?1.4:1);
+    }else if(hurt)model.hurt=null;
+    // Muerte: cae hacia atrás, se hunde y se desvanece; después se retira.
+    let fade=1;
+    if(model.deathAt&&!model.dying&&now>=model.deathAt){model.dying=now;model.label.style.opacity='0';model.ring.visible=false;}
+    if(model.dying){
+      const dt=(now-model.dying)/950;
+      if(dt>=1){removeModel(model.unit.id);return;}
+      const fall=ease(dt/.55);
+      if(left){L.rotation.x=-Math.PI/2*fall*.95;L.position.y=.1*fall-.25*ease((dt-.6)/.4);}
+      else{L.scale.y=Math.max(.15,1-.85*fall);L.position.y-=.2*ease((dt-.5)/.5);}
+      fade=1-ease((dt-.45)/.55);
+      flash=Math.max(flash,(1-dt)*.25);
+    }
+    if(model.materials){
+      model.materials.forEach((m,i)=>{
+        const base=model.baseEmissive[i];
+        if(m.emissive&&base){
+          if(flash>0){
+            const dark=base.color.r+base.color.g+base.color.b<.02;
+            m.emissive.setRGB(.9,.12,.08);
+            m.emissiveIntensity=(dark?0:base.intensity)+flash*.35;
+          }
+          else if(model.flashed){m.emissive.copy(base.color);m.emissiveIntensity=base.intensity;}
+        }
+        const transparent=fade<1||m.userData.wasTransparent;
+        if(fade<1&&!m.userData.fading){m.userData.fading=true;m.userData.wasTransparent=m.transparent;m.userData.opacity=m.opacity;m.transparent=true;m.needsUpdate=true;}
+        if(m.userData.fading)m.opacity=(m.userData.opacity??1)*fade;
+        void transparent;
+      });
+      model.flashed=flash>0;
+    }
   }
   function clearTransient(){
     transient.clear();
@@ -403,11 +494,19 @@ export function createIso(mount,onCell){
     }
     for(const u of next.units){
       const moving=shouldAnimate(u.id)||steps.has(u.id);
-      if(u.hp<=0&&!moving){removeModel(u.id);continue;}
+      if(u.hp<=0&&!moving){
+        // La caída empieza tras el golpe que la mata (o, si no llega a verse, al cabo de 1,5 s).
+        const dying=models.get(u.id);
+        if(!dying)continue;
+        if(!active){removeModel(u.id);continue;}
+        if(!dying.dying&&!dying.deathAt)dying.deathAt=performance.now()+1500;
+        continue;
+      }
       const coords=logical(next,u.pos);
       if(!models.has(u.id)){
         const tint=u.enemy?null:playerColors.find(c=>c.id===u.color)||null;
         const model=miniature(look(u),tint);
+        ownMaterials(model);
         model.root.position.copy(coords);
         model.root.rotation.y=u.enemy?-.9:.9;
         figures.add(model.root);
@@ -533,6 +632,19 @@ export function createIso(mount,onCell){
     model.root.position.copy(points[0]);
     return new Promise(resolve=>steps.set(event.unit,{points,elapsed:0,first:true,resolve}));
   }
+  /** Qué animación hace el que actúa, según el efecto y quién es. */
+  function actionFor(unit,effect){
+    if(['heal','cleanse'].includes(effect))return 'support';
+    if(effect==='push'||effect==='pull')return effect;
+    if(unit?.boss&&effect!=='slash')return 'cast';                   // poderes de jefe: invocar, aullar, nova
+    if(effect==='dash'||effect==='swap')return 'dash';
+    if(effect==='arrow')return 'shoot';
+    if(effect==='slash')return 'melee';
+    if(unit?.classId==='tirador')return 'shoot';
+    if(unit?.classId==='guardia'||unit?.classId==='sombra')return 'melee';
+    if(unit?.enemy&&!unit.boss&&(unit.range||1)<=1)return 'melee';
+    return 'cast';
+  }
   function impact(event){
     if(!active)return;
     const palette={heal:'#9bf2a5',cleanse:'#fff2ba',blast:'#ff884b',slow:'#9be8ff',venom:'#b9e574',expose:'#d9a3ff',
@@ -541,6 +653,12 @@ export function createIso(mount,onCell){
     const time=performance.now();
     const target=logical(state,event.pos);
     if(event.kind!=='spell'){
+      const victim=event.unit&&models.get(event.unit);
+      if(victim&&event.amount>0&&['damage','glyph','poison','trap'].includes(event.kind)){
+        const from=event.from!==undefined?logical(state,event.from):null;
+        victim.hurt={start:time,dx:from?victim.root.position.x-from.x:0,dz:from?victim.root.position.z-from.z:0,crit:!!event.critical};
+        if(state.units.find(u=>u.id===event.unit)?.hp<=0&&!victim.dying)victim.deathAt=time+240;
+      }
       if(event.kind==='glyph'||event.kind==='poison'){
         const pulse=piece(transient,'disc',color,target.x,.045,target.z,.45,.025,.45,true);
         effects.push({mesh:pulse,start:time,duration:330,pop:true});
@@ -552,6 +670,7 @@ export function createIso(mount,onCell){
     const model=models.get(event.actor);
     if(model){
       model.strike=time;
+      model.action={type:actionFor(model.unit,event.effect),start:time};
       if(travel>.01)model.root.rotation.y=Math.atan2(target.x-from.x,target.z-from.z);
     }
     const ranged=travel>1.1&&!['heal','cleanse','dash','slash'].includes(event.effect);
@@ -622,7 +741,14 @@ export function createIso(mount,onCell){
         if(t>=walk.points.length-1){steps.delete(id);walk.resolve();}
       }
       const strike=Math.max(0,1-(now-(model.strike??-10000))/285);
-      const swing=Math.sin(strike*Math.PI);
+      let swing=Math.sin(strike*Math.PI);
+      const act=model.action,actDur={melee:460,shoot:560,cast:620,support:640,push:420,pull:460,dash:300}[act?.type]||400;
+      const at=act?(now-act.start)/actDur:2;
+      if(at<1){
+        // Anticipación (hacia atrás) y golpe: la curva se pasa a la animación propia del modelo.
+        swing=act.type==='melee'?(at<.35?-.45*Math.sin(at/.35*Math.PI/2):Math.sin((at-.35)/.65*Math.PI)):
+          act.type==='pull'?(at<.5?Math.sin(at*2*Math.PI/2):Math.cos((at-.5)*2*Math.PI/2)*(1-at)*2-.3*(at-.5)):Math.sin(at*Math.PI)*.8;
+      }else if(act)model.action=null;
       // Las animaciones de reposo se mantienen siempre (son suaves), incluso con movimiento reducido.
       const breath=Math.sin(now*.0028+model.phase);
       if(model.animate){
@@ -642,6 +768,7 @@ export function createIso(mount,onCell){
         model.legs[0].rotation.x=-gait*.43;
         model.legs[1].rotation.x=gait*.43;
       }
+      actionLayer(model,now,at<1?act.type:null,at,walk);
       if(model.ring.visible&&!reduced){
         model.ring.rotation.y=now*.0012;
         const s=1+Math.sin(now*.005)*.05;

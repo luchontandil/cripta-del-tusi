@@ -28,7 +28,7 @@ Correcciones de roster, escala medida, botín, eventos y VFX en la sección «Au
 | Familias de equipo | 9 slots (27 bases) + 9 runas + 4 rarezas | Pendiente | Bases confirmadas; el equipo solo existe como icono de UI, no sobre el héroe 3D |
 | Props/eventos | Obstáculos, agua/lava, trampas, antorchas | Pendiente | Eventos y tienda son tarjetas 2D de UI: no necesitan modelo 3D |
 | Hechizos/VFX | 40 habilidades + VFX de jefe | Pendiente | 8 habilidades × 5 clases; falta matriz completa por forma/elemento |
-| Animaciones | 11 estados (reposo, andar, ataque, disparo, hechizo, apoyo, desplazamiento, empuje/atracción, golpe recibido, muerte, poderes de jefe) | Pendiente | Añadido el 17-11-2026. Hoy solo existen reposo, andar y golpe genérico; faltan golpe recibido y muerte. Ver inventario |
+| Animaciones | 11 estados | **Propuesta** (17-11-2026) — `anim_keyposes.png` | Hechos: tajo, disparo, hechizo, apoyo, empuje/atracción, golpe recibido y muerte. Básicos: desplazamiento y poderes de jefe |
 
 ## Assets
 

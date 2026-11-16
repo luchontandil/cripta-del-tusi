@@ -156,14 +156,14 @@ Las animaciones se hacen por código (`animate` de cada modelo, sin huesos), con
 |---|---|---|---|
 | Reposo (respirar, mirar) | Héroes y monstruos | siempre | Hecho (básico) |
 | Andar | Héroes y monstruos con patas | evento `move` | Hecho (básico) |
-| Ataque cuerpo a cuerpo | Guardián, Ninja, monstruos melee | `spell` con `slash` | Pendiente: tajo/mazazo con anticipación |
-| Disparo | Arquero, monstruos a distancia | `arrow` | Pendiente: tensar y soltar |
-| Lanzar hechizo | Mago, Clérigo, jefes | `arcane`, `blast`, `slow`, `venom` | Pendiente: alzar báculo y canalizar |
-| Apoyo | Clérigo y quien cure o escude | `heal`, `cleanse`, escudo, celeridad | Pendiente |
-| Desplazamiento | Mago (teletransporte), Ninja (paso de sombra, sustitución) | `dash`, `swap` | Pendiente: salida/entrada |
-| Empuje / atracción | Guardián (Gancho, empujón), Arquero, Mago, Ninja | `push`, `pull` | Pendiente: golpe + reacción del objetivo |
-| Recibir golpe | Todos | evento `damage` sobre la unidad | **Falta**: retroceso + destello |
-| Muerte | Todos | PV a 0 | **Falta**: caída y desvanecido antes de quitar el modelo |
-| Poderes de jefe | 7 jefes | `bossPower` (invocar, nova, embestida, aullido, cadena) | Pendiente: una animación por poder |
+| Ataque cuerpo a cuerpo | Guardián, Ninja, monstruos melee | `spell` con `slash` | **Hecho**: anticipación hacia atrás, golpe con giro del torso y paso adelante |
+| Disparo | Arquero | `arrow` (y cualquier habilidad del Arquero) | **Hecho**: alzar el arco, tensar y soltar |
+| Lanzar hechizo | Mago, Clérigo, monstruos a distancia, jefes | `arcane`, `blast`, `slow`, `venom` | **Hecho**: alzar el báculo, descargar y elevarse; criaturas sin brazos se estiran |
+| Apoyo | Clérigo y quien cure | `heal`, `cleanse` | **Hecho**: báculo al cielo y brazos abiertos |
+| Desplazamiento | Mago (teletransporte), Ninja (paso de sombra, sustitución) | `dash`, `swap` | **Básico**: giro completo al salir; pendiente efecto de entrada |
+| Empuje / atracción | Guardián (Gancho, empujón), Arquero, Mago, Ninja | `push`, `pull` | **Hecho**: empujón con ambos brazos / lanzar y tirar hacia atrás |
+| Recibir golpe | Todos | daño, glifo, veneno, trampa | **Hecho**: retroceso desde el atacante, inclinación y destello rojo (más fuerte si es crítico) |
+| Muerte | Todos | PV a 0 | **Hecho**: tras el golpe mortal, los humanoides caen hacia atrás y los limos/criaturas se aplastan; se hunden y se desvanecen en ~1 s |
+| Poderes de jefe | 7 jefes | `bossPower` (invocar, nova, embestida, aullido, cadena) | **Básico**: pose de hechizo genérica; pendiente una animación propia por poder |
 
-Láminas de referencia previstas: `anim_<clase>_keyposes.png` (5 héroes) y `anim_monsters_keyposes.png` + una por jefe.
+Implementación: capa de acción en `isometric.js` (grupo intermedio por modelo que se reinicia en cada fotograma) + materiales propios por modelo para destello y desvanecido, sin draw calls extra. Lámina de poses: `references/anim_keyposes.png` (4 fotogramas por acción, reloj congelado).

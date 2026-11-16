@@ -3,8 +3,10 @@ import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { create, join, act, tick } from './engine.js';
+import * as accounts from './accounts.js';
+import { persistent } from './store.js';
 
-const rooms = new Map();
+export const rooms = new Map();
 const assets = {'/':'index.html','/client.js':'client.js','/engine.js':'engine.js','/art.js':'art.js','/music.js':'music.js','/icons.js':'icons.js','/style.css':'style.css',
   '/isometric.js':'isometric.js','/models3d.js':'models3d.js','/three.module.js':'three.module.js','/three.core.js':'three.core.js','/three-LICENSE.txt':'three-LICENSE.txt'};
 const mime = {html:'text/html',js:'text/javascript',css:'text/css',txt:'text/plain'};
@@ -16,7 +18,7 @@ const snapshot = room => ({
 export const server = createServer(async (req,res) => {
   res.setHeader('Access-Control-Allow-Origin','*');
   res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization, X-Account');
   const send = (status, data) => {
     res.writeHead(status, {'Content-Type':'application/json','Cache-Control':'no-store'});
     res.end(JSON.stringify(data));
@@ -42,6 +44,8 @@ export const server = createServer(async (req,res) => {
       }
       body = JSON.parse(input || '{}');
     }
+    const accountToken = req.headers['x-account'] || null;
+    if (code === 'account') return send(200, await accountRoute(operation, req.method, body, accountToken));
     if (req.method === 'POST' && ((code === 'rooms' && !operation) || operation === 'join')) {
       const creating = code === 'rooms';
       if (creating && rooms.size >= 250) return send(503,{error:'Servidor lleno.'});
@@ -49,7 +53,9 @@ export const server = createServer(async (req,res) => {
       if (!room) return send(404,{error:'Sala no encontrada.'});
       const id = token(5);
       const key = token(24);
-      join(room.state,id,body.name,body.classId);
+      // Con cuenta: el nombre es el nick y se aplican sus maestrías.
+      const user = await accounts.userFromToken(accountToken);
+      join(room.state,id,user?.nick||body.name,body.classId,user?{mastery:user.mastery,account:user.nick}:{});
       room.keys.set(key,id);
       room.touched = Date.now();
       let roomCode = code;
@@ -64,17 +70,56 @@ export const server = createServer(async (req,res) => {
     const id = room.keys.get(req.headers.authorization?.slice(7));
     if (!id) return send(401,{error:'Sesión inválida.'});
     room.touched=Date.now();
-    if (req.method === 'POST' && operation === 'action') act(room.state,id,body);
+    if (req.method === 'POST' && operation === 'action') {
+      act(room.state,id,body);
+      if (room.state.phase === 'lobby') room.awarded = false;
+      await settle(room);
+    }
     else if (req.method !== 'GET' || operation) return send(404,{error:'Ruta desconocida.'});
+    await settle(room);
     return send(200,{state:snapshot(room)});
   } catch (error) {
-    send(400,{error:error.message});
+    send(error.status || 400,{error:error.message});
   }
 });
+/** Al terminar una partida en sala, reparte los puntos a cada cuenta (una sola vez). */
+async function settle(room){
+  const s=room.state;
+  if(room.awarded||!['won','lost'].includes(s.phase))return;
+  room.awarded=true;
+  for(const p of s.players){
+    if(p.account)await accounts.awardRun(p.account,{floor:s.floor,bossKills:s.bossKills,won:s.phase==='won'}).catch(()=>{});
+  }
+}
+/** Rutas de cuentas: /api/account/<operación>. */
+async function accountRoute(operation,method,body,tokenValue){
+  if(method==='POST'&&operation==='register')return accounts.register(body.nick,body.password);
+  if(method==='POST'&&operation==='login')return accounts.login(body.nick,body.password);
+  if(method==='GET'&&operation==='status')return {persistent};
+  const user=await accounts.userFromToken(tokenValue);
+  if(!user)throw Object.assign(new Error('Sesión de cuenta caducada. Vuelve a entrar.'),{status:401});
+  if(method==='POST'&&operation==='logout'){await accounts.logout(tokenValue);return {ok:true};}
+  if(method==='GET'&&operation==='me')return {user:accounts.publicUser(user),friends:await accounts.friendList(user)};
+  if(method!=='POST')throw new Error('Ruta desconocida.');
+  if(operation==='mastery')return {user:await accounts.buyMastery(user,body.key)};
+  if(operation==='mastery-reset')return {user:await accounts.resetMastery(user)};
+  if(operation==='friend')return {user:await accounts.addFriend(user,body.nick),friends:await accounts.friendList(user)};
+  if(operation==='unfriend'){const updated=await accounts.removeFriend(user,body.nick);return {user:updated,friends:await accounts.friendList({...user,friends:updated.friends})};}
+  if(operation==='invite'){
+    const room=rooms.get(String(body.code||''));
+    if(!room||room.state.phase!=='lobby')throw new Error('La sala ya no acepta jugadores.');
+    if(!room.state.players.some(p=>p.account===user.nick))throw new Error('Solo puedes invitar a una sala en la que estés.');
+    await accounts.invite(user,body.nick,body.code);
+    return {ok:true};
+  }
+  if(operation==='dismiss')return {user:await accounts.dismissInvite(user,body.from)};
+  if(operation==='award')return accounts.awardSolo(user,body);
+  throw new Error('Ruta desconocida.');
+}
 setInterval(() => {
   for (const [code, room] of rooms) {
     if (Date.now()-room.touched > 3600000) rooms.delete(code);
-    else tick(room.state);
+    else if (tick(room.state)) settle(room).catch(()=>{});
   }
 },200).unref();
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

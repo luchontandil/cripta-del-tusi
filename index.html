@@ -7,7 +7,7 @@
   <title>Cripta del tusi</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="./style.css?v=21">
+  <link rel="stylesheet" href="./style.css?v=22">
 </head>
 <body><main>
   <header class="brand">
@@ -16,6 +16,7 @@
   </header>
   <section id="entry" class="gateway">
     <p class="tagline">Dungeon crawler táctico por turnos · seis pisos · hasta cuatro jugadores</p>
+    <section id="account" class="panel gateway-account" aria-live="polite"></section>
     <div class="gateway-grid">
       <div class="panel gateway-main">
         <h2>Entrar a la cripta</h2>
@@ -83,13 +84,21 @@
   </section>
 </main>
 <dialog id="training" aria-labelledby="training-title"><aside id="training-compare" class="training-compare" aria-live="polite" hidden></aside><h2 id="training-title"></h2><p>Aprende una habilidad o mejora una que ya conoces. Pasa el ratón por una opción para ver cómo cambia.</p><div id="training-choices"></div></dialog>
+<dialog id="masteries" class="masteries" aria-labelledby="masteries-title">
+  <div class="masteries-head"><h2 id="masteries-title">Maestrías</h2><span id="mastery-points" class="mastery-points"></span><button id="masteries-close" class="ghost">Cerrar</button></div>
+  <p class="hint">Se compran con los puntos que ganas al terminar cada partida y se aplican a todas las partidas futuras.</p>
+  <div id="mastery-grid" class="mastery-grid"></div>
+  <button id="mastery-reset" class="ghost small-button">Reiniciar maestrías (devuelve los puntos)</button>
+</dialog>
+<div id="invite-toast" class="invite-toast" hidden></div>
 <dialog id="gameover" class="gameover" aria-labelledby="gameover-title">
   <div class="gameover-skull" aria-hidden="true"></div>
   <h2 id="gameover-title">El grupo ha caído</h2>
   <p class="gameover-sub">La cripta reclama a otro grupo de aventureros.</p>
   <dl id="gameover-stats" class="gameover-stats"></dl>
   <ul id="gameover-party" class="gameover-party"></ul>
+  <p id="gameover-points" class="gameover-points" hidden></p>
   <button id="gameover-home" class="primary big">Volver al inicio</button>
 </dialog>
-<script type="module" src="./client.js?v=19"></script></body>
+<script type="module" src="./client.js?v=22"></script></body>
 </html>

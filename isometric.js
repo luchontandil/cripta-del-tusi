@@ -1,12 +1,17 @@
 import * as T from './three.module.js';
-import {miniature,obstacle,piece,solid} from './models3d.js?v=19';
+import {miniature,obstacle,piece,solid} from './models3d.js?v=22';
+import {playerColors} from './engine.js?v=22';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
 const tilesets={
   crypt:['#3e485e','#4c506a','#41475c','#575970','#464d63'],
-  roots:['#3c524e','#465c50','#384a4a','#4e5f55','#415450']
+  roots:['#3c524e','#465c50','#384a4a','#4e5f55','#415450'],
+  bones:['#4e4840','#5a5246','#474036','#625a4c','#514a3e'],
+  hell:['#3e2420','#4a2a22','#36201c','#542e24','#41261f']
 };
+const biomeLight={crypt:'#ffb46b',roots:'#c1f195',bones:'#9dffb8',hell:'#ff6a2a'};
+const biomeFog={crypt:'#100d1a',roots:'#0d1412',bones:'#12110e',hell:'#1a0806'};
 const overlayColors={walk:'#448ead',cast:'#725298',aim:'#f1bf71',route:'#b3efff',area:'#ed8855',blocked:'#b34255',damage:'#ea6a50',poison:'#9abe56',slow:'#719add'};
 const ink='#121423';
 const flatTile=new T.PlaneGeometry(1,1).rotateX(-Math.PI/2);
@@ -245,6 +250,7 @@ export function createIso(mount,onCell){
     torchLights.length=0;
     gasPuffs.length=0;
     const mode=state.biome||'crypt';
+    scene.fog.color.set(biomeFog[mode]||'#100d1a');
     const palette=tilesets[mode]||tilesets.crypt;
     const walls=new Set(state.walls);
     const holes=new Set(state.voids||[]);
@@ -311,7 +317,7 @@ export function createIso(mount,onCell){
     placement.forEach(([x,z],index)=>{
       piece(stage,'column','#475264',x,.52,z,.34,1.13,.34);
       piece(stage,'column','#b18a65',x,1.13,z,.31,.17,.31);
-      const color=mode==='roots'?'#c1f195':'#ffb46b';
+      const color=biomeLight[mode]||'#ffb46b';
       const flame=piece(stage,'gem',color,x,1.34,z,.22,.37,.22,true);
       torches.push(flame);
       const light=new T.PointLight(color,14,6,2);
@@ -320,7 +326,7 @@ export function createIso(mount,onCell){
       torchLights.push(light);
       const halo=piece(stage,'orb',color,x,1.36,z,.5,.5,.5,true);
       halo.material=new T.MeshBasicMaterial({color,transparent:true,opacity:.16,depthWrite:false,blending:T.AdditiveBlending});
-      const crystal=piece(stage,'gem',mode==='roots'?'#7da38f':'#8479b5',x+(index===0?.65:-.41),.19,z+.35,.22,.38,.20);
+      const crystal=piece(stage,'gem',{roots:'#7da38f',bones:'#c9c0a8',hell:'#ff7a3a'}[mode]||'#8479b5',x+(index===0?.65:-.41),.19,z+.35,.22,.38,.20);
       crystal.rotation.z=.32;
     });
     stage.add(hoverMarker);
@@ -338,7 +344,7 @@ export function createIso(mount,onCell){
       geometry.setAttribute('position',new T.BufferAttribute(positions,3));
       geometry.setAttribute('seed',new T.BufferAttribute(seeds,1));
       const material=new T.ShaderMaterial({
-        uniforms:{time:clock,tint:{value:new T.Color(mode==='roots'?'#d4ff9c':'#ffc98a')}},
+        uniforms:{time:clock,tint:{value:new T.Color({roots:'#d4ff9c',bones:'#c9ffd8',hell:'#ff8a3a'}[mode]||'#ffc98a')}},
         vertexShader:`attribute float seed; uniform float time; varying float vFade;
           void main(){
             vec3 p=position;
@@ -359,7 +365,9 @@ export function createIso(mount,onCell){
   }
   function makeLabel(u){
     const label=document.createElement('div');
-    label.className='iso-label'+(u.enemy?' enemy-label':'');
+    label.className='iso-label'+(u.enemy?' enemy-label':'')+(u.boss?' boss-label':'');
+    const tint=!u.enemy&&playerColors.find(c=>c.id===u.color);
+    if(tint)label.style.setProperty('--player',tint.hex);
     const name=document.createElement('span');
     name.textContent=u.name;
     const hp=document.createElement('i');
@@ -379,7 +387,8 @@ export function createIso(mount,onCell){
       if(u.hp<=0&&!moving){removeModel(u.id);continue;}
       const coords=logical(next,u.pos);
       if(!models.has(u.id)){
-        const model=miniature(look(u));
+        const tint=u.enemy?null:playerColors.find(c=>c.id===u.color)||null;
+        const model=miniature(look(u),tint);
         model.root.position.copy(coords);
         model.root.rotation.y=u.enemy?-.9:.9;
         figures.add(model.root);

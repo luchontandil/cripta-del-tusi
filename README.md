@@ -61,3 +61,18 @@ Ejecuta `npm test` para comprobar el motor y la sincronización de dos clientes.
 - Abre la URL HTTPS que muestra Render. El mismo servicio entrega la web y la API. El anfitrión crea una sala y comparte el código.
 - Si entras desde GitHub Pages, abre Jugar con amigos e introduce la misma URL HTTPS de Render en Dirección del servidor. Publica el cliente y el servidor de la misma revisión.
 - Las salas viven en memoria. Un reinicio o un nuevo despliegue corta las partidas en curso.
+
+
+## Actos, jefes y monstruos
+
+La expedición tiene **3 actos** (La Cripta, El Osario y El Infierno), cada uno con su propio árbol de **8 pisos** y 3–4 caminos por piso. Hay un jefe a mitad (piso 4) y otro al final (piso 8) de cada acto: Cancerbero (embestida y aullido), Oráculo de Ceniza (glifos y mirada ardiente), Rey Osario (invoca esqueletos y escudo de huesos), Rey del Umbral (glifos y cadena que arrastra), Demonio de Fuego (nova y suelo en llamas) y Reina Vampira (robo de vida y murciélagos). Cada acto tiene su fauna: limos, murciélagos, calaveras flotantes, gusanos, esqueletos, súcubos (encantan), vampiros (roban vida) y diablillos (fuego a distancia). En los dos primeros pisos de cada acto no hay élites, y en solitario hay menos enemigos y más suaves.
+
+## Habilidades
+
+Cada clase tiene 8 hechizos de varios elementos al estilo Dofus: daño directo, áreas en cruz, cono y línea, empujes en línea con daño por choque, atracciones, escudos, celeridad, intercambio de posición y teletransporte. Se empieza con 3 y en cada piso se aprende uno nuevo o se mejora otro (máximo 3/3). Al rango 3 cada hechizo gana una bonificación propia: más alcance, alcance modificable, más crítico, menos coste, más efecto o un área mayor. El Ninja lanza shurikens.
+
+## Cuentas, maestrías y amigos
+
+Con una cuenta (nick y contraseña) se guardan los puntos de cada partida: un punto por piso alcanzado, 3 por jefe, 10 por acto completado y 25 por la victoria. Los puntos se gastan en el árbol de **maestrías** (vigor, fuerza, precisión, coraza, fortuna, ojo para el botín, sabiduría y celeridad), que se aplica a todas las partidas futuras y se puede reiniciar. Se pueden agregar amigos por nick, ver quién está conectado e invitarlos a la sala. En multijugador, cada puesto tiene un color fijo: J1 rojo, J2 azul, J3 verde y J4 amarillo.
+
+Las cuentas se guardan en **Upstash Redis** mediante su API REST. Configura en el servidor las variables `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`; sin ellas, las cuentas solo viven en memoria y se pierden al reiniciar.

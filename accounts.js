@@ -1,0 +1,136 @@
+// Cuentas: registro, sesión, puntos, maestrías, amigos e invitaciones.
+import {randomBytes,scrypt as scryptCallback,timingSafeEqual} from 'node:crypto';
+import {promisify} from 'node:util';
+import {getJSON,setJSON,remove} from './store.js';
+import {masteryTree,masteryCost,cleanMastery,runPoints} from './engine.js';
+
+const scrypt=promisify(scryptCallback);
+const sessionDays=30;
+const onlineWindow=45000;
+export const nickKey=nick=>'user:'+String(nick).trim().toLowerCase();
+const fail=message=>{throw Object.assign(new Error(message),{status:400});};
+
+function validNick(nick){
+  const clean=String(nick||'').trim();
+  if(!/^[\p{L}\p{N}_.-]{3,16}$/u.test(clean))fail('El nick debe tener de 3 a 16 letras, números, punto, guion o guion bajo.');
+  return clean;
+}
+async function hashPassword(password,salt=randomBytes(16).toString('hex')){
+  const hash=(await scrypt(String(password),salt,32)).toString('hex');
+  return {salt,hash};
+}
+/** Datos públicos de la cuenta (sin contraseña). */
+export function publicUser(user){
+  return {nick:user.nick,points:user.points,spent:user.spent,mastery:user.mastery,friends:user.friends,
+    invites:(user.invites||[]).filter(i=>Date.now()-i.at<600000),runs:user.runs||0,best:user.best||0};
+}
+async function newSession(nick){
+  const token=randomBytes(24).toString('hex');
+  await setJSON('session:'+token,{nick},sessionDays*86400);
+  return token;
+}
+export async function register(nick,password){
+  nick=validNick(nick);
+  if(String(password||'').length<6)fail('La contraseña debe tener al menos 6 caracteres.');
+  if(await getJSON(nickKey(nick)))fail('Ese nick ya existe.');
+  const {salt,hash}=await hashPassword(password);
+  const user={nick,salt,hash,points:0,spent:0,mastery:{},friends:[],invites:[],runs:0,best:0,created:Date.now(),seen:Date.now()};
+  await setJSON(nickKey(nick),user);
+  return {token:await newSession(nick),user:publicUser(user)};
+}
+export async function login(nick,password){
+  const user=await getJSON(nickKey(nick));
+  if(!user)fail('Nick o contraseña incorrectos.');
+  const {hash}=await hashPassword(password,user.salt);
+  if(!timingSafeEqual(Buffer.from(hash,'hex'),Buffer.from(user.hash,'hex')))fail('Nick o contraseña incorrectos.');
+  return {token:await newSession(user.nick),user:publicUser(user)};
+}
+export async function logout(token){if(token)await remove('session:'+token);}
+/** Usuario de una sesión; marca la hora de última conexión. */
+export async function userFromToken(token,touch=true){
+  if(!token)return null;
+  const session=await getJSON('session:'+token);
+  if(!session)return null;
+  const user=await getJSON(nickKey(session.nick));
+  if(user&&touch&&Date.now()-(user.seen||0)>15000){user.seen=Date.now();await setJSON(nickKey(user.nick),user);}
+  return user;
+}
+async function save(user){await setJSON(nickKey(user.nick),user);}
+export async function buyMastery(user,key){
+  const node=masteryTree[key];
+  if(!node)fail('Maestría desconocida.');
+  const rank=user.mastery[key]||0;
+  if(rank>=node.max)fail('Esa maestría ya está al máximo.');
+  if(node.requires&&!(user.mastery[node.requires]>0))fail('Primero necesitas '+masteryTree[node.requires].name+'.');
+  const cost=masteryCost(key,rank);
+  if(user.points-user.spent<cost)fail('No tienes puntos suficientes.');
+  user.mastery[key]=rank+1;
+  user.spent+=cost;
+  await save(user);
+  return publicUser(user);
+}
+export async function resetMastery(user){
+  user.mastery={};user.spent=0;
+  await save(user);
+  return publicUser(user);
+}
+/** Suma los puntos de una partida terminada. */
+export async function awardRun(nick,summary){
+  const user=await getJSON(nickKey(nick));
+  if(!user)return 0;
+  const points=runPoints(summary);
+  user.points+=points;
+  user.runs=(user.runs||0)+1;
+  user.best=Math.max(user.best||0,Math.floor(Number(summary.floor)||0));
+  await save(user);
+  return points;
+}
+/** Partida en solitario: el cliente envía el resumen; una vez cada 30 s como máximo. */
+export async function awardSolo(user,summary){
+  if(Date.now()-(user.lastAward||0)<30000)fail('Puntos ya guardados.');
+  const points=runPoints(summary);
+  user.lastAward=Date.now();
+  user.points+=points;
+  user.runs=(user.runs||0)+1;
+  user.best=Math.max(user.best||0,Math.floor(Number(summary.floor)||0));
+  await save(user);
+  return {points,user:publicUser(user)};
+}
+export async function addFriend(user,nick){
+  const other=await getJSON(nickKey(nick));
+  if(!other)fail('No existe ningún jugador con ese nick.');
+  if(other.nick===user.nick)fail('No puedes agregarte a ti mismo.');
+  if(!user.friends.includes(other.nick))user.friends.push(other.nick);
+  if(!other.friends.includes(user.nick))other.friends.push(user.nick);
+  await save(user);await save(other);
+  return publicUser(user);
+}
+export async function removeFriend(user,nick){
+  user.friends=user.friends.filter(f=>f.toLowerCase()!==String(nick).toLowerCase());
+  await save(user);
+  const other=await getJSON(nickKey(nick));
+  if(other){other.friends=other.friends.filter(f=>f!==user.nick);await save(other);}
+  return publicUser(user);
+}
+/** Lista de amigos con su estado de conexión. */
+export async function friendList(user){
+  const list=await Promise.all(user.friends.map(async nick=>{
+    const other=await getJSON(nickKey(nick));
+    return other?{nick:other.nick,online:Date.now()-(other.seen||0)<onlineWindow,best:other.best||0}:null;
+  }));
+  return list.filter(Boolean);
+}
+export async function invite(user,nick,code){
+  if(!user.friends.some(f=>f.toLowerCase()===String(nick).toLowerCase()))fail('Solo puedes invitar a tus amigos.');
+  const other=await getJSON(nickKey(nick));
+  if(!other)fail('Jugador no encontrado.');
+  other.invites=(other.invites||[]).filter(i=>i.from!==user.nick&&Date.now()-i.at<600000);
+  other.invites.push({from:user.nick,code,at:Date.now()});
+  await save(other);
+}
+export async function dismissInvite(user,from){
+  user.invites=(user.invites||[]).filter(i=>i.from!==from);
+  await save(user);
+  return publicUser(user);
+}
+export {cleanMastery};

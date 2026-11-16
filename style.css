@@ -853,3 +853,68 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 .loot-card button:hover:not(:disabled),.inventory-slot>.item button:hover:not(:disabled){border-color:#d6ad66;background:linear-gradient(180deg,#3c3453,#2d263f);box-shadow:0 1px 0 #ffffff12 inset,0 2px 6px #0006}
 .loot-card button.primary{color:#2a1f12;border-color:#ffe2a6;background:linear-gradient(180deg,#ffe5ad,#e4b56d 55%,#c9944d);box-shadow:0 1px 0 #fff7 inset,0 6px 18px #c9944d40,0 2px 4px #0007}
 .loot-card button.primary:hover:not(:disabled){background:linear-gradient(180deg,#fff0c9,#ecc07a 55%,#d6a157);border-color:#fff1c8}
+
+/* Color de cada jugador (J1 rojo, J2 azul, J3 verde, J4 amarillo). */
+.initiative li.ally{box-shadow:inset 4px 0 0 var(--player,transparent),inset 1px 1px 0 #3a302c}
+.initiative li.ally.current{box-shadow:inset 4px 0 0 var(--player,transparent),inset 0 0 0 2px var(--gold)}
+.iso-label:not(.enemy-label){border-color:var(--player,#000)!important;box-shadow:inset 0 0 0 1px var(--player,#4a3c34)}
+.iso-label.boss-label{font-size:.8rem;border-color:#c9402f!important}
+.turn-art canvas,.voter canvas,.ready-chip canvas{filter:drop-shadow(0 0 0 var(--player,transparent))}
+
+/* ───────────── Cuenta, amigos, maestrías y sala ───────────── */
+.gateway-account{max-width:980px;margin:0 auto 16px;padding:16px 20px;display:grid;gap:12px}
+.account-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.account-head h2{display:flex;align-items:center;gap:8px;color:var(--gold);margin:0}
+.account-head .hint{flex-basis:100%;margin:0}
+.account-stats{display:flex;flex-wrap:wrap;gap:6px}
+.account-actions{margin-left:auto;display:flex;gap:6px}
+.account-form{display:grid;grid-template-columns:1fr 1fr auto auto;gap:10px;align-items:end}
+.account-form .field{margin:0}
+.link-button{font-size:.78rem;box-shadow:none;background:transparent;border-color:transparent;color:var(--muted)}
+.hint.warn{color:#ffb38a}
+.friends h3,.journey h3{display:flex;align-items:center;gap:7px;color:var(--gold);margin:4px 0 8px}
+.add-friend{display:flex;gap:8px;max-width:420px;margin-bottom:8px}
+.friend-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
+.friend{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#120e10;border:2px solid #000;box-shadow:inset 1px 1px 0 #3a302c;font-size:.86rem}
+.friend .dot{width:10px;height:10px;border-radius:50%!important;background:#5a524c;box-shadow:0 0 0 2px #000}
+.friend.online .dot{background:#5fbf4a}
+.friend small{color:var(--muted);margin-right:auto}
+.friend.empty{color:var(--muted)}
+.friend button{font-size:.76rem;padding:.3em .6em}
+.invite{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 12px;background:#2a2014;border:2px solid #000;box-shadow:inset 0 0 0 2px var(--gold)}
+.invite code{color:var(--gold);font-family:var(--font-ui);font-weight:700}
+.invite span{margin-right:auto}
+.invite-toast{position:fixed;z-index:80;right:16px;bottom:16px;display:flex;align-items:center;gap:10px;padding:12px 14px;background:#151114;border:2px solid #000;box-shadow:inset 0 0 0 2px var(--gold),4px 4px 0 #000;max-width:calc(100vw - 32px)}
+.masteries{width:min(96vw,820px);max-height:88vh;overflow:auto;background:#151114;color:var(--paper);border:2px solid #000;box-shadow:var(--bevel),6px 6px 0 #000;padding:18px}
+.masteries::backdrop{background:#000c}
+.masteries-head{display:flex;align-items:center;gap:12px}
+.masteries-head h2{color:var(--gold);margin:0;margin-right:auto}
+.mastery-points{display:inline-flex;align-items:center;gap:6px;color:#d5b8ff;font-weight:700}
+.mastery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin:12px 0}
+.mastery{display:grid;grid-template-columns:44px 1fr;gap:6px 10px;padding:10px;background:#1a1517;border:2px solid #000;box-shadow:inset 2px 2px 0 #3e332e,inset -2px -2px 0 #0a0708}
+.mastery.owned{box-shadow:inset 0 0 0 2px #9b6ad6}
+.mastery.maxed{box-shadow:inset 0 0 0 2px var(--gold)}
+.mastery-icon{display:grid;place-items:center;width:44px;height:44px;background:#0a0809;border:2px solid #000}
+.mastery-icon .icon{width:26px;height:26px}
+.mastery-body strong{display:block;color:#fff1cf}
+.mastery-body p{margin:3px 0 0;font-size:.8rem;color:var(--muted)}
+.mastery-body p.next{color:#a8de8c}
+.mastery button{grid-column:1/-1;font-size:.8rem}
+.pips{display:flex;gap:3px;margin-top:3px}
+.pips i{width:12px;height:6px;background:#2a2124;border:1px solid #000}
+.pips i.on{background:#9b6ad6}
+.small-button{font-size:.78rem}
+.gameover-points{display:flex;align-items:center;justify-content:center;gap:6px;color:#d5b8ff;font-weight:700;margin:0 0 14px}
+.gameover.victory{border-color:var(--gold)!important}
+.gameover.victory h2{color:var(--gold)!important}
+.gameover.victory .gameover-skull{color:var(--gold);border-color:var(--gold)}
+.lobby-party{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.lobby-slot{display:flex;align-items:center;gap:10px;padding:10px;background:#120e10;border:2px solid #000;box-shadow:inset 4px 0 0 var(--player),inset 1px 1px 0 #3a302c;opacity:.55}
+.lobby-slot.taken{opacity:1}
+.slot-color i{display:block;width:14px;height:14px;background:var(--player);border:2px solid #000}
+.slot-art canvas{width:30px;image-rendering:pixelated}
+.slot-info{display:grid}
+.slot-info small{color:var(--muted);font-size:.78rem}
+@media(max-width:760px){.account-form{grid-template-columns:1fr}.account-actions{margin-left:0}}
+.tip-note.max-bonus{display:flex;align-items:center;gap:6px;color:#d5b8ff;border-top:1px dashed #ffffff18;padding-top:6px}
+.tip-note.max-bonus.active{color:var(--gold)}

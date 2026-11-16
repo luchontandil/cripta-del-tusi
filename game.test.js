@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices} from './engine.js';
+import {maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -51,7 +51,8 @@ test('valida turno, ruta, puntos, visibilidad y escalado',()=>{
   assert.throws(()=>act(s,'p0',{type:'skill',skill:2,pos:enemy.pos}),/puntos/);
   assert.ok(encounter(3,4).length>encounter(3,1).length);
   assert.ok(encounter(5,1)[0].hp>encounter(1,1)[0].hp);
-  assert.ok(encounter(1,1)[0].hp>=20&&encounter(1,1)[0].damage>=4);
+  assert.ok(encounter(1,2)[0].hp>=20&&encounter(1,2)[0].damage>=4);
+  assert.ok(encounter(1,1)[0].hp<encounter(1,2)[0].hp);
 });
 test('la vulnerabilidad se aplica a otro atacante y el clérigo cura a un aliado',()=>{
   const s=battle('tirador','mistico');
@@ -74,10 +75,12 @@ test('la vulnerabilidad se aplica a otro atacante y el clérigo cura a un aliado
 });
 test('el jefe anuncia una sola cruz y, al activarla en su turno, las cadenas dañan y restan PM',()=>{
   const s=battle('tirador');
-  s.floor=5;
+  s.route=makeRoute(rng,2);
+  s.floor=15;
   s.phase='reward';
   s.picks=['p0'];
   act(s,'p0',{type:'next'},rng);
+  assert.equal(s.units.find(u=>u.boss).look,'umbralking');
   const boss=s.units[s.turn];
   assert.equal(boss.boss,true);
   timeout(s);
@@ -185,6 +188,7 @@ test('la IA rodea un muro y publica el trayecto antes de atacar',()=>{
   const hero=s.units[0], foe=s.units[1];
   hero.pos=17;
   foe.pos=13;
+  foe.look='slime';foe.stats.movement=0;
   s.walls=[2,3,4,14,15,16,26,27,28];
   act(s,'p0',{type:'end'},rng);
   const route=planEnemy(s,foe,[hero]);
@@ -325,15 +329,18 @@ test('dos clientes reciben la misma trayectoria completa y el cambio de turno', 
   assert.equal(active.state.units[active.state.turn].id,peer.id);
 });
 
-test('el camino tiene 6 pisos, jefes en 3 y 6 y todos los nodos alcanzables',()=>{
+test('cada acto tiene 8 pisos, jefes en 4 y 8, sin élites al principio y todos los nodos alcanzables',()=>{
   for(let seed=1;seed<30;seed++){
     let x=seed;const random=()=>((x=(Math.imul(x,1664525)+1013904223)>>>0)/4294967296);
-    const route=makeRoute(random);
-    assert.equal(route.rows.length,6);
-    assert.equal(route.rows[2][0].kind,'boss');
-    assert.equal(route.rows[5][0].kind,'boss');
-    for(let r=1;r<6;r++)for(const node of route.rows[r])assert.ok(route.rows[r-1].some(prev=>prev.next.includes(node.id)));
-    for(let r=0;r<5;r++)for(const node of route.rows[r])assert.ok(node.next.length>0);
+    for(const actNumber of [1,2,3]){
+      const route=makeRoute(random,actNumber);
+      assert.equal(route.rows.length,8);
+      assert.equal(route.rows[3][0].kind,'boss');
+      assert.equal(route.rows[7][0].kind,'boss');
+      assert.ok(route.rows[0].concat(route.rows[1]).every(n=>n.kind!=='elite'));
+      for(let r=1;r<8;r++)for(const node of route.rows[r])assert.ok(route.rows[r-1].some(prev=>prev.next.includes(node.id)));
+      for(let r=0;r<7;r++)for(const node of route.rows[r])assert.ok(node.next.length>0);
+    }
   }
 });
 test('los eventos se votan, el empate lo decide el anfitrión y aplican efectos al próximo combate',()=>{
@@ -371,8 +378,9 @@ test('el voto se resuelve al acabarse los 15 segundos',()=>{
   assert.notEqual(s.phase,'map');
 });
 test('el combate de élite trae un enemigo extra y mejor botín',()=>{
-  const normal=encounter(2,1),elite=encounter(2,1,true);
+  const normal=encounter(2,2),elite=encounter(2,2,true);
   assert.equal(elite.length,normal.length+1);
+  assert.equal(encounter(2,1,true).length,encounter(2,1).length);
   assert.ok(elite[0].hp>normal[0].hp);
 });
 test('el agua bloquea el paso pero no la visión y los pinchos dañan al pisarlos',()=>{
@@ -393,8 +401,8 @@ test('la tienda es una sala del mapa: se compra y vende allí y se sigue cuando 
   for(let seed=1;seed<20;seed++){
     let x=seed;const random=()=>((x=(Math.imul(x,1664525)+1013904223)>>>0)/4294967296);
     const route=makeRoute(random);
-    assert.ok(route.rows[1].some(n=>n.kind==='shop'));
-    assert.ok(route.rows[4].some(n=>n.kind==='shop'));
+    assert.ok(route.rows[2].some(n=>n.kind==='shop'));
+    assert.ok(route.rows[6].some(n=>n.kind==='shop'));
   }
   const s=create();
   join(s,'p0','Uno','guardia');join(s,'p1','Dos','mago');
@@ -471,4 +479,175 @@ test('los enemigos se adaptan al poder real del grupo',()=>{
   assert.ok(strong.hp<=2.2&&weak.hp>=.7);
   const s=battle('guardia');
   assert.ok(s.scaling&&s.scaling.hp>0);
+});
+
+test('cada jefe usa sus poderes sin romper el combate',()=>{
+  for(const [boss,floor] of [['cerberus',4],['oracle',8],['skeletonking',12],['umbralking',16],['firedemon',20],['vampqueen',24]]){
+    const s=battle('guardia','mago');
+    s.walls=[];s.water=[];s.traps=[];
+    s.floor=floor;
+    const foe=encounter(floor,2,{boss})[0];
+    foe.max=foe.hp;
+    const heroes=s.units.filter(u=>!u.enemy);
+    for(const h of heroes){h.hp=h.max=999;}
+    foe.pos=heroes[0].pos-4;
+    s.units=[...heroes,foe];
+    s.turn=s.units.indexOf(foe);
+    s.deadline=0;s.enemyPlan=null;
+    for(let i=0;i<12&&s.phase==='combat';i++){
+      if(s.units[s.turn].enemy){timeout(s);if(s.units[s.turn]?.enemy)timeout(s);}
+      else act(s,s.units[s.turn].id,{type:'end'},rng);
+    }
+    assert.equal(s.phase,'combat',boss);
+    if(boss==='skeletonking')assert.ok(s.units.some(u=>u.minion),'el Rey Osario invoca');
+    if(boss==='cerberus')assert.ok(heroes.some(h=>h.hp<999),'Cancerbero muerde');
+  }
+});
+test('una partida completa recorre los 3 actos y termina en victoria',()=>{
+  const s=create();
+  join(s,'p0','Uno','guardia');join(s,'p1','Dos','mago');
+  act(s,'p0',{type:'start'},rng);
+  let guard=0,acts=new Set();
+  while(s.phase!=='won'&&guard++<400){
+    acts.add(s.route.act);
+    if(s.phase==='map'||s.phase==='event'){for(const p of s.players)if(s.phase==='map'||s.phase==='event')act(s,p.id,{type:'vote',option:0},rng);}
+    else if(s.phase==='shop'){for(const p of s.players)if(s.phase==='shop')act(s,p.id,{type:'ready'},rng);}
+    else if(s.phase==='combat'){
+      for(const u of s.units)if(u.enemy)u.hp=0;
+      const hero=s.units.find(u=>!u.enemy&&u.hp>0);
+      hero.hp=Math.max(hero.hp,1);
+      s.turn=s.units.indexOf(hero);
+      act(s,hero.id,{type:'end'},rng);
+    }else if(s.phase==='reward'){
+      for(const p of s.players){
+        if(!s.picks.includes(p.id))act(s,p.id,{type:'reward',item:null},rng);
+        if(s.training&&!p.trained)act(s,p.id,{type:'train',skill:trainingChoices(p)[0].index},rng);
+      }
+      act(s,'p0',{type:'next'},rng);
+    }else assert.fail('fase inesperada '+s.phase);
+  }
+  assert.equal(s.phase,'won');
+  assert.equal(s.floor,24);
+  assert.deepEqual([...acts],[1,2,3]);
+  assert.equal(s.bossKills,6);
+});
+
+test('colores fijos por puesto y maestrías aplicadas a la partida',()=>{
+  const s=create();
+  join(s,'a','Uno','tirador',{mastery:{vigor:2,fuerza:1,fortuna:3,sabiduria:1,coraza:9}});
+  join(s,'b','Dos','tirador');
+  assert.deepEqual(s.players.map(p=>p.color),['red','blue']);
+  assert.equal(s.players[0].gold,30);
+  assert.equal(s.players[0].mastery.coraza,3);
+  assert.equal(s.players[0].skillRanks[0],2);
+  act(s,'a',{type:'start'},rng);
+  enterCombat(s);
+  const [a,b]=['a','b'].map(id=>s.units.find(u=>u.id===id));
+  assert.equal(a.max-b.max,8);
+  assert.equal(a.stats.physical-b.stats.physical,1);
+  assert.equal(a.stats.ward-b.stats.ward,3);
+  assert.equal(a.color,'red');
+  assert.equal(masteryCost('fuerza',2),6);
+});
+test('los puntos de cuenta crecen con lo lejos que se llega',()=>{
+  assert.ok(runPoints({floor:3})<runPoints({floor:9,bossKills:2}));
+  assert.ok(runPoints({floor:24,bossKills:6,won:true})>runPoints({floor:24,bossKills:5}));
+  assert.equal(runPoints({floor:999,bossKills:99,won:true}),24+18+30+25);
+});
+test('cuentas: registro, maestrías, amigos, invitaciones y puntos al terminar la partida en sala', {timeout:10000}, async t=>{
+  const {server:app}=await import('./server.js');
+  if(!app.listening){app.listen(0,'127.0.0.1');await once(app,'listening');}
+  t.after(()=>app.close());
+  const base='http://127.0.0.1:'+app.address().port;
+  const call=async(path,body,account,key)=>{
+    const response=await fetch(base+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(account?{'X-Account':account}:{}),...(key?{Authorization:'Bearer '+key}:{})},body:body?JSON.stringify(body):undefined});
+    return {status:response.status,...await response.json()};
+  };
+  const ana=await call('/api/account/register',{nick:'Ana',password:'secreto1'});
+  assert.equal(ana.status,200);
+  assert.equal((await call('/api/account/register',{nick:'ana',password:'otraclave'})).status,400);
+  assert.equal((await call('/api/account/login',{nick:'Ana',password:'mala'})).status,400);
+  const bob=await call('/api/account/register',{nick:'Bob',password:'secreto2'});
+  const login=await call('/api/account/login',{nick:'ANA',password:'secreto1'});
+  assert.equal(login.user.nick,'Ana');
+  const friends=await call('/api/account/friend',{nick:'bob'},ana.token);
+  assert.deepEqual(friends.user.friends,['Bob']);
+  assert.equal(friends.friends[0].online,true);
+  const solo=await call('/api/account/award',{floor:9,bossKills:2,won:false},ana.token);
+  assert.equal(solo.points,9+6+10);
+  assert.equal((await call('/api/account/award',{floor:9},ana.token)).status,400);
+  const bought=await call('/api/account/mastery',{key:'vigor'},ana.token);
+  assert.equal(bought.user.mastery.vigor,1);
+  assert.equal(bought.user.spent,1);
+  assert.equal((await call('/api/account/mastery',{key:'celeridad'},bob.token)).status,400);
+  const room=await call('/api/rooms',{classId:'guardia'},ana.token);
+  assert.equal(room.state.players[0].name,'Ana');
+  assert.equal(room.state.players[0].mastery.vigor,1);
+  assert.equal((await call('/api/account/invite',{nick:'Bob',code:room.code},ana.token)).status,200);
+  const bobMe=await call('/api/account/me',null,bob.token);
+  assert.equal(bobMe.user.invites[0].code,room.code);
+  const joined=await call('/api/'+room.code+'/join',{classId:'mago'},bob.token);
+  assert.deepEqual(joined.state.players.map(p=>p.color),['red','blue']);
+  const before=(await call('/api/account/me',null,bob.token)).user.points;
+  const {rooms}=await import('./server.js');
+  await call('/api/'+room.code+'/action',{type:'start'},null,room.key);
+  const live=rooms.get(room.code);
+  live.state.floor=5;live.state.bossKills=1;live.state.phase='lost';
+  await call('/api/'+room.code,null,null,room.key);
+  await call('/api/'+room.code,null,null,joined.key);
+  const after=(await call('/api/account/me',null,bob.token)).user.points;
+  assert.equal(after-before,5+3);
+  assert.ok(before>=0);
+});
+
+test('habilidades estilo Dofus: Ninja con shuriken, cono, línea, empuje con choque, atracción, intercambio y bonus de rango máximo',()=>{
+  assert.equal(classes.sombra.name,'Ninja');
+  assert.equal(classes.sombra.skills[0][0],'Shuriken');
+  assert.ok(classes.sombra.skills[0][2]>1);
+  for(const cls of Object.values(classes)){
+    assert.ok(cls.skills.length>=8);
+    const elementsUsed=new Set(cls.skills.map(sk=>sk[8]?.element).filter(Boolean));
+    assert.ok(elementsUsed.size>=2,cls.name);
+    for(const sk of cls.skills)assert.ok(maxBonusText(sk),sk[0]);
+  }
+  const s=battle('guardia','mago');
+  s.walls=[];s.water=[];s.traps=[];
+  const g=s.units.find(u=>u.id==='p0'),m=s.units.find(u=>u.id==='p1');
+  const foe=s.units.find(u=>u.enemy);
+  for(const u of s.units.filter(u=>u.enemy&&u!==foe))u.hp=0;
+  const w=s.width;
+  // Cono de Barrido: 4 casillas hacia delante.
+  g.pos=3*w+5;
+  const cone=spellArea(s,3*w+4,skillFor({...g,skillRanks:[1,1,1,1,1,1,1,1]},4),g);
+  assert.deepEqual(new Set(cone),new Set([3*w+4,3*w+3,2*w+3,4*w+3]));
+  // Línea del Relámpago: casilla elegida y 3 detrás.
+  m.pos=6*w+8;
+  const line=spellArea(s,6*w+7,skillFor({...m,skillRanks:[1,1,1,1,1,1,1,1]},4),m);
+  assert.deepEqual(new Set(line),new Set([6*w+7,6*w+6,6*w+5,6*w+4]));
+  // Empujón de escudo contra un muro: la unidad choca y recibe daño extra.
+  s.turn=s.units.indexOf(g);s.ap=6;
+  g.skillRanks=[1,1,1,1,0,1,1,0];
+  foe.pos=g.pos-1;foe.hp=foe.max=200;foe.stats.ward=0;
+  s.walls=[g.pos-3];
+  const before=foe.hp;
+  act(s,'p0',{type:'skill',skill:3,pos:foe.pos},()=>.5);
+  assert.equal(foe.pos,g.pos-2);
+  assert.ok(before-foe.hp>=4+6);
+  // Cadena del carcelero: atrae al enemigo hacia el Guardián.
+  s.walls=[];foe.pos=g.pos-4;s.ap=6;
+  act(s,'p0',{type:'skill',skill:5,pos:foe.pos},()=>.5);
+  assert.equal(foe.pos,g.pos-2);
+  // Rango máximo: Tajo gana crítico, Golpe de brasas pasa a alcance modificable.
+  const top={classId:'guardia',skillRanks:[3,1,1,1,1,1,1,3]};
+  assert.equal(skillFor(top,0)[8].crit,15);
+  assert.equal(skillFor(top,7)[8].modifiable,true);
+  assert.equal(skillFor({classId:'mistico',skillRanks:[1,1,1,1,1,1,1,3]},7)[1],2);
+  // Sustitución del Ninja: intercambia posiciones.
+  const n=battle('sombra');
+  n.walls=[];n.water=[];n.traps=[];
+  const ninja=n.units.find(u=>!u.enemy),enemy=n.units.find(u=>u.enemy);
+  ninja.skillRanks[6]=1;n.ap=6;
+  const [a,b]=[ninja.pos,ninja.pos-3];enemy.pos=b;
+  act(n,'p0',{type:'skill',skill:6,pos:b},rng);
+  assert.deepEqual([ninja.pos,enemy.pos],[b,a]);
 });

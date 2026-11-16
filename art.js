@@ -1,4 +1,72 @@
 const creatureArt={
+  skeleton:c=>{
+    const r=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
+    r(6,28,14,2,'#19151e90');
+    r(9,3,8,7,'#e6dfcc');r(8,5,10,4,'#e6dfcc');r(10,5,2,2,'#1a1418');r(14,5,2,2,'#1a1418');r(10,6,1,1,'#ff5a3a');r(15,6,1,1,'#ff5a3a');
+    r(10,10,6,2,'#cfc6b2');for(const x of [10,12,14])r(x,11,1,1,'#1a1418');
+    r(12,12,2,8,'#e6dfcc');for(const y of [13,15,17])r(9,y,8,1,'#e6dfcc');
+    r(7,12,2,8,'#e6dfcc');r(17,12,2,8,'#e6dfcc');r(19,16,1,9,'#8a7a6a');r(18,15,3,1,'#5a4a3a');
+    r(10,20,6,2,'#e6dfcc');r(10,22,2,6,'#e6dfcc');r(14,22,2,6,'#e6dfcc');
+  },
+  succubus:c=>{
+    const r=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
+    r(6,28,14,2,'#19151e70');
+    r(1,8,5,2,'#5a1846');r(0,10,7,4,'#7a2a62');r(20,8,5,2,'#5a1846');r(19,10,7,4,'#7a2a62');
+    r(9,1,2,3,'#1a0818');r(15,1,2,3,'#1a0818');
+    r(9,3,8,8,'#2a0a20');r(10,4,6,6,'#c76a9a');r(11,6,1,1,'#ff7ad9');r(14,6,1,1,'#ff7ad9');r(12,8,2,1,'#7a1a3a');
+    r(10,11,6,5,'#c76a9a');r(9,14,8,3,'#3a1030');r(8,17,10,8,'#3a1030');r(9,25,8,2,'#2a0820');
+    r(18,20,2,2,'#c76a9a');r(20,22,2,2,'#c76a9a');r(22,23,2,2,'#ff7ad9');
+  },
+  vampire:c=>{
+    const r=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
+    r(5,28,16,2,'#19151e90');
+    r(4,9,4,18,'#4a0a1a');r(18,9,4,18,'#4a0a1a');r(5,7,3,4,'#2a1838');r(18,7,3,4,'#2a1838');
+    r(9,2,8,3,'#151018');r(9,4,8,7,'#d9d4e6');r(10,6,2,1,'#ff2a3a');r(14,6,2,1,'#ff2a3a');r(11,9,1,2,'#ffffff');r(14,9,1,2,'#ffffff');
+    r(8,11,10,15,'#1c1426');r(12,12,2,8,'#7a1020');r(9,26,8,2,'#151018');
+  },
+  imp:c=>{
+    const r=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
+    r(6,28,14,2,'#19151e70');
+    r(8,4,2,3,'#2a1410');r(16,4,2,3,'#2a1410');
+    r(8,7,10,8,'#c2402a');r(10,9,2,2,'#ffe04a');r(14,9,2,2,'#ffe04a');r(11,12,4,1,'#5a1a14');
+    r(3,13,5,3,'#5a1a14');r(18,13,5,3,'#5a1a14');
+    r(9,15,8,7,'#c2402a');r(10,22,2,4,'#a2301e');r(14,22,2,4,'#a2301e');r(17,19,3,2,'#a2301e');r(20,20,2,2,'#c2402a');
+    r(19,14,5,5,'#ffb347');r(20,15,3,3,'#fff2b0');
+  },
+  cerberus:c=>{
+    const r=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
+    r(1,28,24,2,'#19151e90');
+    r(5,14,16,10,'#2a1e1c');r(4,24,3,4,'#1a1210');r(19,24,3,4,'#1a1210');r(9,24,3,4,'#1a1210');r(14,24,3,4,'#1a1210');
+    for(const [x,y] of [[0,8],[9,5],[18,8]]){r(x,y,8,7,'#2a1e1c');r(x+1,y+4,6,3,'#4a3530');r(x+1,y+2,2,1,'#ff6a2a');r(x+5,y+2,2,1,'#ff6a2a');r(x,y-2,2,2,'#2a1e1c');r(x+6,y-2,2,2,'#2a1e1c');r(x+2,y+6,4,1,'#ff6a2a');}
+    r(21,15,4,2,'#2a1e1c');
+  },
+  skeletonking:c=>{
+    const r=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
+    r(3,28,20,2,'#19151e90');
+    r(8,0,10,2,'#c9a24a');for(const x of [8,11,14,17])r(x,-1,1,3,'#e6dfcc');
+    r(8,2,10,7,'#e6dfcc');r(9,4,3,3,'#0c0812');r(14,4,3,3,'#0c0812');r(10,5,1,1,'#7dffb0');r(15,5,1,1,'#7dffb0');
+    r(10,9,6,2,'#cfc6b2');for(const x of [10,12,14])r(x,10,1,1,'#0c0812');
+    r(4,11,5,4,'#c9a24a');r(17,11,5,4,'#c9a24a');
+    r(5,14,16,13,'#3a2a4a');r(12,12,2,10,'#e6dfcc');for(const y of [13,15,17,19])r(9,y,8,1,'#e6dfcc');
+    r(22,4,2,22,'#8fa0b4');r(20,18,6,1,'#c9a24a');
+  },
+  firedemon:c=>{
+    const r=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
+    r(2,28,22,2,'#19151e90');
+    r(6,1,2,5,'#1a0a08');r(18,1,2,5,'#1a0a08');for(const x of [9,12,15])r(x,0,2,3,'#ffd36b');
+    r(8,4,10,7,'#2a1612');r(10,6,2,2,'#fff2a0');r(14,6,2,2,'#fff2a0');r(10,9,6,1,'#ff7a1a');
+    r(3,11,20,12,'#2a1612');r(9,12,8,8,'#ff7a1a');r(11,14,4,4,'#ffd36b');
+    r(1,14,3,8,'#2a1612');r(22,14,3,8,'#2a1612');r(0,21,5,4,'#ff7a1a');r(21,21,5,4,'#ff7a1a');
+    r(6,23,5,5,'#2a1612');r(15,23,5,5,'#2a1612');
+  },
+  vampqueen:c=>{
+    const r=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
+    r(3,28,20,2,'#19151e90');
+    r(0,6,7,3,'#3a0a1a');r(0,9,5,8,'#3a0a1a');r(19,6,7,3,'#3a0a1a');r(21,9,5,8,'#3a0a1a');
+    for(const x of [9,12,15])r(x,0,2,3,'#c9a24a');
+    r(8,2,10,9,'#120a14');r(9,3,8,7,'#e8e0ee');r(10,6,2,1,'#ff2a3a');r(14,6,2,1,'#ff2a3a');
+    r(7,11,12,4,'#e8e0ee');r(6,14,14,14,'#8a0a1e');r(8,16,10,2,'#3a0008');r(2,20,2,2,'#ff1a3a');r(22,18,2,2,'#ff1a3a');
+  },
   oracle:c=>{
     const r=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
     r(5,28,16,2,'#19151e90');
@@ -80,14 +148,16 @@ const palettes = {
   elite:['#392c51','#755e91','#c69980','#ffe0a9'],
   boss:['#572938','#b34a63','#df9a54','#fff0a2']
 };
-export function portrait(look) {
+export function portrait(look,tint=null) {
   const image=document.createElement('canvas');
   image.width=26;
   image.height=30;
   image.setAttribute('aria-hidden','true');
   const c=image.getContext('2d');
   if(creatureArt[look]){creatureArt[look](c,look);return image;}
-  const [dark,mid,light,shine]=palettes[look]||palettes.enemy;
+  let [dark,mid,light,shine]=palettes[look]||palettes.enemy;
+  // Color del jugador: la ropa toma el color de su puesto.
+  if(tint){dark=tint.dark;mid=tint.hex;}
   const ink='#201820';
   const rect=(x,y,w,h,color)=>{c.fillStyle=color;c.fillRect(x,y,w,h);};
   rect(5,26,16,2,'#19151e90');

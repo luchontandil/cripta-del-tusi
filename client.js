@@ -1,13 +1,22 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement,nodeKinds,modText,trapInfo} from './engine.js?v=19';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=19';
-import {setupSfx} from './music.js?v=19';
-import {icon} from './icons.js?v=19';
+  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf} from './engine.js?v=22';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=22';
+import {setupSfx} from './music.js?v=22';
+import {icon} from './icons.js?v=22';
 
 const el=id=>document.getElementById(id);
+const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
+/** Retrato pixelado de una unidad o jugador, con el color de su puesto si es un héroe. */
+const unitArt=u=>{
+  const canvas=portrait(u.look||u.classId,tintOf(u));
+  const tint=tintOf(u);
+  if(tint)canvas.style.setProperty('--player',tint.hex);
+  return canvas;
+};
 let state,session,selected=null,busy=false,polling=false,generation=0,revision=0,rendered='';
 let pending=[],playing=null,lastSeq=0,animationEpoch=0;
-let holdLoot=false,lastDamageUntil=0;
+let holdLoot=false,lastDamageUntil=0,soloAwarded=false;
 const hitDuration=1000;
 function lootReady(){
   return state?.phase==='reward'&&(!holdLoot||(!playing&&!pending.length&&performance.now()>=lastDamageUntil));
@@ -86,7 +95,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=19').then(({createIso})=>{
+import('./isometric.js?v=22').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -98,6 +107,136 @@ import('./isometric.js?v=19').then(({createIso})=>{
     iso.highlight(el('board').children);
   }
 }).catch(()=>{syncViewport();});
+// ───────────── Cuentas, maestrías, amigos e invitaciones ─────────────
+let account={token:localStorage.getItem('cripta-account')||null,user:null,friends:[],persistent:true,mode:'login',busy:false};
+const serverBase=()=>{try{return new URL(el('server').value).origin;}catch{return location.origin;}};
+async function accountCall(operation,body){
+  const response=await fetch(serverBase()+'/api/account/'+operation,{
+    method:body?'POST':'GET',
+    headers:{...(body?{'Content-Type':'application/json'}:{}),...(account.token?{'X-Account':account.token}:{})},
+    body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(12000)
+  });
+  const data=await response.json().catch(()=>({error:'El servidor todavía no responde.'}));
+  if(response.status===401){setAccountToken(null);renderAccount();}
+  if(!response.ok||data.error)throw new Error(data.error||'Error de cuenta.');
+  return data;
+}
+function setAccountToken(token){
+  account.token=token;
+  if(token)localStorage.setItem('cripta-account',token);else{localStorage.removeItem('cripta-account');account.user=null;account.friends=[];}
+}
+const available=()=>account.user?account.user.points-account.user.spent:0;
+async function refreshAccount(){
+  if(!account.token)return;
+  try{
+    const data=await accountCall('me');
+    account.user=data.user;account.friends=data.friends;
+    renderAccount();showInvites();
+    if(masteriesDialog.open)renderMasteries();
+    if(state?.phase==='lobby')renderJourney();
+  }catch{}
+}
+accountCall('status').then(data=>{account.persistent=data.persistent;renderAccount();}).catch(()=>{});
+setInterval(refreshAccount,10000);
+function field(label,input){return h('label','field',label,input);}
+function renderAccount(){
+  const box=el('account');
+  if(!box)return;
+  if(!account.token||!account.user){
+    const nick=document.createElement('input');nick.maxLength=16;nick.autocomplete='username';nick.placeholder='Tu nick';
+    const pass=document.createElement('input');pass.type='password';pass.autocomplete=account.mode==='login'?'current-password':'new-password';pass.placeholder='Contraseña';
+    const go=btn('',async()=>{
+      if(account.busy)return;account.busy=true;
+      try{
+        const data=await accountCall(account.mode==='login'?'login':'register',{nick:nick.value,password:pass.value});
+        setAccountToken(data.token);account.user=data.user;
+        error('');await refreshAccount();renderAccount();classPreview();
+      }catch(e){error(e.message);}finally{account.busy=false;}
+    });
+    go.className='primary';
+    go.append(icon(account.mode==='login'?'play':'users'),account.mode==='login'?'Entrar':'Crear cuenta');
+    const swap=btn(account.mode==='login'?'¿No tienes cuenta? Crear una':'¿Ya tienes cuenta? Entrar',()=>{account.mode=account.mode==='login'?'register':'login';renderAccount();});
+    swap.className='ghost link-button';
+    pass.onkeydown=e=>{if(e.key==='Enter')go.click();};
+    box.replaceChildren(
+      h('div','account-head',h('h2',null,icon('level'),'Tu cuenta'),h('p','hint','Guarda tus puntos y maestrías, agrega amigos e invítalos a tu sala.')),
+      h('div','account-form',field('Nick',nick),field('Contraseña',pass),go,swap),
+      account.persistent?null:h('p','hint warn','Servidor sin base de datos configurada: las cuentas se borrarán al reiniciarlo.'));
+    return;
+  }
+  const u=account.user;
+  const masteryButton=btn('',()=>openMasteries());masteryButton.className='primary';
+  masteryButton.append(icon('xp'),'Maestrías');
+  const out=btn('',async()=>{try{await accountCall('logout',{});}catch{}setAccountToken(null);renderAccount();classPreview();});
+  out.className='ghost';out.append(icon('exit'),'Salir');
+  const nickInput=document.createElement('input');nickInput.placeholder='Nick de tu amigo';nickInput.maxLength=16;
+  const add=btn('',async()=>{
+    try{const data=await accountCall('friend',{nick:nickInput.value});account.user=data.user;account.friends=data.friends;error('');renderAccount();}
+    catch(e){error(e.message);}
+  });
+  add.append(icon('users'),'Agregar');
+  nickInput.onkeydown=e=>{if(e.key==='Enter')add.click();};
+  const friends=h('ul','friend-list',...account.friends.map(f=>h('li','friend'+(f.online?' online':''),h('span','dot'),h('b',null,f.nick),h('small',null,f.online?'Conectado':'Desconectado'))));
+  if(!account.friends.length)friends.append(h('li','friend empty','Todavía no tienes amigos agregados.'));
+  const invites=(u.invites||[]).map(inv=>{
+    const accept=btn('',()=>acceptInvite(inv));accept.className='primary';accept.append(icon('play'),'Unirse');
+    const no=btn('Descartar',async()=>{try{const d=await accountCall('dismiss',{from:inv.from});account.user=d.user;renderAccount();}catch{}});no.className='ghost';
+    return h('div','invite',icon('users'),h('span',null,h('b',null,inv.from),' te invita a su sala ',h('code',null,inv.code)),accept,no);
+  });
+  box.replaceChildren(
+    h('div','account-head',h('h2',null,icon('level'),u.nick),
+      h('div','account-stats',h('span','chip',icon('xp'),available()+' puntos'),h('span','chip',icon('crown'),'Mejor piso: '+(u.best||0)),h('span','chip',icon('clock'),(u.runs||0)+' partidas')),
+      h('div','account-actions',masteryButton,out)),
+    ...invites,
+    h('div','friends',h('h3',null,icon('users'),'Amigos'),h('div','add-friend',nickInput,add),friends));
+}
+async function acceptInvite(inv){
+  el('code').value=inv.code;
+  try{const d=await accountCall('dismiss',{from:inv.from});account.user=d.user;}catch{}
+  hideInviteToast();
+  renderAccount();
+  el('join').click();
+}
+let toastShown='';
+function showInvites(){
+  const inv=(account.user?.invites||[])[0];
+  if(!inv||state||toastShown===inv.from+inv.code)return;
+  toastShown=inv.from+inv.code;
+  const toast=el('invite-toast');
+  const go=btn('',()=>acceptInvite(inv));go.className='primary';go.append(icon('play'),'Unirse');
+  const close=btn('',hideInviteToast);close.className='ghost';close.append('Ahora no');
+  toast.replaceChildren(icon('users'),h('span',null,h('b',null,inv.from),' te invita a jugar'),go,close);
+  toast.hidden=false;
+  sfx('heal');
+}
+function hideInviteToast(){el('invite-toast').hidden=true;}
+const masteriesDialog=el('masteries');
+el('masteries-close').onclick=()=>masteriesDialog.close();
+el('mastery-reset').onclick=async()=>{try{const d=await accountCall('mastery-reset',{});account.user=d.user;renderMasteries();renderAccount();}catch(e){error(e.message);}};
+function openMasteries(){renderMasteries();masteriesDialog.showModal();}
+function renderMasteries(){
+  const u=account.user;if(!u)return;
+  el('mastery-points').replaceChildren(icon('xp'),available()+' puntos disponibles');
+  el('mastery-grid').replaceChildren(...Object.entries(masteryTree).map(([key,node])=>{
+    const rank=u.mastery[key]||0;
+    const maxed=rank>=node.max;
+    const cost=maxed?0:masteryCost(key,rank);
+    const locked=node.requires&&!(u.mastery[node.requires]>0);
+    const buy=btn('',async()=>{try{const d=await accountCall('mastery',{key});account.user=d.user;renderMasteries();renderAccount();}catch(e){error(e.message);}});
+    buy.className=maxed?'ghost':'primary';
+    buy.disabled=maxed||locked||available()<cost;
+    buy.append(maxed?'Máximo':locked?'Requiere '+masteryTree[node.requires].name:'Mejorar · '+cost+' pts');
+    const pips=h('span','pips',...Array.from({length:node.max},(_,i)=>h('i',i<rank?'on':null)));
+    return h('article','mastery'+(rank?' owned':'')+(maxed?' maxed':''),
+      h('div','mastery-icon',icon(node.icon)),
+      h('div','mastery-body',h('strong',null,node.name),pips,
+        h('p',null,rank?'Ahora: '+node.description(rank):'Sin aprender'),
+        maxed?null:h('p','next','Siguiente: '+node.description(rank+1))),
+      buy);
+  }));
+}
+renderAccount();
+refreshAccount();
 function classPreview(){
   const kind=el('class').value;
   const cls=classes[kind];
@@ -239,7 +378,7 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
     if(nodes.length)showTip(nodes,anchor,'tip-compact');
     return;
   }
-  const nodes=[tipHead(portrait(unit.look||unit.classId),unit.name,unit.enemy?(unit.boss?'Jefe':unit.elite?'Élite':'Enemigo'):classes[unit.classId].name+(unit.level?' · nivel '+unit.level:''),null),hpBar(unit)];
+  const nodes=[tipHead(unitArt(unit),unit.name,unit.enemy?(unit.boss?'Jefe':unit.elite?'Élite':'Enemigo'):classes[unit.classId].name+(unit.level?' · nivel '+unit.level:''),null),hpBar(unit)];
   if(unit.enemy&&skill){
     const preview=damagePreview(source,unit,skill);
     if(preview&&aim){
@@ -269,51 +408,70 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
   showTip(nodes,anchor,unit.enemy?'tip-foe':'tip-ally');
 }
 window.addEventListener('scroll',hideUnit,{passive:true});
-const skillEffects={
-  expose:'Vulnerable 2 turnos: todos los atacantes infligen +3',
-  slow:'Ralentiza: −2 PM en el próximo turno del objetivo',
-  venom:'Veneno: 3 PV por turno durante 2 turnos',
-  blast:'Área en cruz: la casilla elegida y las 4 adyacentes',
-  push:'Empuja al objetivo una casilla',
-  cleanse:'Elimina todos los efectos negativos del aliado',
-  heal:'Cura a un aliado o a ti mismo',
-  dash:'Teletransporte por una ruta libre sin gastar PM'
-};
+const areaNames={cross:'cruz',circle:'círculo',cone:'cono',line:'línea'};
+/** Texto del efecto de una habilidad, con sus valores reales (rango y bonificaciones incluidos). */
+function skillEffectText(skill){
+  const kind=skill[5],o=skillOptions(skill);
+  const area=o.area?' · Área en '+areaNames[o.area]+(o.size>1?' ('+o.size+')':''):'';
+  const text={
+    expose:'Vulnerable 2 turnos: los ataques contra el objetivo hacen +'+(o.value||3),
+    slow:'Ralentiza: −'+(o.value||2)+' PM en el próximo turno del objetivo',
+    venom:'Veneno: '+(o.value||3)+' PV por turno durante 2 turnos',
+    blast:'Daño en área',
+    push:'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' en línea (si choca, recibe daño extra)',
+    pull:'Atrae '+(o.pull||1)+(o.pull>1?' casillas':' casilla')+' hacia ti',
+    cleanse:'Elimina todos los efectos negativos del aliado',
+    heal:'Cura a un aliado o a ti mismo',
+    shield:'+'+(o.value||3)+' de armadura durante 2 turnos',
+    haste:'+'+(o.value||2)+' PM en el próximo turno del aliado',
+    swap:'Intercambia tu posición con la del objetivo',
+    dash:o.teleport?'Teletransporte (sin línea de visión)':'Desplazamiento por una ruta libre sin gastar PM'
+  }[kind]||'';
+  return (text+area).replace(/^ · /,'');
+}
 /** Datos calculados de una habilidad para un personaje (con su equipo, si lo tiene). */
 function skillFacts(unit,skill){
   const [,cost,range,min,max,kind,,minRange=0]=skill;
   const reach=modifiableRange(skill)?(unit.stats?.reach||0):0;
   const healing=['heal','cleanse'].includes(kind);
+  const utility=['dash','shield','haste','swap'].includes(kind)||max<=0;
   const element=skillElement(unit,skill);
-  const bonus=healing?Math.floor((unit.level||1)/2):kind==='dash'?0:(unit.stats?.[element]||0);
-  return {cost,minRange,maxRange:range+reach,reach,healing,element,bonus,low:min+bonus,high:max+bonus,kind,modifiable:modifiableRange(skill)};
+  const bonus=healing?Math.floor((unit.level||1)/2):utility?0:(unit.stats?.[element]||0);
+  const crit=Math.min(100,Math.round(critChance(unit)*100)+(skillOptions(skill).crit||0));
+  return {cost,minRange,maxRange:range+reach,reach,healing,utility,element,bonus,low:min+bonus,high:max+bonus,kind,crit,modifiable:modifiableRange(skill)};
 }
 /** Filas de la ficha de una habilidad. */
 function skillRows(unit,skill){
-  const f=skillFacts(unit,skill);
+  const f=skillFacts(unit,skill),o=skillOptions(skill);
   const rows=[statRow('ap','Coste',f.cost+' PA')];
-  if(f.kind==='dash')rows.push(statRow('dash','Efecto','Movimiento sin PM'));
-  else if(f.healing)rows.push(statRow('heal','Curación',f.low+'–'+f.high+(f.bonus?' (+'+f.bonus+' nivel)':'')));
-  else{
+  if(f.healing)rows.push(statRow('heal','Curación',f.low+'–'+f.high+(f.bonus?' (+'+f.bonus+' nivel)':'')));
+  else if(!f.utility){
     rows.push(statRow(f.element,'Elemento',elements[f.element],'element-'+f.element));
     rows.push(statRow(f.element,'Daño',f.low+'–'+f.high+(f.bonus?' (+'+f.bonus+' equipo)':'')));
-    rows.push(statRow('critical','Crítico',Math.round(critChance(unit)*100)+' % · ×1,5'));
+    rows.push(statRow('critical','Crítico',f.crit+' % · ×1,5'));
   }
+  if(o.area)rows.push(statRow('blast','Área',areaNames[o.area]+(o.size>1?' · tamaño '+o.size:'')));
+  if(o.push||o.pull)rows.push(statRow('mp',o.push?'Empuje':'Atracción',(o.push||o.pull)+((o.push||o.pull)>1?' casillas':' casilla')));
   rows.push(statRow('range','Alcance',(f.minRange?f.minRange+'–':'')+f.maxRange+(f.maxRange===1?' casilla':' casillas')+(f.reach?' (+'+f.reach+')':'')));
   rows.push(statRow('reach','Alcance modificable',f.modifiable?'Sí':'No',f.modifiable?'yes':'no'));
-  rows.push(statRow('info','Línea de visión','Necesaria'));
+  rows.push(statRow('info','Línea de visión',o.los===false?'No necesaria':'Necesaria'));
   return rows;
 }
 function skillTipNodes(unit,index,skill,rank){
   const [name,,,,,kind,symbol]=skill;
+  const effect=skillEffectText(skill);
+  const base=classes[unit.classId]?.skills[index??classes[unit.classId].skills.findIndex(s=>s[0]===name)];
+  const bonus=maxBonusText(base||skill);
   return [tipHead(spellIcon(kind,symbol),name,rank?'Nivel '+rank+' de 3':'Sin aprender',index!==null?String(index+1):null),
     h('div','tip-stats',...skillRows(unit,skill)),
-    skillEffects[kind]?h('p','tip-note',skillEffects[kind]):null].filter(Boolean);
+    effect?h('p','tip-note',effect):null,
+    bonus?h('p','tip-note max-bonus'+(rank>=3?' active':''),icon('xp'),(rank>=3?'Rango máximo: ':'Al rango 3: ')+bonus):null].filter(Boolean);
 }
 function initiative(turn){
   const units=state.units.length?state.units:state.players;
   return units.map(u=>{
-    const li=h('li',u.enemy?'foe':'ally',h('span','turn-art',portrait(u.look||u.classId)));
+    const li=h('li',u.enemy?'foe':'ally',h('span','turn-art',unitArt(u)));
+    if(tintOf(u))li.style.setProperty('--player',tintOf(u).hex);
     const info=h('span','turn-info',h('span','turn-name',u.name));
     if(u.max){
       const bar=h('span','turn-hp',h('i'));
@@ -322,7 +480,7 @@ function initiative(turn){
       li.append(info,h('span','turn-pv',String(u.hp)));
       li.onpointerenter=()=>{
         const rect=li.getBoundingClientRect();
-        const nodes=[tipHead(portrait(u.look||u.classId),u.name,u.enemy?'Enemigo':classes[u.classId]?.name||'',null),hpBar(u)];
+        const nodes=[tipHead(unitArt(u),u.name,u.enemy?'Enemigo':classes[u.classId]?.name||'',null),hpBar(u)];
         const chips=effectChips(u);
         if(chips)nodes.push(chips);
         showTip(nodes,{left:rect.right+8,top:rect.top+rect.height,bottom:rect.top},u.enemy?'tip-foe':'tip-ally');
@@ -620,7 +778,7 @@ function giveTusi(player,others){
       giveDraft=null;
       send({type:'give',to:other.id,gold:value});
     });
-    b.append(portrait(other.classId),'A '+other.name);
+    b.append(unitArt(other),'A '+other.name);
     return b;
   });
   box.append(summary,h('div','give-row',amount,...buttons));
@@ -645,7 +803,7 @@ function renderShop(box){
   readyButton.className=me?'ready-button done':'primary ready-button';
   readyButton.append(icon(me?'check':'play'),me?'Listo · esperando al grupo':'Listo para seguir');
   const party=h('div','ready-party',...state.players.map(p=>{
-    const chip=h('span','ready-chip'+(ready.includes(p.id)?' on':''),portrait(p.classId),p.name);
+    const chip=h('span','ready-chip'+(ready.includes(p.id)?' on':''),unitArt(p),p.name);
     return chip;
   }));
   box.replaceChildren(
@@ -700,12 +858,15 @@ function showTrainingCompare(player,unit,index,rank){
     rows.push(line(a.healing?'heal':'attack',a.healing?'Curación':'Daño',amount(b),amount(a)));
     rows.push(line('range','Alcance',b?reach(b):null,reach(a)));
   }
-  const gain=kind==='dash'?'+1 casilla de alcance':!rank?'Nueva habilidad':a.healing?'+2 de curación mínima y máxima':'+2 de daño mínimo y máximo';
+  const baseSkill=classes[player.classId].skills[index];
+  const maxBonus=rank+1>=3?maxBonusText(baseSkill):'';
+  const gain=[!rank?'Nueva habilidad':kind==='dash'?'+1 casilla de alcance':a.utility?'':a.healing?'+2 de curación mínima y máxima':'+2 de daño mínimo y máximo',
+    maxBonus?'Rango máximo: '+maxBonus:''].filter(Boolean).join(' · ')||'Mejora la habilidad';
   el('training-compare').replaceChildren(
     tipHead(spellIcon(kind,symbol),name,rank?'Nivel '+rank+' → '+(rank+1):'Aprender · nivel 1',null),
     h('div','compare-grid',...rows),
     h('p','compare-gain',icon('xp'),gain),
-    ...(skillEffects[kind]?[h('p','tip-note',skillEffects[kind])]:[]));
+    ...(skillEffectText(after)?[h('p','tip-note',skillEffectText(after))]:[]));
   el('training-compare').hidden=false;
 }
 const gameoverDialog=el('gameover');
@@ -717,19 +878,33 @@ el('gameover-home').onclick=()=>{
 gameoverDialog.querySelector('.gameover-skull').append(icon('skull'));
 /** Ventana de fin de partida cuando cae todo el grupo (tras terminar las animaciones). */
 function updateGameOver(){
-  const lost=state?.phase==='lost';
+  const lost=state?.phase==='lost'||state?.phase==='won';
   if(!lost){if(gameoverDialog.open)gameoverDialog.close();return;}
   if(gameoverDialog.open||playing||pending.length||performance.now()<lastDamageUntil)return;
   const foes=state.units.filter(u=>u.enemy);
   const stat=(iconName,label,value)=>[h('dt',null,icon(iconName),label),h('dd',null,String(value))];
   el('gameover-stats').replaceChildren(
-    ...stat('level','Piso alcanzado',state.floor+' de 6'),
+    ...stat('level','Piso alcanzado',state.floor+' de '+ACTS*FLOORS_PER_ACT+' · acto '+actOf(state.floor||1)),
+    ...stat('crown','Jefes derrotados',(state.bossKills||0)+' de 6'),
     ...stat('clock','Rondas en este piso',state.rounds||1),
     ...stat('skull','Enemigos caídos en este piso',foes.filter(u=>u.hp<=0).length+' / '+foes.length));
-  el('gameover-party').replaceChildren(...state.players.map(p=>h('li',null,portrait(p.classId),
+  el('gameover-party').replaceChildren(...state.players.map(p=>h('li',null,unitArt(p),
     h('span',null,h('strong',null,p.name),h('small',null,classes[p.classId].name+' · nivel '+p.level)))));
+  const won=state.phase==='won';
+  gameoverDialog.classList.toggle('victory',won);
+  el('gameover-title').textContent=won?'¡Expedición completada!':'El grupo ha caído';
+  gameoverDialog.querySelector('.gameover-sub').textContent=won?'Los seis jefes han caído. La cripta es vuestra.':'La cripta reclama a otro grupo de aventureros.';
+  gameoverDialog.querySelector('.gameover-skull').replaceChildren(icon(won?'crown':'skull'));
+  const points=state.result?.points??runPoints({floor:state.floor,bossKills:state.bossKills,won});
+  const line=el('gameover-points');
+  line.hidden=false;
+  line.replaceChildren(icon('xp'),'+'+points+' puntos de maestría',account.user?'':' (crea una cuenta para guardarlos)');
+  if(account.user&&!session.code&&!soloAwarded){
+    soloAwarded=true;
+    accountCall('award',{floor:state.floor,bossKills:state.bossKills||0,won}).then(d=>{account.user=d.user;renderAccount();}).catch(()=>{});
+  }else if(account.user&&session.code)setTimeout(refreshAccount,1500);
   hideUnit();
-  sfx('blast');
+  sfx(won?'heal':'blast');
   gameoverDialog.showModal();
 }
 const nodeIcons={combat:'sword',elite:'elite',event:'question',boss:'crown',shop:'shop'};
@@ -738,7 +913,7 @@ function voters(option){
   const votes=state.vote?.votes||{};
   const list=state.players.filter(p=>votes[p.id]===option);
   return h('span','voters',...list.map(p=>{
-    const v=h('span','voter'+(p.id===session.id?' me':''),portrait(p.classId));
+    const v=h('span','voter'+(p.id===session.id?' me':''),unitArt(p));
     v.title=p.name;
     return v;
   }));
@@ -757,8 +932,10 @@ function renderMap(box){
   const options=state.vote?.options||[];
   const path=state.route.path;
   const myVote=state.vote?.votes?.[session.id];
-  const width=1000,height=360,padX=70,padY=46;
-  const at=node=>({x:padX+(node.floor-1)*(width-2*padX)/5,y:padY+node.x*(height-2*padY)});
+  const width=1000,height=380,padX=60,padY=46;
+  const rowOf=new Map();
+  rows.forEach((row,i)=>row.forEach(node=>rowOf.set(node.id,i)));
+  const at=node=>({x:padX+rowOf.get(node.id)*(width-2*padX)/(rows.length-1),y:padY+node.x*(height-2*padY)});
   const svgNS='http://www.w3.org/2000/svg';
   const svg=document.createElementNS(svgNS,'svg');
   svg.setAttribute('viewBox','0 0 '+width+' '+height);
@@ -776,11 +953,12 @@ function renderMap(box){
     svg.append(line);
   }
   const map=h('div','route-map',svg);
-  for(let f=1;f<=6;f++){
+  rows.forEach((row,i)=>{
+    const f=row[0].floor;
     const label=h('span','floor-label'+(f===state.floor+1&&state.phase==='map'?' next':''),'Piso '+f);
-    label.style.left=(at({floor:f,x:0}).x/width*100)+'%';
+    label.style.left=(at(row[0]).x/width*100)+'%';
     map.append(label);
-  }
+  });
   for(const node of rows.flat()){
     const option=options.indexOf(node.id);
     const visited=path.includes(node.id);
@@ -794,15 +972,17 @@ function renderMap(box){
     if(option>=0){b.onclick=()=>send({type:'vote',option});b.append(voters(option));}
     b.onpointerenter=b.onfocus=()=>{
       const r=b.getBoundingClientRect();
-      showTip([tipHead(h('span','tip-node kind-'+node.kind,icon(nodeIcons[node.kind])),nodeKinds[node.kind].name,'Piso '+node.floor,null),
-        h('p','tip-note',nodeKinds[node.kind].description),option>=0?h('p','tip-note strong','Haz clic para votar este camino.'):null].filter(Boolean),
+      const info=node.boss?bosses[node.boss]:null;
+      showTip([tipHead(h('span','tip-node kind-'+node.kind,icon(nodeIcons[node.kind])),info?info.name:nodeKinds[node.kind].name,'Piso '+node.floor+(info?' · Jefe':''),null),
+        h('p','tip-note',info?info.powers:nodeKinds[node.kind].description),option>=0?h('p','tip-note strong','Haz clic para votar este camino.'):null].filter(Boolean),
         {left:r.left,top:r.top,bottom:r.bottom},'tip-skill');
     };
     b.onpointerleave=b.onblur=hideUnit;
     map.append(b);
   }
   const legend=h('div','map-legend',...Object.entries(nodeKinds).map(([kind,info])=>h('span','legend-item kind-'+kind,icon(nodeIcons[kind]),info.name)));
-  box.replaceChildren(h('div','journey-head',h('h3',null,icon('crown'),'Elige el camino'),h('p',null,'Cada jugador vota la siguiente sala. Tenéis 15 segundos.')),map,legend,voteStatus());
+  const actNumber=state.route.act||1;
+  box.replaceChildren(h('div','journey-head',h('h3',null,icon('crown'),'Acto '+actNumber+' de '+ACTS+' · '+actNames[actNumber-1]),h('p',null,'Cada jugador vota la siguiente sala. Tenéis 15 segundos.')),map,legend,voteStatus());
 }
 function renderEvent(box){
   const myVote=state.vote?.votes?.[session.id];
@@ -820,11 +1000,39 @@ function renderEvent(box){
     h('div','event-options',...options),
     voteStatus()));
 }
+/** Sala de espera: grupo con sus colores e invitación a amigos. */
+function renderLobby(box){
+  const host=state.players[0]?.id===session.id;
+  const party=h('ul','lobby-party',...[0,1,2,3].map(i=>{
+    const p=state.players[i];
+    const color=playerColors[i];
+    const slot=h('li','lobby-slot'+(p?' taken':''),h('span','slot-color',h('i')));
+    slot.style.setProperty('--player',color.hex);
+    if(p)slot.append(h('span','slot-art',unitArt(p)),h('span','slot-info',h('b',null,p.name+(p.id===session.id?' (tú)':'')),h('small',null,'Jugador '+(i+1)+' · '+color.name+' · '+classes[p.classId].name)));
+    else slot.append(h('span','slot-info',h('b',null,'Libre'),h('small',null,'Jugador '+(i+1)+' · '+color.name)));
+    return slot;
+  }));
+  const invite=[];
+  if(session.code&&account.user){
+    const list=account.friends.filter(f=>!state.players.some(p=>p.account===f.nick||p.name===f.nick));
+    invite.push(h('h3',null,icon('users'),'Invitar amigos'));
+    if(!list.length)invite.push(h('p','hint','Agrega amigos por su nick desde la pantalla de inicio.'));
+    invite.push(h('ul','friend-list',...list.map(f=>{
+      const b=btn('',async()=>{try{await accountCall('invite',{nick:f.nick,code:session.code});b.disabled=true;b.replaceChildren(icon('check'),'Invitado');}catch(e){error(e.message);}});
+      b.append(icon('play'),'Invitar');
+      return h('li','friend'+(f.online?' online':''),h('span','dot'),h('b',null,f.nick),h('small',null,f.online?'Conectado':'Desconectado'),b);
+    })));
+  }else if(session.code)invite.push(h('p','hint','Entra con tu cuenta para invitar a tus amigos directamente.'));
+  box.replaceChildren(
+    h('div','journey-head',h('h3',null,icon('users'),'Sala '+(session.code||'')),h('p',null,host?'Cuando estéis todos, pulsa «Iniciar expedición».':'Esperando a que el anfitrión inicie la expedición.')),
+    party,...invite);
+}
 function renderJourney(){
   const box=el('journey');
-  const show=['map','event','shop'].includes(state?.phase);
+  const show=['map','event','shop','lobby'].includes(state?.phase);
   box.hidden=!show;
   if(!show)return;
+  if(state.phase==='lobby'){renderLobby(box);return;}
   if(state.phase==='map')renderMap(box);else if(state.phase==='shop')renderShop(box);else renderEvent(box);
 }
 function pawnName(name){
@@ -916,7 +1124,7 @@ async function animate(){
     pawn.style.height=(100/state.height)+'%';
     Object.assign(pawn.style,boardPoint(event.from));
     const name=state.units.find(u=>u.id===event.unit)?.name;
-    pawn.append(portrait(event.look));
+    pawn.append(unitArt(state.units.find(u=>u.id===event.unit)||{look:event.look}));
     if(name)pawn.append(pawnName(name));
     el('animations').append(pawn);
     updatePawns();
@@ -1003,7 +1211,8 @@ function drawBoard(turn,walking,skill){
   board.style.setProperty('--cols',state.width);
   board.className=(state.biome||'crypt')+(state.voids?.length?' shaped':'');
   const fragment=document.createDocumentFragment();
-  const shades=state.biome==='roots'?['#55513a','#4d573b','#60573d','#3f4938']:['#49524c','#3d4845','#515650','#3b4540'];
+  const shades={roots:['#55513a','#4d573b','#60573d','#3f4938'],bones:['#5a5246','#4e473c','#625a4c','#474036'],
+    hell:['#4a2a22','#3e2420','#542e24','#36201c']}[state.biome]||['#49524c','#3d4845','#515650','#3b4540'];
   for(let pos=0;pos<state.width*state.height;pos++){
     const unit=state.units.find(u=>u.hp>0&&u.pos===pos);
     const voidCell=!onBoard(state,pos);
@@ -1047,7 +1256,7 @@ function drawBoard(turn,walking,skill){
       hp.className='hp';
       hp.style.setProperty('--hp',(unit.hp/unit.max*100)+'%');
       hp.append(document.createElement('i'));
-      pawn.append(portrait(unit.look||unit.classId),hp,pawnName(unit.name));
+      pawn.append(unitArt(unit),hp,pawnName(unit.name));
       cell.append(pawn);
     }
     if(unit||glyph||water||trap){
@@ -1075,7 +1284,8 @@ function render(){
   const mine=state.phase==='combat'&&turn?.id===session.id;
   const host=state.players[0]?.id===session.id;
   const rewardReady=lootReady();
-  const title={shop:'Piso '+state.floor+' · Tienda',map:'Piso '+(state.floor+1)+' · Elige el camino',event:'Evento · '+(state.event?.title||''),lobby:'Sala de expedición',combat:'Piso '+state.floor+' · '+state.layoutName+' · '+turn?.name+(mine?' (tú)':''),reward:rewardReady?'Botín y mercader':'Victoria',won:'Expedición completada',lost:'El grupo ha caído'}[state.phase];
+  const actLabel='Acto '+(state.act||actOf(state.floor||1))+' · ';
+  const title={shop:'Piso '+state.floor+' · Tienda',map:'Piso '+(state.floor+1)+' · Elige el camino',event:'Evento · '+(state.event?.title||''),lobby:'Sala de expedición',combat:actLabel+'Piso '+state.floor+' · '+turn?.name+(mine?' (tú)':''),reward:rewardReady?'Botín y mercader':'Victoria',won:'Expedición completada',lost:'El grupo ha caído'}[state.phase];
   el('phase').textContent=title;
   updateGameOver();
   const journey=['map','event','shop'].includes(state.phase);
@@ -1191,7 +1401,7 @@ el('copy-code').onclick=async()=>{
 async function request(base,path,body,key){
   const response=await fetch(base+path,{
     method:body?'POST':'GET',
-    headers:{...(body?{'Content-Type':'application/json'}:{}),...(key?{Authorization:'Bearer '+key}:{})},
+    headers:{...(body?{'Content-Type':'application/json'}:{}),...(key?{Authorization:'Bearer '+key}:{}),...(account.token?{'X-Account':account.token}:{})},
     body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(12000)
   });
   const result=await response.json().catch(()=>({error:'El servidor todavía no responde.'}));
@@ -1230,7 +1440,8 @@ el('solo').onclick=()=>{
   const p=profile();
   const next=create();
   session={id:'local'};
-  join(next,session.id,p.name,p.classId);
+  join(next,session.id,account.user?.nick||p.name,p.classId,account.user?{mastery:account.user.mastery}:{});
+  soloAwarded=false;
   act(next,session.id,{type:'start'});
   error('');
   setState(next,true);

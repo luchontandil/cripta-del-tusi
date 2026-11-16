@@ -72,3 +72,29 @@ main{max-width:1440px}
 @media(max-width:980px){.layout{grid-template-columns:minmax(0,1fr) minmax(150px,185px);grid-template-areas:"arena inventory" "log inventory"}.combat-log ol{max-height:130px}}
 @media(max-width:640px){.layout{grid-template-columns:1fr;grid-template-areas:"arena" "inventory" "log"}#inventory{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.equipment-grid .inventory-slot>summary,.equipment-grid .inventory-slot>span{aspect-ratio:1.6}#clock{width:48px;height:48px}#seconds{width:25px;height:25px}#end-turn{padding:4px 6px}}
 
+
+#iso-world{position:relative;overflow:hidden;width:100%;height:clamp(350px,56vw,650px);border:1px solid #52516b;border-radius:7px;background:radial-gradient(ellipse at 48% 38%,#2f3148 0,#181b2e 54%,#0d101a 100%);box-shadow:inset 0 0 45px #0b0e20,0 10px 26px #07071280}
+#iso-world canvas{display:block;width:100%;height:100%;touch-action:manipulation;cursor:crosshair}
+.iso-labels{position:absolute;inset:0;pointer-events:none}
+.iso-label{position:absolute;top:0;left:0;width:max-content;max-width:140px;padding:2px 5px;border-radius:4px;background:#131625e8;border:1px solid #8b82924b;color:#fff1d0;font-size:.67rem;font-weight:700;line-height:1.1;text-align:center}
+.iso-label span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iso-label.active{border-color:#f3c775;color:#ffdf94}.iso-label.enemy-label span{color:#ffb49b}
+.iso-label i{display:block;height:2px;background:linear-gradient(to right,#b7da9b var(--hp),#464150 var(--hp));border-radius:2px;margin-top:3px}
+.iso-label.enemy-label i{background:linear-gradient(to right,#e99179 var(--hp),#514152 var(--hp))}
+#battlefield.isometric #board{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);border:0}
+#battlefield.isometric #animations{inset:0;pointer-events:none}
+#battlefield.isometric .impact{z-index:8}
+@media(max-width:640px){#iso-world{height:clamp(280px,76vw,420px)}.iso-label{font-size:.59rem;max-width:100px}}
+
+
+.in-expedition main{padding-block:12px}
+.in-expedition header{justify-content:flex-start;margin-bottom:0;min-height:37px;gap:8px}
+.in-expedition h1{font-size:clamp(1.2rem,3vw,1.8rem)}
+.in-expedition header .crest{font-size:1rem}
+.in-expedition #error:empty{display:none}
+.in-expedition .status{padding-block:4px}
+.in-expedition .fight-header{min-height:auto;padding:5px 10px}
+.in-expedition .fight-header h2{font-size:1.19rem}
+#iso-world{height:clamp(310px,54vh,580px)}
+@media(max-width:640px){#iso-world{height:clamp(260px,72vw,400px)}}
+

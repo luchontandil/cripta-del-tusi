@@ -157,6 +157,9 @@ test('dos clientes reciben la misma trayectoria completa y el cambio de turno', 
   assert.match(await (await fetch(base)).text(),/Cripta del tusi/);
   assert.equal((await fetch(base+'/art.js')).status,200);
   assert.equal((await fetch(base+'/music.js')).status,200);
+  for(const file of ['isometric.js','models3d.js','three.module.js','three.core.js']){
+    assert.match((await fetch(base+'/'+file)).headers.get('content-type'),/^text\/javascript/);
+  }
   async function request(path,body,key){
     const response=await fetch(base+path,{
       method:body?'POST':'GET',

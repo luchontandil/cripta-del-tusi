@@ -2,6 +2,8 @@
 
 Dungeon crawler táctico para navegador. Juega en solitario o en una sala de hasta cuatro personas. Elige Guardián, Arquero, Clérigo o Mago y supera seis pisos. Los tableros combinan cinco diseños, reflejos, obstáculos adicionales y posiciones enemigas variables. Crecen con el grupo. Cada piso cambia de diseño y, a partir del segundo, también de dimensiones respecto al anterior.
 
+El tablero isométrico usa Three.js r180, incluido con su licencia MIT. Pulsa una casilla para moverte o para lanzar el hechizo seleccionado. Desde la barra superior puedes alternar con la vista cenital. Si el navegador no dispone de WebGL, el juego usa la vista cenital automáticamente.
+
 ## Jugar en local
 
 Con Node.js 20 o posterior, abre una terminal en esta carpeta y ejecuta:
@@ -39,6 +41,7 @@ Las salas viven en memoria y se pierden al reiniciar el servidor. Al recargar la
 Los totales de los pisos 3 y 6 incluyen al jefe. Ajusta las clases y la función `encounter` en `engine.js` para cambiar el balance.
 
 Ejecuta `npm test` para comprobar el motor y la sincronización de dos clientes.
+
 
 
 

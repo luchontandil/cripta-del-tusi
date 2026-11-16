@@ -11,6 +11,45 @@ const error=message=>{el('error').textContent=message;};
 const iconName={expose:'Vulnerable',slow:'−PM',poison:'Veneno'};
 const specs={guardia:'Primera línea · debilita al enemigo',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha'};
 const musicMode=setupMusic(el('music'));
+let iso=null;
+let useIso=localStorage.getItem('cripta-view')!=='2d';
+const battlefield=el('battlefield');
+const worldMount=el('iso-world');
+function syncViewport(){
+  const shown=!!(iso&&useIso&&state?.units.length&&!el('game').hidden);
+  iso?.show(shown);
+  battlefield.classList.toggle('isometric',shown);
+  const toggle=el('view-toggle');
+  toggle.hidden=!iso||!state?.units.length;
+  toggle.setAttribute('aria-pressed',String(shown));
+  toggle.textContent=shown?'Vista isométrica':'Vista cenital';
+}
+el('view-toggle').onclick=()=>{
+  useIso=!useIso;
+  localStorage.setItem('cripta-view',useIso?'iso':'2d');
+  syncViewport();
+  if(iso?.active){
+    iso.sync(state,hidePawn);
+    iso.highlight(el('board').children);
+  }
+};
+worldMount.addEventListener('graphicslost',()=>{
+  iso?.show(false);
+  iso=null;
+  syncViewport();
+});
+import('./isometric.js?v=6').then(({createIso})=>{
+  iso=createIso(worldMount,(event,pos)=>{
+    const cell=el('board').children[pos];
+    if(event==='click')cell?.click();
+    else cell?.dispatchEvent(new PointerEvent('pointer'+event));
+  });
+  syncViewport();
+  if(iso?.active){
+    iso.sync(state,hidePawn);
+    iso.highlight(el('board').children);
+  }
+}).catch(()=>{syncViewport();});
 function classPreview(){
   const kind=el('class').value;
   const description=document.createElement('span');
@@ -66,7 +105,7 @@ function inspectUnit(unit,cell){
     return row;
   }));
   tooltip.hidden=false;
-  const anchor=cell.getBoundingClientRect();
+  const anchor=iso?.active?iso.anchor(unit.pos):cell.getBoundingClientRect();
   const left=Math.max(6,Math.min(anchor.left,window.innerWidth-tooltip.offsetWidth-6));
   const above=anchor.top-tooltip.offsetHeight-7;
   tooltip.style.left=left+'px';
@@ -186,6 +225,11 @@ function pawnName(name){
   return tag;
 }
 function boardPoint(pos){
+  if(iso?.active){
+    const p=iso.anchor(pos);
+    const rect=worldMount.getBoundingClientRect();
+    return {left:(p.left-rect.left+14)+'px',top:(p.top-rect.top)+'px'};
+  }
   const col=pos%state.width;
   const row=Math.floor(pos/state.width);
   return {left:((col+.5)/state.width*100)+'%',top:((row+.5)/state.height*100)+'%'};
@@ -202,6 +246,10 @@ function resetAnimation(){
   el('animations').replaceChildren();
 }
 function impact(event){
+  if(iso?.active){
+    iso.impact(event);
+    if(event.kind==='blast')return;
+  }
   if(event.kind==='blast'){
     for(const pos of event.area){
       const flash=document.createElement('span');
@@ -227,6 +275,10 @@ async function animate(){
     playing=event;
     if(!['combat','reward','won','lost'].includes(state.phase))continue;
     if(event.kind!=='move'){impact(event);continue;}
+    if(iso?.active){
+      await iso.move(event);
+      continue;
+    }
     const pawn=document.createElement('div');
     pawn.className='pawn moving';
     pawn.style.inset='auto';
@@ -252,6 +304,7 @@ async function animate(){
   }
   if(epoch!==animationEpoch)return;
   playing=null;
+  if(iso?.active)iso.sync(state,hidePawn);
   updatePawns();
 }
 function setState(next,initial=false){
@@ -295,11 +348,13 @@ function paintPath(path,origin){
     arrow.setAttribute('aria-hidden','true');
     cell.append(arrow);
   });
+  if(iso?.active)iso.highlight(board.children);
 }
 function paintArea(area=[]){
   const board=el('board');
   for(const cell of board.querySelectorAll('.area-preview'))cell.classList.remove('area-preview');
   for(const pos of area)board.children[pos]?.classList.add('area-preview');
+  if(iso?.active)iso.highlight(board.children);
 }
 function drawBoard(turn,walking,skill){
   const board=el('board');
@@ -307,6 +362,7 @@ function drawBoard(turn,walking,skill){
   hideUnit();
   field.hidden=!state.units.length;
   board.replaceChildren();
+  syncViewport();
   if(field.hidden)return;
   board.style.setProperty('--cols',state.width);
   board.className=state.biome||'crypt';
@@ -361,10 +417,15 @@ function drawBoard(turn,walking,skill){
     fragment.append(cell);
   }
   board.append(fragment);
+  if(iso?.active){
+    iso.sync(state,hidePawn);
+    iso.highlight(board.children);
+  }
 }
 function render(){
   el('entry').hidden=!!state;
   el('game').hidden=!state;
+  document.body.classList.toggle('in-expedition',!!state);
   if(!state)return;
   const turn=state.units[state.turn];
   const mine=state.phase==='combat'&&turn?.id===session.id;
@@ -517,6 +578,7 @@ el('join').onclick=()=>enter(false);
 el('leave').onclick=()=>{
   generation++;busy=false;state=null;session=null;selected=null;rendered='';
   resetAnimation();
+  syncViewport();
   hideUnit();
   musicMode(false);
   sessionStorage.removeItem('amber-session');

@@ -335,6 +335,50 @@ function makeLayout(s,rng){
   }
   return {name:layout.name,walls:blocks,water,traps};
 }
+/** Daño esperado por turno de un héroe con su mejor habilidad ofensiva. */
+export function heroOffense(hero){
+  const ap=4+(hero.stats?.action||0);
+  let best=0;
+  classes[hero.classId].skills.forEach((_,i)=>{
+    const skill=skillFor(hero,i);
+    if(!skill||['heal','cleanse','dash'].includes(skill[5]))return;
+    const element=skillElement(hero,skill);
+    const average=(skill[3]+skill[4])/2+(hero.stats?.[element]||0);
+    const area=skill[5]==='blast'?1.6:1;
+    best=Math.max(best,average*area*Math.floor(ap/skill[1]));
+  });
+  return best*(1+critChance(hero)*.5);
+}
+/** Vida efectiva: la armadura reduce cada golpe físico. */
+export const heroDefense=hero=>hero.max*(1+(hero.stats?.ward||0)*.09);
+/** Héroe "esperado" en un piso: nivel, una mejora de habilidad por piso y equipo medio. */
+function expectedHero(classId,floor){
+  const ranks=[...initialSkills[classId],0];
+  for(let i=1;i<floor;i++){const k=(i-1)%(ranks.length-1);if(ranks[k]<3)ranks[k]++;}
+  const gear=Math.floor((floor-1)*.8);
+  const stats={action:0,ward:Math.floor((floor-1)/3),critical:(floor-1)*1.5};
+  for(const key of damageKeys)stats[key]=Math.floor(floor/2)+gear;
+  const max=classes[classId].hp+(floor-1)*4+(floor-1)*3;
+  return {classId,level:floor,skillRanks:ranks,stats,max};
+}
+/**
+ * Escalado dinámico: compara el poder real del grupo con el esperado en ese piso.
+ * Más daño del grupo → enemigos con más vida; más aguante → enemigos que pegan más.
+ */
+export function enemyScaling(floor,heroes){
+  if(!heroes.length)return {hp:1,damage:1};
+  let offense=0,expectedOffense=0,defense=0,expectedDefense=0;
+  for(const hero of heroes){
+    const base=expectedHero(hero.classId,floor);
+    offense+=heroOffense(hero);expectedOffense+=heroOffense(base);
+    defense+=heroDefense(hero);expectedDefense+=heroDefense(base);
+  }
+  const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
+  return {
+    hp:Number(Math.pow(clamp(offense/expectedOffense,.7,2.2),.9).toFixed(2)),
+    damage:Number(Math.pow(clamp(defense/expectedDefense,.7,2.2),.75).toFixed(2))
+  };
+}
 function openFloor(s,rng,elite=false) {
   s.phase='combat';
   s.vote=null;
@@ -385,17 +429,21 @@ function openFloor(s,rng,elite=false) {
       pos:heroPositions[i],effects:{}};
   });
   const lineup=encounter(s.floor,s.players.length,elite);
+  const scale=enemyScaling(s.floor,heroes);
+  s.scaling=scale;
   if(s.mods.startHpPct)for(const hero of heroes)hero.hp=Math.max(1,Math.min(hero.hp,Math.ceil(hero.max*s.mods.startHpPct)));
   const spawns=s.floor===1?Array.from({length:(s.height-2)*2},(_,i)=>w*(1+Math.floor(i/2))+1+i%2):
     free.filter(pos=>!heroPositions.includes(pos)).sort((a,b)=>a%w-b%w).slice(0,Math.max(12,lineup.length*2));
   const foes=lineup.map(u=>{
     const pos=spawns.splice(roll(0,spawns.length-1,mapRng),1)[0];
-    const hp=Math.round(u.hp*(s.mods.enemyHp||1));
-    return {...u,hp,max:hp,pos};
+    const hp=Math.max(1,Math.round(u.hp*(s.mods.enemyHp||1)*scale.hp));
+    return {...u,hp,max:hp,damage:Math.max(1,Math.round(u.damage*scale.damage)),pos};
   });
   s.units=[...heroes,...foes].sort((a,b)=>b.initiative-a.initiative);
   s.turn=0;
   note(s,'Piso '+s.floor+' · '+s.layoutName+(s.voids.length?' · '+s.shape.toUpperCase():'')+(s.floor%3===0?' · Cámara del jefe':elite?' · Combate de élite':''));
+  if(Math.abs(scale.hp-1)>=.05||Math.abs(scale.damage-1)>=.05)
+    note(s,'Los enemigos se adaptan al poder del grupo: vida ×'+scale.hp.toFixed(2)+', daño ×'+scale.damage.toFixed(2)+'.');
   const effects=modText(s.mods);
   if(effects)note(s,'Efectos de este combate: '+effects+'.');
   beginTurn(s);

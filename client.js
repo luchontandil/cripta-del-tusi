@@ -1032,7 +1032,7 @@ function drawBoard(turn,walking,skill){
       };
       cell.onpointerleave=cell.onblur=()=>{
         paintPath();
-        el('path-status').textContent='Azul: casillas a las que puedes moverte.';
+        el('path-status').textContent='Haz clic en una casilla azul para moverte.';
       };
     }else if(aim&&blast){
       cell.onpointerenter=cell.onfocus=()=>paintArea(spellArea(state,pos,skill));
@@ -1110,10 +1110,6 @@ function render(){
   const walking=mine&&selected===null?paths(state,turn,state.mp):new Map();
   const skill=mine&&selected!==null?skillFor(turn,selected):null;
   if(mine){
-    const moveButton=btn('',()=>{selected=null;render();},selected===null);
-    moveButton.className='ability move-ability';
-    moveButton.append(h('span','spell-icon move',icon('move')),h('span','ability-name','Mover'),h('span','ability-cost stat-mp',state.mp+' PM'));
-    controls.append(moveButton);
     classes[turn.classId].skills.forEach((_,i)=>{
       const current=skillFor(turn,i);
       if(!current)return;
@@ -1143,7 +1139,7 @@ function render(){
     });
     const hint=h('small','hint-line');
     hint.id='path-status';
-    hint.textContent=selected===null?'Azul: casillas a las que puedes moverte.':'Morado: alcance · Rojo: sin visión · Dorado: objetivo válido'+(skill[5]==='blast'?' · Naranja: área de impacto':'');
+    hint.textContent=selected===null?'Haz clic en una casilla azul para moverte. Teclas 1–'+classes[turn.classId].skills.filter((_,i)=>skillFor(turn,i)).length+': habilidades.':'Morado: alcance · Rojo: sin visión · Dorado: objetivo válido'+(skill[5]==='blast'?' · Naranja: área de impacto':'')+' · Esc o clic derecho: cancelar';
     controls.append(hint);
   }
   drawBoard(turn,walking,skill);
@@ -1168,8 +1164,18 @@ function selectSpell(index){
   render();
 }
 el('end-turn').onclick=endTurn;
+// Clic derecho sobre el tablero: soltar la habilidad seleccionada y volver a moverse.
+el('battlefield').addEventListener('contextmenu',event=>{
+  if(selected===null)return;
+  event.preventDefault();
+  selected=null;render();
+});
 document.addEventListener('keydown',event=>{
   if(state?.phase!=='combat'||event.altKey||event.ctrlKey||event.metaKey)return;
+  if(event.key==='Escape'&&selected!==null){
+    event.preventDefault();
+    selected=null;render();return;
+  }
   if(event.key==='F1'){
     event.preventDefault();
     if(!event.repeat)endTurn();

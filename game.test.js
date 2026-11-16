@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices} from './engine.js';
+import {enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -459,4 +459,16 @@ test('los objetos siguen las reglas de rareza, afijos/sufijos y tiers por nivel'
   assert.ok(avgTier(late)>avgTier(early)+.8);
   assert.ok(early.every(i=>i.affixes.every(a=>a.tier<=2)));
   assert.ok(late.filter(i=>i.grade>=2).length>early.filter(i=>i.grade>=2).length);
+});
+
+test('los enemigos se adaptan al poder real del grupo',()=>{
+  const hero=(extra={})=>({classId:'guardia',level:3,skillRanks:[2,1,1,0],max:classes.guardia.hp+8+(extra.vitality||0),
+    stats:{physical:1,fire:1,ice:1,arcane:1,shadow:1,ward:0,critical:0,action:0,...extra}});
+  const weak=enemyScaling(3,[hero()]);
+  const strong=enemyScaling(3,[hero({physical:8,critical:25,ward:3,vitality:25})]);
+  assert.ok(strong.hp>weak.hp);
+  assert.ok(strong.damage>weak.damage);
+  assert.ok(strong.hp<=2.2&&weak.hp>=.7);
+  const s=battle('guardia');
+  assert.ok(s.scaling&&s.scaling.hp>0);
 });

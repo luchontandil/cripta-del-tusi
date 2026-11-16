@@ -2,7 +2,7 @@
 
 Dungeon crawler táctico para navegador. Juega en solitario o en una sala de hasta cuatro personas. Elige Guardián, Arquero, Clérigo, Mago o Acechante y supera seis pisos. Los tableros combinan cinco diseños, reflejos, obstáculos adicionales y posiciones enemigas variables. Crecen con el grupo. A partir del segundo piso, la planta puede tener forma de L, T, C o cruz y cambia de dimensiones respecto al anterior.
 
-El tablero isométrico usa Three.js r180, incluido con su licencia MIT. Pulsa una casilla para moverte o para lanzar el hechizo seleccionado. Desde la barra superior puedes alternar con la vista cenital. Si el navegador no dispone de WebGL, el juego usa la vista cenital automáticamente.
+El tablero isométrico usa Three.js r180, incluido con su licencia MIT. Sin hechizo seleccionado, pulsa una casilla azul para moverte; con las teclas 1 a 4 eliges hechizo y con Esc o clic derecho lo sueltas. Desde la barra superior puedes alternar con la vista cenital. Si el navegador no dispone de WebGL, el juego usa la vista cenital automáticamente.
 
 ## Jugar en local
 
@@ -42,7 +42,7 @@ Las salas viven en memoria y se pierden al reiniciar el servidor. Al recargar la
 | 3 | 2 | 3 | 5 | 28 / 6 |
 | 6 | 4 | 5 | 7 | 40 / 9 |
 
-Los totales de los pisos 3 y 6 incluyen al jefe. Los vigías tienen un 25 % menos de vida y los custodios un 15 % más y 2 de armadura. Los jefes tienen 48 PV más 6 por piso y 8 por jugador adicional. Ajusta las clases y la función `encounter` en `engine.js` para cambiar el balance.
+Los totales de los pisos 3 y 6 incluyen al jefe. Además, al empezar cada combate se compara el daño por turno y la vida efectiva del grupo (equipo, nivel, rangos de habilidad, crítico y armadura) con lo esperado para ese piso: la vida de los enemigos se ajusta según la ofensiva del grupo y su daño según su aguante (entre ×0,7 y ×2). Los vigías tienen un 25 % menos de vida y los custodios un 15 % más y 2 de armadura. Los jefes tienen 48 PV más 6 por piso y 8 por jugador adicional. Ajusta las clases y la función `encounter` en `engine.js` para cambiar el balance.
 
 Ejecuta `npm test` para comprobar el motor y la sincronización de dos clientes.
 

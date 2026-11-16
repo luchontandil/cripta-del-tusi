@@ -1,4 +1,4 @@
-import {classes,create,join,act,tick,paths,targetable,inRange,spellArea,slots,statNames} from './engine.js?v=3';
+import {classes,create,join,act,tick,paths,targetable,inRange,spellArea,slots,statNames} from './engine.js?v=5';
 import {portrait,spellIcon} from './art.js?v=3';
 import {setupMusic} from './music.js?v=3';
 

@@ -553,6 +553,7 @@ function bat(){
   };
   return {root,figure,legs:[],arms:[],head:1.05*1.55,animate};
 }
+const wispMaterial=new T.MeshBasicMaterial({color:'#7dff9a'});
 /** Calavera flotante: levita, abre la mandíbula, ojos brillantes y llamas que orbitan. */
 function skull(){
   const root=new T.Group(),figure=new T.Group(),head=new T.Group();
@@ -1152,3 +1153,196 @@ function ps1Hero(kind,tint){
   return {root,figure,legs,arms,head:info.height*.86,animate,
     pose:{T:()=>{figure.rotation.x=0;arms[0].rotation.set(0,0,-Math.PI/2);arms[1].rotation.set(0,0,Math.PI/2);legs.forEach(l=>l.rotation.set(0,0,0));}}};
 }
+
+// ───────────── Bestiario estilo PS1 · Acto I (Mazmorra) ─────────────
+P.ico=new T.IcosahedronGeometry(.5,1);
+P.ico0=new T.IcosahedronGeometry(.5,0);
+const BONE='#d8cfb4',BONE_DARK='#9a9078';
+/** Esqueleto: huesos finos, costillar abierto, cráneo con cuencas y espada oxidada. */
+function ps1Skeleton(){
+  const root=new T.Group(),figure=new T.Group();root.add(figure);
+  const b=[];
+  lp(b,P.taper6,BONE_DARK,[0,.6,0],[0,0,0],[.22,.08,.14]);                          // pelvis
+  lp(b,P.prism6,BONE,[0,.8,-.02],[0,0,0],[.05,.36,.05]);                            // columna
+  for(let i=0;i<4;i++)lp(b,P.prism6,BONE,[0,.74+i*.075,.01],[0,0,0],[.3-i*.03,.025,.17-i*.01]); // costillas
+  lp(b,P.box,BONE_DARK,[0,.98,0],[0,0,0],[.36,.04,.08]);                            // clavículas
+  lp(b,P.prism6,BONE,[0,1.04,0],[0,0,0],[.04,.08,.04]);                             // cuello
+  lp(b,P.head,BONE,[0,1.16,.01],[0,Math.PI/8,0],[.22,.2,.24]);                      // cráneo
+  lp(b,P.box,BONE,[0,1.06,.04],[0,0,0],[.16,.06,.16]);                              // mandíbula
+  for(const s of [-1,1]){lp(b,P.box,SHADOW,[s*.05,1.17,.115],[0,0,0],[.06,.06,.02]);lp(b,P.box,'#ff4a2a',[s*.05,1.17,.127],[0,0,0],[.018,.018,.01]);}
+  lp(b,P.box,SHADOW,[0,1.11,.12],[0,0,0],[.03,.04,.01]);                            // nariz
+  for(const x of [-.045,-.015,.015,.045])lp(b,P.box,'#f2ead2',[x,1.07,.123],[0,0,0],[.018,.03,.01]); // dientes
+  const torso=fuse(b,'body');figure.add(torso);
+  const legs=[-1,1].map(s=>{const leg=new T.Group();leg.position.set(s*.08,.58,0);figure.add(leg);const p=[];
+    lp(p,P.prism6,BONE,[0,-.14,0],[0,0,0],[.04,.27,.04]);lp(p,P.oct,BONE_DARK,[0,-.28,0],[0,0,0],[.06,.06,.06]);
+    lp(p,P.prism6,BONE,[0,-.42,0],[0,0,0],[.035,.26,.035]);lp(p,P.box,BONE,[0,-.56,.04],[0,0,0],[.07,.04,.14]);
+    leg.add(fuse(p,'leg'));return leg;});
+  const arms=[-1,1].map(s=>{const arm=new T.Group();arm.position.set(s*.18,.97,0);figure.add(arm);const p=[];
+    lp(p,P.oct,BONE_DARK,[0,0,0],[0,0,0],[.07,.07,.07]);lp(p,P.prism6,BONE,[0,-.14,0],[0,0,0],[.035,.26,.035]);
+    lp(p,P.prism6,BONE,[0,-.36,0],[0,0,0],[.03,.22,.03]);lp(p,P.box,BONE,[0,-.48,.01],[0,0,0],[.06,.05,.06]);
+    arm.add(fuse(p,'arm'));const held=new T.Group();held.name='held';held.position.set(0,-.48,.03);arm.add(held);return arm;});
+  const w=[];
+  lp(w,P.box,'#8a6a4a',[0,.26,0],[0,0,.04],[.055,.42,.016]);                        // hoja oxidada
+  lp(w,P.box,'#6a4a32',[.01,.4,0],[0,0,.3],[.03,.08,.018]);                         // mella
+  lp(w,P.box,'#4a3a2a',[0,.04,0],[0,0,0],[.16,.03,.04]);lp(w,P.prism6,'#3a2a1a',[0,-.03,0],[0,0,0],[.03,.09,.03]);
+  const sword=arms[1].getObjectByName('held');sword.add(fuse(w,'sword'));sword.rotation.x=1.1;
+  const sh=[];
+  lp(sh,P.prism6,'#5a4632',[0,0,0],[Math.PI/2,0,0],[.3,.04,.3]);lp(sh,P.prism6,'#7a6a5a',[0,0,.025],[Math.PI/2,0,0],[.09,.02,.09]);
+  lp(sh,P.box,'#3a2a1a',[.05,.06,.03],[0,0,.6],[.02,.14,.01]);                       // grieta
+  const shield=fuse(sh,'shield');shield.position.set(-.04,.02,.08);shield.rotation.y=-.3;arms[0].getObjectByName('held').add(shield);
+  figure.scale.setScalar(.95);
+  const animate=(t,{gait,swing,walking,phase})=>{
+    const rattle=Math.sin(t*9+phase)*.02;
+    figure.position.y=Math.abs(gait)*.05+Math.abs(Math.sin(t*1.7+phase))*.015;
+    torso.rotation.z=walking?gait*.08:rattle;
+    torso.rotation.y=Math.sin(t*.6+phase)*.15;
+    arms[0].rotation.x=gait*.4-.15;arms[1].rotation.x=-gait*.4-swing*1.6-.2+rattle;
+    arms[0].rotation.z=-.08;arms[1].rotation.z=.08;
+    legs[0].rotation.x=-gait*.6;legs[1].rotation.x=gait*.6;
+  };
+  return {root,figure,legs,arms,head:1.28*.95,animate};
+}
+/** Limo (y limo colosal): masa facetada translúcida con núcleo, ojos simples y gotas. */
+function ps1Slime(kind){
+  const king=kind==='slimeking',lava=kind==='lavaslime';
+  const tone=king?'#9a4ad0':lava?'#ff5a1a':'#4fbf5a',dark=king?'#5a2a86':lava?'#7a1a08':'#1f6b2a';
+  const root=new T.Group(),figure=new T.Group(),body=new T.Group();root.add(figure);figure.add(body);
+  const jellyMat=new T.MeshStandardMaterial({color:tone,flatShading:true,transparent:true,opacity:lava?1:.82,roughness:.35,emissive:lava?'#ff4a10':tone,emissiveIntensity:lava?.6:.12});
+  const jellyGeo=P.ico.clone();
+  const p=jellyGeo.attributes.position;                                              // aplastado y deformado
+  for(let i=0;i<p.count;i++){const y=p.getY(i);p.setY(i,y<0?y*.55:y*.85);p.setX(i,p.getX(i)*(1+Math.sin(i*1.7)*.06));}
+  jellyGeo.computeVertexNormals();
+  const jelly=new T.Mesh(jellyGeo,jellyMat);jelly.scale.set(.7,.62,.7);jelly.position.y=.24;jelly.castShadow=true;body.add(jelly);
+  const d=[];
+  lp(d,P.oct,king?'#ffe27a':lava?'#ffe08a':'#d9ff9e',[0,.22,0],[0,0,0],[.16,.2,.16]);   // núcleo
+  for(const s of [-1,1]){lp(d,P.box,'#f6fff6',[s*.1,.36,.26],[0,s*.2,0],[.08,.09,.02]);lp(d,P.box,'#101010',[s*.1,.355,.272],[0,s*.2,0],[.04,.05,.01]);}
+  lp(d,P.box,dark,[0,.27,.29],[0,0,0],[.1,.02,.01]);                                 // boca
+  if(king){lp(d,P.prism6,'#d9a441',[0,.58,0],[0,0,0],[.3,.07,.3]);for(let i=0;i<5;i++){const a=i*Math.PI*2/5;lp(d,P.cone6,'#ffd977',[Math.sin(a)*.12,.67,Math.cos(a)*.12],[0,0,0],[.06,.12,.06]);}}
+  if(lava)for(const [x,z] of [[-.2,-.1],[.15,-.18],[.05,.2],[-.1,.12]])lp(d,P.oct,'#2a1410',[x,.42,z],[0,x*9,0],[.14,.08,.12]);
+  body.add(fuse(d,'details'));
+  const size=king?1.5:1;figure.scale.setScalar(size);
+  const animate=(t,{gait,swing,walking,phase})=>{
+    const breath=Math.sin(t*3.1+phase),hop=walking?Math.abs(gait):0;
+    body.position.y=hop*.26;
+    const squash=1+breath*.06-hop*.12+swing*.25;
+    body.scale.set(1/Math.sqrt(squash)*(1+(walking?(1-hop)*.1:0)),squash,1/Math.sqrt(squash));
+    body.position.z=swing*.2;
+    jellyMat.emissiveIntensity=(lava?.6+Math.sin(t*5)*.15:.12)+swing*.5;
+  };
+  return {root,figure,legs:[],arms:[],head:.72*size,animate};
+}
+/** Calavera flotante: cráneo facetado, mandíbula que se abre, ojos verdes y fuegos fatuos. */
+function ps1Skull(){
+  const root=new T.Group(),figure=new T.Group(),head=new T.Group();root.add(figure);figure.add(head);
+  const h=[];
+  lp(h,P.ball,BONE,[0,.06,-.02],[0,Math.PI/7,0],[.46,.42,.5]);                   // bóveda craneal
+  lp(h,P.taper6,BONE,[0,-.1,.04],[Math.PI,Math.PI/6,0],[.34,.14,.34]);           // pómulos y maxilar
+  for(const s of [-1,1])lp(h,P.box,BONE_DARK,[s*.21,-.02,0],[0,0,0],[.03,.1,.14]); // sienes
+  for(const s of [-1,1]){lp(h,P.prism6,SHADOW,[s*.09,.02,.205],[Math.PI/2,0,0],[.12,.015,.12]);lp(h,P.box,'#7dff9a',[s*.09,.02,.214],[0,0,0],[.04,.04,.008]);}
+  lp(h,P.cone6,SHADOW,[0,-.07,.2],[Math.PI/2,0,Math.PI],[.06,.015,.07]);
+  lp(h,P.box,BONE_DARK,[.08,.17,.19],[-.4,0,.7],[.02,.12,.015]);                     // grieta
+  head.add(fuse(h,'skull'));
+  const jaw=new T.Group();jaw.position.set(0,-.15,.04);head.add(jaw);
+  const j=[];lp(j,P.box,BONE,[0,-.03,.04],[0,0,0],[.3,.07,.3]);
+  for(const x of [-.09,-.03,.03,.09])lp(j,P.box,'#f2ead2',[x,.02,.19],[0,0,0],[.035,.05,.015]);
+  jaw.add(fuse(j,'jaw'));
+  const wisps=[0,1,2].map(i=>{const w=new T.Mesh(P.oct,wispMaterial);w.scale.setScalar(.07);figure.add(w);return w;});
+  head.position.y=.85;figure.scale.setScalar(1.2);
+  const animate=(t,{swing,walking,phase})=>{
+    head.position.y=.85+Math.sin(t*2+phase)*.06;
+    head.rotation.x=-swing*.5;head.rotation.z=Math.sin(t*1.3+phase)*.1;head.position.z=swing*.3;
+    jaw.rotation.x=.15+Math.max(0,Math.sin(t*3+phase))*.25+swing*.6;
+    wisps.forEach((w,i)=>{const a=t*1.6+i*2.1;w.position.set(Math.sin(a)*.38,.85+Math.sin(t*3+i)*.12,Math.cos(a)*.38);w.rotation.y=t*3;});
+  };
+  return {root,figure,legs:[],arms:[],head:1.1*1.2,animate};
+}
+/** Gusano de cripta: segmentos facetados que ondulan y una boca circular con dientes. */
+function ps1Worm(){
+  const root=new T.Group(),figure=new T.Group();root.add(figure);
+  const flesh='#b8786a',ring='#8a4a44';
+  const segments=[0,1,2,3,4].map(i=>{const s=[];const r=.4-i*.05;
+    lp(s,P.prism6,i%2?ring:flesh,[0,0,0],[Math.PI/2,0,0],[r,.2,r]);
+    lp(s,P.box,'#6a3632',[0,r*.5,0],[0,0,0],[.04,.03,.18]);
+    const m=fuse(s,'segment');m.position.set(0,r*.5,-i*.19);figure.add(m);return m;});
+  const head=new T.Group();figure.add(head);
+  const hp=[];
+  lp(hp,P.prism6,flesh,[0,0,0],[Math.PI/2,0,0],[.42,.22,.42]);
+  lp(hp,P.prism6,'#2a0f14',[0,0,.11],[Math.PI/2,0,0],[.28,.02,.28]);                 // boca
+  for(let i=0;i<8;i++){const a=i*Math.PI/4;lp(hp,P.cone6,'#f2e6d0',[Math.sin(a)*.11,Math.cos(a)*.11,.12],[Math.PI/2,0,0],[.04,.08,.04]);}
+  for(const s of [-1,1])lp(hp,P.box,'#ffcc4d',[s*.14,.13,.06],[0,0,0],[.04,.04,.02]);
+  head.add(fuse(hp,'head'));
+  figure.scale.setScalar(1.1);
+  const animate=(t,{swing,walking,phase})=>{
+    const speed=walking?7:2.6;
+    segments.forEach((seg,i)=>{const wave=Math.sin(t*speed-i*.9+phase);seg.position.x=wave*.05*(i+1)*.5;seg.position.y=(.4-i*.05)*.5+Math.max(0,wave)*.05;});
+    head.position.set(Math.sin(t*speed+.9+phase)*.04,.55+Math.sin(t*1.7+phase)*.06+swing*.1,.18+swing*.3);
+    head.rotation.x=-.35-swing*.5;head.rotation.z=Math.sin(t*1.4+phase)*.15;
+  };
+  return {root,figure,legs:[],arms:[],head:.95*1.1,animate};
+}
+Object.assign(creatures,{skeleton:ps1Skeleton,slime:ps1Slime,slimeking:ps1Slime,lavaslime:ps1Slime,skull:ps1Skull,worm:ps1Worm});
+/** Rey Osario: esqueleto gigante con corona de hueso, capa raída, espadón y ojos de llama verde. */
+function ps1SkeletonKing(){
+  const m=ps1Skeleton();
+  const torso=m.figure.getObjectByName('body');
+  const x=[];
+  lp(x,P.prism6,'#c9a04f',[0,1.29,.01],[0,Math.PI/6,0],[.26,.06,.26]);              // aro de la corona
+  for(let i=0;i<6;i++){const a=i*Math.PI/3;lp(x,P.cone6,BONE,[Math.sin(a)*.11,1.38,Math.cos(a)*.11],[0,0,0],[.05,.15,.05]);} // puntas de hueso
+  lp(x,P.oct,'#7dff9a',[0,1.3,.13],[0,0,0],[.05,.06,.03]);
+  for(const s of [-1,1])lp(x,P.box,'#7dff9a',[s*.05,1.17,.128],[0,0,0],[.03,.03,.01]);   // ojos de llama verde
+  lp(x,P.box,'#4a2a5a',[0,.72,-.12],[.12,0,0],[.46,.62,.03]);                       // capa raída
+  for(const dx of [-.16,-.04,.08,.18])lp(x,P.cone6,'#4a2a5a',[dx,.38,-.16],[.1,0,Math.PI],[.1,.14,.02]); // jirones
+  lp(x,P.box,'#2a1830',[0,1.0,-.1],[0,0,0],[.5,.06,.12]);                           // cuello de la capa
+  for(const s of [-1,1])lp(x,P.dome,'#8a8070',[s*.2,.99,0],[0,0,s*-.3],[.18,.12,.18]); // hombreras de hueso
+  lp(x,P.oct,'#7dff9a',[0,.82,.02],[0,0,0],[.08,.1,.06]);                            // núcleo en el costillar
+  torso.add(fuse(x,'regalia'));
+  const held=m.arms[1].getObjectByName('held');held.clear();
+  const w=[];
+  lp(w,P.box,'#c8c0a8',[0,.42,0],[0,0,0],[.1,.7,.02]);                              // espadón de hueso
+  lp(w,P.cone6,'#c8c0a8',[0,.82,0],[0,0,0],[.1,.12,.02]);
+  for(const y of [.25,.45,.65])lp(w,P.box,BONE_DARK,[0,y,.012],[0,0,0],[.04,.04,.01]);
+  lp(w,P.box,'#4a3a2a',[0,.05,0],[0,0,0],[.26,.04,.05]);lp(w,P.prism6,'#3a2a1a',[0,-.04,0],[0,0,0],[.035,.12,.035]);
+  lp(w,P.oct,'#7dff9a',[0,-.12,0],[0,0,0],[.06,.06,.06]);
+  held.add(fuse(w,'greatsword'));held.rotation.x=1.0;
+  m.arms[0].getObjectByName('held').clear();
+  m.figure.scale.setScalar(1.55);
+  m.head=1.48*1.55;
+  return m;
+}
+/** Rey del Umbral: liche flotante con túnica hecha jirones, corona de púas, guadaña y cadenas que orbitan. */
+function ps1UmbralKing(){
+  const root=new T.Group(),figure=new T.Group();root.add(figure);
+  const b=[];
+  lp(b,P.taper8,'#2a2040',[0,.55,0],[0,Math.PI/8,0],[.5,.7,.4]);                    // túnica flotante
+  for(let i=0;i<8;i++){const a=i*Math.PI/4+.2;lp(b,P.cone6,'#2a2040',[Math.sin(a)*.2,.16,Math.cos(a)*.16],[0,0,Math.PI],[.1,.18,.06]);} // jirones
+  lp(b,P.taper8,'#3a2e5a',[0,.98,0],[Math.PI,Math.PI/8,0],[.44,.32,.3]);            // torso
+  lp(b,P.box,'#8a7ab0',[0,.9,.15],[0,0,0],[.06,.4,.02]);                            // franja arcana
+  for(const s of [-1,1]){lp(b,P.dome,'#5a5070',[s*.24,1.12,0],[0,0,s*-.4],[.22,.16,.22]);lp(b,P.cone6,'#5a5070',[s*.3,1.2,0],[0,0,s*-.7],[.05,.14,.05]);} // hombreras con púa
+  hood(b,'#2a2040','#1a1428',{y:1.3});                                               // capucha con rostro en sombra
+  for(const s of [-1,1])lp(b,P.box,'#c08aff',[s*.05,1.3,.125],[0,0,0],[.045,.025,.01]); // ojos arcanos
+  lp(b,P.box,'#d8cfb4',[0,1.2,.12],[0,0,0],[.08,.04,.01]);                          // mandíbula de hueso
+  lp(b,P.prism6,'#3a3048',[0,1.47,0],[0,Math.PI/6,0],[.27,.05,.27]);                // corona
+  for(let i=0;i<5;i++){const a=i*Math.PI*2/5;lp(b,P.cone6,'#3a3048',[Math.sin(a)*.115,1.57,Math.cos(a)*.115],[0,0,0],[.05,.18,.05]);}
+  lp(b,P.oct,'#c08aff',[0,1.48,.135],[0,0,0],[.06,.07,.03]);
+  const torso=fuse(b,'body');figure.add(torso);
+  const arms=[-1,1].map(s=>{const arm=new T.Group();arm.position.set(s*.26,1.08,0);figure.add(arm);const p=[];
+    lp(p,P.taper6,'#3a2e5a',[0,-.16,0],[Math.PI,0,0],[.14,.3,.14]);lp(p,P.box,'#d8cfb4',[0,-.36,.01],[0,0,0],[.07,.08,.07]);
+    arm.add(fuse(p,'arm'));const held=new T.Group();held.name='held';held.position.set(0,-.36,.04);arm.add(held);return arm;});
+  const w=[];
+  lp(w,P.prism6,'#2a2030',[0,.3,0],[0,0,0],[.04,1.2,.04]);                          // asta de la guadaña
+  lp(w,P.box,'#b8c0d0',[.17,.86,0],[0,0,-.35],[.38,.06,.015]);                      // hoja
+  lp(w,P.cone6,'#b8c0d0',[.36,.78,0],[0,0,-2.3],[.05,.14,.015]);
+  lp(w,P.oct,'#c08aff',[0,.92,0],[0,0,0],[.07,.07,.07]);
+  arms[1].getObjectByName('held').add(fuse(w,'scythe'));
+  const chains=[0,1,2,3].map(i=>{const c=[];for(let j=0;j<4;j++)lp(c,P.prism6,'#7a7488',[0,j*.07,0],[0,j%2?Math.PI/2:0,Math.PI/2],[.05,.025,.03]);const m=fuse(c,'chain');figure.add(m);return m;});
+  figure.scale.setScalar(1.4);
+  const animate=(t,{swing,walking,phase})=>{
+    figure.position.y=.08+Math.sin(t*1.5+phase)*.05;
+    torso.rotation.y=Math.sin(t*.5+phase)*.1;
+    arms[0].rotation.x=-.3+Math.sin(t*1.2)*.08;arms[1].rotation.x=-.2-swing*1.4;
+    arms[0].rotation.z=-.15;arms[1].rotation.z=.15;
+    chains.forEach((c,i)=>{const a=t*.9+i*Math.PI/2;c.position.set(Math.sin(a)*.55,.7+Math.sin(t*2+i)*.1,Math.cos(a)*.45);c.rotation.set(t+i,a,.4);});
+  };
+  return {root,figure,legs:[],arms,head:1.62*1.4,animate};
+}
+Object.assign(creatures,{skeletonking:ps1SkeletonKing,umbralking:ps1UmbralKing});

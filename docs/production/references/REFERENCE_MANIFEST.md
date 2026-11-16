@@ -28,6 +28,7 @@ Correcciones de roster, escala medida, botín, eventos y VFX en la sección «Au
 | Familias de equipo | 9 slots (27 bases) + 9 runas + 4 rarezas | Pendiente | Bases confirmadas; el equipo solo existe como icono de UI, no sobre el héroe 3D |
 | Props/eventos | Obstáculos, agua/lava, trampas, antorchas | Pendiente | Eventos y tienda son tarjetas 2D de UI: no necesitan modelo 3D |
 | Hechizos/VFX | 40 habilidades + VFX de jefe | Pendiente | 8 habilidades × 5 clases; falta matriz completa por forma/elemento |
+| Animaciones | 11 estados (reposo, andar, ataque, disparo, hechizo, apoyo, desplazamiento, empuje/atracción, golpe recibido, muerte, poderes de jefe) | Pendiente | Añadido el 17-11-2026. Hoy solo existen reposo, andar y golpe genérico; faltan golpe recibido y muerte. Ver inventario |
 
 ## Assets
 
@@ -42,7 +43,14 @@ La lista completa, vistas, observaciones y huecos de auditoría está en [ASSET_
 | Mago | Personaje | `hero_mage.png`, `hero_mage.md` | Igual que el Guardián | **Propuesta** (17-11-2026) | 680 tris, 7 draw calls, 2 materiales (cristal emisivo) |
 | Ninja | Personaje | `hero_ninja.png`, `hero_ninja.md` | Igual que el Guardián | **Propuesta** (17-11-2026) | 852 tris, 7 draw calls, 1 material |
 | Lineup de clases | Dirección visual | `01_class_lineup.png` | Frontal a escala común + isométrico con colores de jugador | **Propuesta** (17-11-2026) | Las cinco clases juntas; sustituye a STY-02 |
-| Monstruos y jefes | Bestiario | Ver inventario | Ortho F/L/T, top-down, escala, articulaciones y ataque | Pendiente | Cobertura enumerada en inventario; diseño final requiere hojas aprobadas |
+| Esqueleto | Bestiario · Acto I | `monster_skeleton.png`, `monster_skeleton.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 724 tris, 7 draw calls |
+| Limo | Bestiario · Acto I | `monster_slime.png`, `monster_slime.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 148 tris, 2 draw calls |
+| Limo colosal | Bestiario · Acto I–II | `monster_colossal_slime.png`, `monster_colossal_slime.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 232 tris, 2 draw calls |
+| Calavera flotante | Bestiario · Acto I | `monster_floating_skull.png`, `monster_floating_skull.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 284 tris, 5 draw calls |
+| Gusano de cripta | Bestiario · Acto I | `monster_crypt_worm.png`, `monster_crypt_worm.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 348 tris, 6 draw calls |
+| Rey Osario | Bestiario · Acto I (jefe a mitad) | `boss_ossuary_king.png`, `boss_ossuary_king.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 1028 tris, 7 draw calls |
+| Rey del Umbral | Bestiario · Acto I (jefe final) | `boss_threshold_king.png`, `boss_threshold_king.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 1084 tris, 8 draw calls |
+| Monstruos y jefes de los Actos II y III | Bestiario | Ver inventario | Igual | Pendiente | Siguiente tanda |
 | Mazmorra, Jungla, Infierno | Entorno | `act_crypt.png`, `act_jungle.png`, `act_hell.png` | Room top-down/isométrico + kit modular/footprints | Pendiente | No fijar metros ni tile sin medida de código |
 | Slots, runas, rarezas | Equipo | `equipment/`, `props/rune_token.png` | Frente/lado/arriba/3-4, punto de agarre | Pendiente | Confirmar bases en el código de loot antes de crear ítems individuales |
 | Props, eventos y VFX | Gameplay | `props/`, `vfx/` | Vista aislada y overlay táctico | Pendiente | Mapear con reglas de colisión, LOS, alcance y áreas reales |

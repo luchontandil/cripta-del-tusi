@@ -145,3 +145,25 @@ En esta sesión, Claude **no tiene generador de imágenes integrado** y no usar�
 ### Conteo para la Fase 2
 
 3 hojas de estilo · 5 héroes · 19 entradas de bestiario (12 normales/familias + 7 jefes) · 3 kits de acto + salas de prueba · 1 matriz de VFX · (opcional) 9 familias de iconos de equipo + runas/rarezas. Sin props de evento 3D.
+
+## Animaciones (añadido 17-11-2026 a petición de Lucho)
+
+Estado en el código: el renderer (`isometric.js`) solo tiene **reposo**, **andar** y un **golpe genérico** (balanceo del brazo derecho en cualquier acción). **No hay** reacción al recibir daño ni muerte (la figura desaparece al llegar a 0 PV), ni animaciones distintas por habilidad.
+
+Las animaciones se hacen por código (`animate` de cada modelo, sin huesos), con poses clave legibles en isométrico. Cada una necesita una lámina de **poses clave** (inicio, contacto, final) como referencia.
+
+| Estado | Quién | Disparador en el motor | Estado |
+|---|---|---|---|
+| Reposo (respirar, mirar) | Héroes y monstruos | siempre | Hecho (básico) |
+| Andar | Héroes y monstruos con patas | evento `move` | Hecho (básico) |
+| Ataque cuerpo a cuerpo | Guardián, Ninja, monstruos melee | `spell` con `slash` | Pendiente: tajo/mazazo con anticipación |
+| Disparo | Arquero, monstruos a distancia | `arrow` | Pendiente: tensar y soltar |
+| Lanzar hechizo | Mago, Clérigo, jefes | `arcane`, `blast`, `slow`, `venom` | Pendiente: alzar báculo y canalizar |
+| Apoyo | Clérigo y quien cure o escude | `heal`, `cleanse`, escudo, celeridad | Pendiente |
+| Desplazamiento | Mago (teletransporte), Ninja (paso de sombra, sustitución) | `dash`, `swap` | Pendiente: salida/entrada |
+| Empuje / atracción | Guardián (Gancho, empujón), Arquero, Mago, Ninja | `push`, `pull` | Pendiente: golpe + reacción del objetivo |
+| Recibir golpe | Todos | evento `damage` sobre la unidad | **Falta**: retroceso + destello |
+| Muerte | Todos | PV a 0 | **Falta**: caída y desvanecido antes de quitar el modelo |
+| Poderes de jefe | 7 jefes | `bossPower` (invocar, nova, embestida, aullido, cadena) | Pendiente: una animación por poder |
+
+Láminas de referencia previstas: `anim_<clase>_keyposes.png` (5 héroes) y `anim_monsters_keyposes.png` + una por jefe.

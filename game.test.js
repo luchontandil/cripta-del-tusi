@@ -38,6 +38,7 @@ test('valida turno, ruta, puntos, visibilidad y escalado',()=>{
   assert.throws(()=>act(s,'p0',{type:'skill',skill:2,pos:enemy.pos}),/puntos/);
   assert.ok(encounter(3,4).length>encounter(3,1).length);
   assert.ok(encounter(5,1)[0].hp>encounter(1,1)[0].hp);
+  assert.ok(encounter(1,1)[0].hp>=20&&encounter(1,1)[0].damage>=4);
 });
 test('la vulnerabilidad se aplica a otro atacante y el clérigo cura a un aliado',()=>{
   const s=battle('tirador','mistico');
@@ -58,7 +59,7 @@ test('la vulnerabilidad se aplica a otro atacante y el clérigo cura a un aliado
   act(s,'p1',{type:'skill',skill:1,pos:30},rng);
   assert.equal(archer.hp,24);
 });
-test('el jefe anuncia una sola cruz y las cadenas restan PM al comenzar encima',()=>{
+test('el jefe anuncia una sola cruz y, al activarla en su turno, las cadenas dañan y restan PM',()=>{
   const s=battle('tirador');
   s.floor=5;
   s.phase='reward';
@@ -75,7 +76,9 @@ test('el jefe anuncia una sola cruz y las cadenas restan PM al comenzar encima',
   assert.deepEqual(new Set(glyph.cells),new Set([center,center-s.width,center+s.width,center-1,center+1]));
   const hero=s.units.find(u=>u.id==='p0');
   hero.pos=center;
+  const before=hero.hp;
   for(let i=0;i<16&&s.glyphs.some(g=>g.warn);i++)timeout(s);
+  assert.ok(hero.hp<before);
   while(s.units[s.turn]===boss&&s.enemyPlan)timeout(s);
   assert.equal(s.glyphs.every(g=>!g.warn),true);
   assert.equal(s.units[s.turn],hero);

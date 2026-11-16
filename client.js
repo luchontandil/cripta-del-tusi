@@ -1,8 +1,8 @@
-import {classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement} from './engine.js?v=10';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=11';
-import {setupSfx} from './music.js?v=11';
-import {icon} from './icons.js?v=11';
+import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
+  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement} from './engine.js?v=12';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=12';
+import {setupSfx} from './music.js?v=12';
+import {icon} from './icons.js?v=12';
 
 const el=id=>document.getElementById(id);
 let state,session,selected=null,busy=false,polling=false,generation=0,revision=0,rendered='';
@@ -86,7 +86,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=11').then(({createIso})=>{
+import('./isometric.js?v=12').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -106,7 +106,21 @@ function classPreview(){
     card.setAttribute('aria-checked',String(on));
     card.tabIndex=on?0:-1;
   }
-  const skills=h('ul','preview-skills',...cls.skills.slice(0,-1).map(skill=>h('li',null,spellIcon(skill[5],skill[6]),h('span',null,skill[0]),h('small','stat-pa',skill[1]+' PA'))));
+  const sample={classId:kind,stats:{},level:1};
+  const skills=h('ul','preview-skills',...cls.skills.map((skill,index)=>{
+    const locked=index===cls.skills.length-1;
+    const item=h('li',locked?'locked':null,spellIcon(skill[5],skill[6]),h('span',null,skill[0]),h('small',locked?'unlock':'stat-pa',locked?'Nivel 2+':skill[1]+' PA'));
+    item.tabIndex=0;
+    const show=()=>{
+      const rect=item.getBoundingClientRect();
+      const nodes=skillTipNodes(sample,locked?null:index,skill,locked?0:1);
+      if(locked)nodes.push(h('p','tip-note','Se puede aprender al subir de nivel.'));
+      showTip(nodes,{left:rect.left,top:rect.top,bottom:rect.bottom},'tip-skill');
+    };
+    item.onpointerenter=item.onfocus=show;
+    item.onpointerleave=item.onblur=hideUnit;
+    return item;
+  }));
   el('class-preview').replaceChildren(
     h('div','preview-head',h('strong',null,cls.name),h('span','role-tag',roles[kind])),
     h('p',null,specs[kind]),
@@ -247,6 +261,47 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
   showTip(nodes,anchor,unit.enemy?'tip-foe':'tip-ally');
 }
 window.addEventListener('scroll',hideUnit,{passive:true});
+const skillEffects={
+  expose:'Vulnerable 2 turnos: todos los atacantes infligen +3',
+  slow:'Ralentiza: −2 PM en el próximo turno del objetivo',
+  venom:'Veneno: 3 PV por turno durante 2 turnos',
+  blast:'Área en cruz: la casilla elegida y las 4 adyacentes',
+  push:'Empuja al objetivo una casilla',
+  cleanse:'Elimina todos los efectos negativos del aliado',
+  heal:'Cura a un aliado o a ti mismo',
+  dash:'Teletransporte por una ruta libre sin gastar PM'
+};
+/** Datos calculados de una habilidad para un personaje (con su equipo, si lo tiene). */
+function skillFacts(unit,skill){
+  const [,cost,range,min,max,kind,,minRange=0]=skill;
+  const reach=modifiableRange(skill)?(unit.stats?.reach||0):0;
+  const healing=['heal','cleanse'].includes(kind);
+  const element=skillElement(unit,skill);
+  const bonus=healing?Math.floor((unit.level||1)/2):kind==='dash'?0:(unit.stats?.[element]||0);
+  return {cost,minRange,maxRange:range+reach,reach,healing,element,bonus,low:min+bonus,high:max+bonus,kind,modifiable:modifiableRange(skill)};
+}
+/** Filas de la ficha de una habilidad. */
+function skillRows(unit,skill){
+  const f=skillFacts(unit,skill);
+  const rows=[statRow('ap','Coste',f.cost+' PA')];
+  if(f.kind==='dash')rows.push(statRow('dash','Efecto','Movimiento sin PM'));
+  else if(f.healing)rows.push(statRow('heal','Curación',f.low+'–'+f.high+(f.bonus?' (+'+f.bonus+' nivel)':'')));
+  else{
+    rows.push(statRow(f.element,'Elemento',elements[f.element],'element-'+f.element));
+    rows.push(statRow(f.element,'Daño',f.low+'–'+f.high+(f.bonus?' (+'+f.bonus+' equipo)':'')));
+    rows.push(statRow('critical','Crítico',Math.round(critChance(unit)*100)+' % · ×1,5'));
+  }
+  rows.push(statRow('range','Alcance',(f.minRange?f.minRange+'–':'')+f.maxRange+(f.maxRange===1?' casilla':' casillas')+(f.reach?' (+'+f.reach+')':'')));
+  rows.push(statRow('reach','Alcance modificable',f.modifiable?'Sí':'No',f.modifiable?'yes':'no'));
+  rows.push(statRow('info','Línea de visión','Necesaria'));
+  return rows;
+}
+function skillTipNodes(unit,index,skill,rank){
+  const [name,,,,,kind,symbol]=skill;
+  return [tipHead(spellIcon(kind,symbol),name,rank?'Nivel '+rank+' de 3':'Sin aprender',index!==null?String(index+1):null),
+    h('div','tip-stats',...skillRows(unit,skill)),
+    skillEffects[kind]?h('p','tip-note',skillEffects[kind]):null].filter(Boolean);
+}
 function initiative(turn){
   const units=state.units.length?state.units:state.players;
   return units.map(u=>{
@@ -534,10 +589,49 @@ function updateTraining(player,ready){
   }
   if(trainingDialog.open)return;
   el('training-title').textContent='Nivel '+(player.level+1)+' · Habilidad';
-  el('training-choices').replaceChildren(...trainingChoices(player).map(({index,rank,name})=>
-    actionButton((rank?'Mejorar a '+(rank+1)+'/3 · ':'Aprender · ')+name,'train',{skill:index})));
+  const unit=state.units.find(u=>u.id===player.id)||{classId:player.classId,stats:{},level:player.level};
+  el('training-compare').hidden=true;
+  el('training-choices').replaceChildren(...trainingChoices(player).map(({index,rank,name})=>{
+    const base=classes[player.classId].skills[index];
+    const choice=actionButton('','train',{skill:index});
+    choice.className='training-choice';
+    choice.append(spellIcon(base[5],base[6]),h('span','training-name',name),
+      h('span','training-rank'+(rank?'':' new'),rank?rank+'/3 → '+(rank+1)+'/3':'Nueva'));
+    choice.onpointerenter=choice.onfocus=()=>showTrainingCompare(player,unit,index,rank);
+    return choice;
+  }));
   hideUnit();
   trainingDialog.showModal();
+}
+/** Panel lateral: la habilidad antes y después de la mejora. */
+function showTrainingCompare(player,unit,index,rank){
+  const ranks=[...player.skillRanks];
+  const before=rank?skillFor({classId:player.classId,skillRanks:ranks},index):null;
+  ranks[index]=rank+1;
+  const after=skillFor({classId:player.classId,skillRanks:ranks},index);
+  const a=after&&skillFacts(unit,after),b=before&&skillFacts(unit,before);
+  const [name,,,,,kind,symbol]=after;
+  const line=(iconName,label,from,to)=>{
+    const changed=from!==to;
+    return h('div','compare-row'+(changed?' changed':''),icon(iconName),h('span','tip-label',label),
+      changed?h('span','compare-from',from??'—'):h('span'),changed?h('span','compare-arrow','→'):h('span'),h('span','compare-to',to));
+  };
+  const amount=f=>f?f.low+'–'+f.high:null;
+  const reach=f=>f?(f.minRange?f.minRange+'–':'')+f.maxRange:null;
+  const rows=[line('ap','Coste',b?b.cost+' PA':null,a.cost+' PA')];
+  if(kind==='dash')rows.push(line('dash','Distancia',b?reach(b)+' cas.':null,reach(a)+' cas.'));
+  else{
+    if(!a.healing)rows.push(line(a.element,'Elemento',b?elements[b.element]:null,elements[a.element]));
+    rows.push(line(a.healing?'heal':'attack',a.healing?'Curación':'Daño',amount(b),amount(a)));
+    rows.push(line('range','Alcance',b?reach(b):null,reach(a)));
+  }
+  const gain=kind==='dash'?'+1 casilla de alcance':!rank?'Nueva habilidad':a.healing?'+2 de curación mínima y máxima':'+2 de daño mínimo y máximo';
+  el('training-compare').replaceChildren(
+    tipHead(spellIcon(kind,symbol),name,rank?'Nivel '+rank+' → '+(rank+1):'Aprender · nivel 1',null),
+    h('div','compare-grid',...rows),
+    h('p','compare-gain',icon('xp'),gain),
+    ...(skillEffects[kind]?[h('p','tip-note',skillEffects[kind])]:[]));
+  el('training-compare').hidden=false;
 }
 function pawnName(name){
   const tag=document.createElement('span');
@@ -833,19 +927,17 @@ function render(){
       key.setAttribute('aria-hidden','true');
       b.append(spellIcon(kind,symbol),h('span','ability-name',name),h('span','ability-cost stat-pa',cost+' PA'),key);
       if(rank>1)b.append(h('span','ability-rank',rank+'/3'));
+      if(!['heal','cleanse','dash'].includes(kind)){
+        const element=skillElement(turn,current);
+        b.append(h('span','ability-element element-'+element,icon(element)));
+      }
       b.setAttribute('aria-keyshortcuts',String(i+1));
       const maxRange=range+(modifiableRange(current)?turn.stats.reach:0);
       const healing=['heal','cleanse'].includes(kind);
       b.setAttribute('aria-description',cost+' PA · alcance '+minRange+'–'+maxRange);
       b.onpointerenter=b.onfocus=()=>{
-        const element=elements[skillElement(turn,current)];
-        const rows=[statRow('ap','Coste',cost+' PA'),statRow('range','Alcance',(minRange?minRange+'–':'')+maxRange+(maxRange===1?' casilla':' casillas'))];
-        if(kind==='dash')rows.push(statRow('mp','Efecto','Movimiento sin gastar PM'));
-        else rows.push(statRow(healing?'heal':skillElement(turn,current),healing?'Curación':'Daño '+element.toLowerCase(),min+'–'+max));
-        const extra={expose:'Aplica vulnerabilidad',slow:'Resta PM al objetivo',venom:'Envenena al objetivo',blast:'Daño en área',push:'Empuja al objetivo',cleanse:'Elimina efectos negativos'}[kind];
         const rect=b.getBoundingClientRect();
-        showTip([tipHead(spellIcon(kind,symbol),name,'Nivel '+rank+' de 3',String(i+1)),h('div','tip-stats',...rows),extra?h('p','tip-note',extra):null].filter(Boolean),
-          {left:rect.left,top:rect.top,bottom:rect.bottom},'tip-skill');
+        showTip(skillTipNodes(turn,i,current,rank),{left:rect.left,top:rect.top,bottom:rect.bottom},'tip-skill');
       };
       b.onpointerleave=b.onblur=hideUnit;
       b.disabled=cost>state.ap;

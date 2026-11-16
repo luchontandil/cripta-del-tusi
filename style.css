@@ -302,6 +302,8 @@ summary{cursor:pointer}
 .ability kbd{position:absolute;top:-6px;left:-6px;min-width:17px;height:17px;display:grid;place-items:center;padding:0;border-radius:5px;font-size:.62rem;opacity:1;background:#0d0b14;border-color:var(--line-strong);color:var(--muted)}
 .ability-rank{position:absolute;top:-6px;right:-6px;padding:0 4px;border-radius:5px;font-size:.58rem;font-weight:800;color:#d5b8ff;background:#0d0b14;border:1px solid #d5b8ff66}
 .ability:hover:not(:disabled) .spell-icon{filter:brightness(1.15)}
+.ability-element{position:absolute;right:-7px;top:50%;transform:translateY(-60%);display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#0d0b14;border:1px solid var(--line-strong)}
+.ability-element .icon{width:13px;height:13px}
 .ability[aria-pressed=true]{background:linear-gradient(180deg,#4a3a63,#2c2340);border-color:var(--gold);box-shadow:0 0 0 1px var(--gold-glow),0 0 18px #f2cd8a44}
 .ability[aria-pressed=true] .spell-icon{box-shadow:0 0 0 1px #fff3,0 0 12px #f2cd8a88}
 .ability:disabled .ability-cost{color:var(--danger)}
@@ -472,6 +474,12 @@ summary{cursor:pointer}
 .tip-glyph small{color:var(--gold-2);font-weight:700}
 .tip-glyph.glyph-damage .icon{color:#ff9e7e}.tip-glyph.glyph-poison .icon{color:var(--poison)}.tip-glyph.glyph-slow .icon{color:#a8c4ff}
 .tip-note{margin-top:7px;color:var(--muted);font-size:.74rem}
+.tip-row.yes .tip-value{color:var(--good)}.tip-row.no .tip-value{color:var(--faint)}
+.tip-row.element-fire .tip-value{color:var(--fire)}.tip-row.element-ice .tip-value{color:var(--ice)}.tip-row.element-arcane .tip-value{color:var(--arcane)}.tip-row.element-shadow .tip-value{color:var(--shadow)}.tip-row.element-physical .tip-value{color:var(--physical)}
+.preview-skills li{cursor:help;padding:3px 4px;border-radius:6px}
+.preview-skills li:hover,.preview-skills li:focus-visible{background:#ffffff0d;outline:none}
+.preview-skills li.locked{opacity:.65}
+.preview-skills small.unlock{color:#d5b8ff}
 .tip .stat-list{margin:0}
 
 /* ───────────── Diálogo de habilidades ───────────── */
@@ -480,7 +488,31 @@ summary{cursor:pointer}
 #training h2{color:var(--gold)}
 #training p{color:var(--muted);font-size:.88rem;margin:4px 0 14px}
 #training-choices{display:grid;gap:8px}
-#training-choices button{justify-content:flex-start;padding:.75em 1em;text-align:left}
+#training{overflow:visible}
+#training-choices button{justify-content:flex-start;padding:.6em .8em;text-align:left}
+.training-choice{display:grid!important;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
+.training-choice .spell-icon{width:32px;height:32px}
+.training-name{font-weight:700}
+.training-rank{font-size:.72rem;font-weight:800;color:#d5b8ff;white-space:nowrap}
+.training-rank.new{color:var(--good)}
+.training-choice:hover,.training-choice:focus-visible{border-color:var(--gold)}
+.training-compare{
+  position:absolute;top:0;right:calc(100% + 14px);width:290px;padding:12px 14px;border-radius:12px;
+  background:linear-gradient(160deg,#ffffff0e,transparent 45%),#17131ff5;border:1px solid var(--line-gold);
+  box-shadow:0 20px 50px #000d;font-size:.8rem;animation:tip-in .12s var(--ease);
+}
+.compare-grid{display:grid;gap:5px;margin-top:2px}
+.compare-row{display:grid;grid-template-columns:18px minmax(0,1fr) auto auto auto;align-items:center;gap:6px}
+.compare-row .icon{width:16px;height:16px}
+.compare-from{color:var(--faint);font-variant-numeric:tabular-nums;text-align:right}
+.compare-arrow{color:var(--faint);font-size:.75rem}
+.compare-to{font-weight:800;font-variant-numeric:tabular-nums;color:#fff}
+.compare-row.changed .compare-to{color:var(--good)}
+.compare-row.changed .compare-from{text-decoration:line-through;text-decoration-color:#ff8f7a99}
+.compare-gain{display:flex;align-items:center;gap:6px;margin-top:9px;padding:6px 8px;border-radius:7px;background:#a8de8c14;border:1px solid #a8de8c40;color:var(--good);font-weight:700}
+@media(max-width:820px){
+  .training-compare{position:static;width:auto;margin-bottom:12px}
+}
 
 /* ───────────── Responsive ───────────── */
 @media(max-width:1100px){

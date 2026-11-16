@@ -152,7 +152,9 @@ export function encounter(floor,size) {
     const elite=!boss&&!ranged&&floor>=4;
     return {id:'enemy'+i,name:boss?(floor===3?'Oráculo de Ceniza':'Rey del Umbral'):ranged?'Vigía':elite?'Custodio':'Acechador',
       look:boss?'boss':ranged?'ranged':elite?'elite':'enemy',boss,enemy:true,initiative:boss?16:ranged?11:6,
-      range:boss?4:ranged?8:1,hp:boss?30+floor*3+6*(size-1):9+2*floor,damage:2+Math.floor(floor/2)+(boss?2:0),stats:{ward:boss?2:elite?1:0},effects:{}};
+      range:boss?4:ranged?8:1,
+      hp:boss?48+floor*6+8*(size-1):Math.round((16+4*floor)*(ranged?.75:elite?1.15:1)),
+      damage:boss?4+floor:ranged?2+floor:3+floor,stats:{ward:boss?3:elite?2:0},effects:{}};
   });
 }
 export const distance = (s,a,b) => Math.abs(a%s.width-b%s.width)+Math.abs(Math.floor(a/s.width)-Math.floor(b/s.width));
@@ -330,19 +332,27 @@ function effect(unit,key,value,turns) {
   const previous=unit.effects[key];
   unit.effects[key]={value:Math.max(previous?.value||0,value),turns:Math.max(previous?.turns||0,turns)};
 }
+export const glyphPower={damage:{damage:9,element:'fire'},poison:{damage:4,element:'shadow',poison:3,turns:2},slow:{damage:4,element:'arcane',slow:2}};
+/** Aplica un glifo activo a un héroe: daño y, según el tipo, veneno o pérdida de PM. */
+function triggerGlyph(s,g,unit) {
+  const power=glyphPower[g.kind];
+  hit(s,{name:glyphInfo[g.kind].name,pos:unit.pos},unit,power.damage,'glyph',false,power.element);
+  if(!alive(unit))return;
+  if(power.poison) {
+    effect(unit,'poison',power.poison,power.turns);
+    note(s,unit.name+' queda envenenado.');
+  }
+  if(power.slow) {
+    effect(unit,'slow',power.slow,1);
+    note(s,unit.name+' pierde '+power.slow+' PM en su próximo turno por el glifo de cadenas.');
+  }
+}
 function applyGlyphs(s,unit,oldPos) {
   if(unit.enemy)return;
   for(const g of s.glyphs) {
-    if(g.warn||!alive(unit)||!g.cells.includes(unit.pos)||g.cells.includes(oldPos))continue;
-    if(g.kind==='damage')hit(s,{name:'Glifo de brasas',pos:unit.pos},unit,8,'glyph',false,'fire');
-    if(g.kind==='poison') {
-      effect(unit,'poison',3,2);
-      note(s,unit.name+' queda envenenado.');
-    }
-    if(g.kind==='slow') {
-      s.mp=Math.max(0,s.mp-2);
-      note(s,unit.name+' pierde 2 PM por el glifo de cadenas.');
-    }
+    // Las cadenas solo se activan en el turno del jefe que las lanza.
+    if(g.kind==='slow'||g.warn||!alive(unit)||!g.cells.includes(unit.pos)||g.cells.includes(oldPos))continue;
+    triggerGlyph(s,g,unit);
   }
 }
 function move(s,unit,path,voluntary=true) {
@@ -409,15 +419,18 @@ function advance(s,rng) {
   }
 }
 export const glyphInfo={
-  damage:{name:'Glifo de brasas',description:'Inflige 8 de daño de fuego al entrar o empezar el turno.'},
-  poison:{name:'Glifo de veneno',description:'Aplica veneno de 3 PV por turno durante 2 turnos.'},
-  slow:{name:'Glifo de cadenas',description:'Resta 2 PM al entrar o empezar el turno.'}
+  damage:{name:'Glifo de brasas',description:'Al activarse en el turno del jefe, y al entrar o empezar el turno encima: 9 de daño de fuego.'},
+  poison:{name:'Glifo de veneno',description:'Al activarse en el turno del jefe, y al entrar o empezar el turno encima: 4 de daño de sombra y veneno de 3 PV durante 2 turnos.'},
+  slow:{name:'Glifo de cadenas',description:'En cada turno del jefe: 4 de daño arcano y −2 PM en el próximo turno de quien esté encima.'}
 };
 function castGlyph(s,boss,heroes) {
   const existing=s.glyphs.find(g=>g.owner===boss.id);
   if(existing?.warn){
     existing.warn=false;
     note(s,boss.name+' activa '+glyphInfo[existing.kind].name.toLowerCase()+'.');
+    for(const hero of heroes.filter(h=>alive(h)&&existing.cells.includes(h.pos))){
+      triggerGlyph(s,existing,hero);
+    }
     return;
   }
   s.glyphs=s.glyphs.filter(g=>g.owner!==boss.id);

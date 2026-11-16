@@ -1,5 +1,5 @@
 // Short, synthesized effects. This module never starts a soundtrack.
-import {icon} from './icons.js?v=11';
+import {icon} from './icons.js?v=12';
 export function setupSfx(button){
   let context,master;
   let muted=false;

@@ -16,7 +16,7 @@ Entra en http://localhost:3000. Para probar el cooperativo, abre una segunda ven
 
 Los turnos tienen 60 segundos. Las casillas azules se pueden alcanzar. Pasa el puntero para ver la ruta y haz clic para moverte. Selecciona un hechizo para ver su alcance en morado y sus objetivos válidos con borde dorado. La Bola de fuego del Mago permite elegir una casilla y previsualizar su área en naranja. Usa F1 para terminar el turno y las teclas 1 a 4 para seleccionar hechizos. Pasa el puntero sobre una unidad para ver su ficha. El botón SFX controla los sonidos de botones y hechizos. Las casillas rojas indican que hay alcance pero falta línea de visión. Todos los jugadores reciben la misma secuencia de pasos. Los hechizos largos comprueban línea de visión y la vulnerabilidad aumenta el daño de cualquier atacante.
 
-Los jefes de los pisos 3 y 6 anuncian un glifo en cruz por vez. El Oráculo alterna brasas y veneno. El Rey alterna cadenas y veneno. Al activarse pueden dañar, envenenar o restar PM a los héroes que entren o comiencen el turno encima.
+Los jefes de los pisos 3 y 6 anuncian un glifo en cruz por vez. El Oráculo alterna brasas y veneno. El Rey alterna cadenas y veneno. Todos los glifos hacen daño al activarse en el turno del jefe. Las brasas y el veneno también afectan a quien entre o empiece el turno encima. Las cadenas solo actúan en el turno del jefe y restan 2 PM en el siguiente turno de quien esté encima.
 
 Entre pisos se elige el botín sobre el tablero. Las tarjetas comparan cada pieza con la equipada y permiten equiparla directamente o guardarla. Hay nueve ranuras de equipo, con iconos propios para cada ranura y las runas. Arrastra objetos de la mochila a una ranura compatible y devuélvelos a la mochila para desequiparlos. El botón Mercader abre la tienda. Cada nuevo piso da un nivel y 4 PV máximos. Tras la victoria, cada jugador elige una habilidad antes de continuar. El equipo aporta daño elemental, crítico, vida, armadura, alcance, PA o PM según la ranura. El equipo combina bases, rarezas y atributos aleatorios. Las runas se guardan en la mochila y pueden venderse, engarzarse en una pieza o extraerse para reutilizarlas.
 
@@ -34,11 +34,11 @@ Las salas viven en memoria y se pierden al reiniciar el servidor. Al recargar la
 
 | Piso | 1 jugador | 2 jugadores | 4 jugadores | PV / daño base de enemigo común |
 | --- | ---: | ---: | ---: | --- |
-| 1 | 1 | 2 | 4 | 11 / 2 |
-| 3 | 2 | 3 | 5 | 15 / 3 |
-| 6 | 4 | 5 | 7 | 21 / 5 |
+| 1 | 1 | 2 | 4 | 20 / 4 |
+| 3 | 2 | 3 | 5 | 28 / 6 |
+| 6 | 4 | 5 | 7 | 40 / 9 |
 
-Los totales de los pisos 3 y 6 incluyen al jefe. Ajusta las clases y la función `encounter` en `engine.js` para cambiar el balance.
+Los totales de los pisos 3 y 6 incluyen al jefe. Los vigías tienen un 25 % menos de vida y los custodios un 15 % más y 2 de armadura. Los jefes tienen 48 PV más 6 por piso y 8 por jugador adicional. Ajusta las clases y la función `encounter` en `engine.js` para cambiar el balance.
 
 Ejecuta `npm test` para comprobar el motor y la sincronización de dos clientes.
 

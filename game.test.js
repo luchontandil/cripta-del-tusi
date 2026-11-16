@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {create,join,act,tick,encounter,paths,lineOfSight} from './engine.js';
+import {create,join,act,tick,encounter,paths,lineOfSight,inRange,spellArea,classes} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -104,6 +104,27 @@ test('genera botín con afijos y permite equipar, engarzar, extraer y vender una
   act(s,'p0',{type:'next'},rng);
   assert.equal(s.floor,2);
 });
+test('el Mago puede lanzar a una casilla vacía y dañar a dos enemigos en cruz',()=>{
+  const s=battle('mago','guardia');
+  const mage=s.units.find(u=>u.id==='p0');
+  const ally=s.units.find(u=>u.id==='p1');
+  const [first,second]=s.units.filter(u=>u.enemy);
+  const skill=classes.mago.skills[1];
+  s.walls=[];
+  mage.pos=29;
+  ally.pos=45;
+  first.pos=34;
+  second.pos=47;
+  const center=33;
+  assert.equal(inRange(s,mage,center,skill),true);
+  assert.ok(spellArea(s,center,skill).includes(first.pos));
+  assert.ok(spellArea(s,center,skill).includes(second.pos));
+  act(s,'p0',{type:'skill',skill:1,pos:center},rng);
+  assert.equal(s.ap,1);
+  assert.equal(first.max-first.hp,8);
+  assert.equal(second.max-second.hp,8);
+  assert.equal(ally.hp,ally.max);
+});
 test('dos clientes reciben la misma trayectoria completa y el cambio de turno', {timeout:10000}, async t=>{
   server.listen(0,'127.0.0.1');
   await once(server,'listening');
@@ -111,6 +132,7 @@ test('dos clientes reciben la misma trayectoria completa y el cambio de turno', 
   const base='http://127.0.0.1:'+server.address().port;
   assert.match(await (await fetch(base)).text(),/Cripta del tusi/);
   assert.equal((await fetch(base+'/art.js')).status,200);
+  assert.equal((await fetch(base+'/music.js')).status,200);
   async function request(path,body,key){
     const response=await fetch(base+path,{
       method:body?'POST':'GET',

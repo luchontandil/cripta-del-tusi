@@ -2,6 +2,7 @@ const palettes = {
   guardia:['#315251','#73937a','#d7b169','#f7dda0'],
   tirador:['#283e2d','#51865b','#b28455','#f2ce92'],
   mistico:['#4e3869','#8a6caf','#f3b363','#fff2bf'],
+  mago:['#243451','#5675ad','#99b6ef','#f6d1ff'],
   enemy:['#523237','#95565b','#c6846d','#ffdc92'],
   ranged:['#4d293b','#a45579','#d690a2','#ffd2a2'],
   elite:['#392c51','#755e91','#c69980','#ffe0a9'],
@@ -27,6 +28,9 @@ export function portrait(look) {
     rect(8,4,9,2,dark);rect(9,3,7,2,mid);rect(17,6,3,2,mid);
     rect(21,10,2,3,light);rect(23,13,2,8,light);rect(21,21,2,3,light);
     rect(21,13,1,8,shine);rect(17,16,6,1,shine);
+  }else if(look==='mago'){
+    rect(5,7,16,2,dark);rect(8,5,10,2,mid);rect(10,3,7,2,mid);rect(12,1,5,2,light);
+    rect(8,20,11,5,mid);rect(21,9,2,15,light);rect(20,7,4,4,shine);
   }else if(look==='mistico'){
     rect(7,5,3,8,mid);rect(16,5,3,8,mid);rect(10,3,6,2,mid);
     rect(21,8,2,17,light);rect(19,6,6,5,dark);rect(20,5,4,6,shine);rect(21,6,2,4,light);
@@ -61,6 +65,11 @@ export function spellIcon(kind,symbol) {
     stroke('#eaffc3',4,[14,6],[14,22]);
     stroke('#eaffc3',4,[6,14],[22,14]);
     if(kind==='cleanse')stroke('#c6fdad',1,[6,6],[22,6],[22,22],[6,22],[6,6]);
+  }else if(kind==='blast'){
+    c.fillStyle='#ff8c41';c.beginPath();
+    for(const [x,y] of [[5,16],[10,9],[11,14],[18,3],[18,11],[24,8],[23,21],[17,25],[9,23]])c.lineTo(x,y);
+    c.closePath();c.fill();
+    c.fillStyle='#ffe0a1';c.beginPath();c.arc(15,18,4,0,Math.PI*2);c.fill();
   }else if(kind==='expose'){
     stroke('#e7baff',2,[14,4],[23,9],[22,18],[14,24],[6,18],[5,9],[14,4]);
     stroke('#fff0cf',2,[15,5],[11,12],[16,14],[12,22]);

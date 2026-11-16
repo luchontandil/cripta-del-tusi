@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#171917">
   <title>Cripta del tusi</title>
-  <link rel="stylesheet" href="./style.css?v=2">
+  <link rel="stylesheet" href="./style.css?v=3">
 </head>
 <body><main>
-  <header><div class="crest" aria-hidden="true">◆</div><h1>Cripta del tusi</h1></header>
+  <header><div class="crest" aria-hidden="true">◆</div><h1>Cripta del tusi</h1><button id="music" type="button" aria-pressed="false">Música</button></header>
   <section id="entry" class="panel gateway">
     <h2>Entrar a la cripta</h2>
     <label>Nombre <input id="name" maxlength="22" placeholder="Aventurero"></label>
-    <label>Clase <select id="class"><option value="guardia">Guardián</option><option value="tirador">Arquero</option><option value="mistico">Clérigo</option></select></label>
+    <label>Clase <select id="class"><option value="guardia">Guardián</option><option value="tirador">Arquero</option><option value="mistico">Clérigo</option><option value="mago">Mago</option></select></label>
     <div id="class-preview"></div>
     <button id="solo" class="primary">Jugar en solitario</button>
     <details><summary>Jugar con amigos</summary>
@@ -37,5 +37,5 @@
       <aside class="panel combat-log"><h2>Registro</h2><ol id="log"></ol></aside>
     </div>
   </section>
-</main><script type="module" src="./client.js?v=2"></script></body>
+</main><script type="module" src="./client.js?v=3"></script></body>
 </html>

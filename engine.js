@@ -15,6 +15,11 @@ export const classes = {
     ['Restaurar',2,5,7,11,'heal','✚'],
     ['Sello de fragilidad',2,4,2,4,'expose','✷'],
     ['Purificar',2,3,3,6,'cleanse','❖']
+  ]},
+  mago: {name:'Mago', hp:30, initiative:13, skills:[
+    ['Descarga arcana',2,6,6,9,'damage','✦'],
+    ['Bola de fuego',3,5,7,11,'blast','✹',2],
+    ['Escarcha',2,5,3,6,'slow','❄']
   ]}
 };
 export const slots = {weapon:'Arma', armor:'Armadura', boots:'Botas', charm:'Talismán'};
@@ -292,11 +297,17 @@ export function tick(s,rng=Math.random) {
   return true;
 }
 const support=kind=>kind==='heal'||kind==='cleanse';
+export function inRange(s,unit,pos,skill) {
+  const [,cost,range,,,,,min=0]=skill;
+  if(!Number.isInteger(pos)||pos<0||pos>=s.width*s.height||s.walls.includes(pos)||cost>s.ap)return false;
+  const d=distance(s,unit.pos,pos);
+  return d>=min&&d<=range+(range>1?(unit.stats?.reach||0):0)&&lineOfSight(s,unit.pos,pos);
+}
+export function spellArea(s,pos,skill) {
+  return skill[5]==='blast'?[pos,...adjacent(s,pos)].filter(cell=>!s.walls.includes(cell)):[pos];
+}
 export function targetable(s,unit,target,skill) {
-  const [,cost,range,,,kind,,min=0]=skill;
-  if(!target||!alive(target)||cost>s.ap||!!target.enemy===support(kind))return false;
-  const d=distance(s,unit.pos,target.pos);
-  return d>=min&&d<=range+(range>1?(unit.stats?.reach||0):0)&&lineOfSight(s,unit.pos,target.pos);
+  return !!target&&alive(target)&&!!target.enemy!==support(skill[5])&&inRange(s,unit,target.pos,skill);
 }
 function gearAction(s,p,a,rng) {
   const bagIndex=p.bag.findIndex(item=>item.id===a.item);
@@ -370,6 +381,17 @@ export function act(s,id,a,rng=Math.random) {
   const [name,cost,,min,max,kind]=skill;
   if(cost>s.ap)fail('No te quedan suficientes puntos de acción.');
   const target=s.units.find(u=>alive(u)&&u.pos===a.pos);
+  if(kind==='blast'){
+    if(!inRange(s,unit,a.pos,skill))fail('Casilla fuera de alcance o sin línea de visión.');
+    s.ap-=cost;
+    const area=spellArea(s,a.pos,skill);
+    emit(s,{kind:'blast',pos:a.pos,area});
+    for(const foe of s.units.filter(u=>u.enemy&&alive(u)&&area.includes(u.pos))){
+      hit(s,unit,foe,roll(min,max,rng)+unit.stats.power);
+    }
+    finish(s,rng);
+    return;
+  }
   if(!targetable(s,unit,target,skill))fail('Objetivo inválido, fuera de alcance o sin línea de visión.');
   s.ap-=cost;
   if(support(kind)){

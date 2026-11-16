@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { create, join, act, tick } from './engine.js';
 
 const rooms = new Map();
-const assets = {'/':'index.html','/client.js':'client.js','/engine.js':'engine.js','/art.js':'art.js','/style.css':'style.css'};
+const assets = {'/':'index.html','/client.js':'client.js','/engine.js':'engine.js','/art.js':'art.js','/music.js':'music.js','/style.css':'style.css'};
 const mime = {html:'text/html',js:'text/javascript',css:'text/css'};
 const token = bytes => randomBytes(bytes).toString('hex');
 const snapshot = room => ({

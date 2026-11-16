@@ -1,14 +1,16 @@
-import {classes,create,join,act,tick,paths,targetable,slots,statNames} from './engine.js?v=2';
-import {portrait,spellIcon} from './art.js?v=2';
+import {classes,create,join,act,tick,paths,targetable,inRange,spellArea,slots,statNames} from './engine.js?v=3';
+import {portrait,spellIcon} from './art.js?v=3';
+import {setupMusic} from './music.js?v=3';
 
 const el=id=>document.getElementById(id);
-let state,session,selected=null,preview=null,busy=false,polling=false,generation=0,revision=0,rendered='';
+let state,session,selected=null,busy=false,polling=false,generation=0,revision=0,rendered='';
 let pending=[],playing=null,lastSeq=0,animationEpoch=0;
 const onPages=location.hostname.endsWith('.github.io');
 el('server').value=localStorage.getItem('amber-server')||(onPages?'https://cripta-del-tusi.onrender.com':location.origin);
 const error=message=>{el('error').textContent=message;};
 const iconName={expose:'Vulnerable',slow:'−PM',poison:'Veneno'};
-const specs={guardia:'Primera línea · debilita al enemigo',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados'};
+const specs={guardia:'Primera línea · debilita al enemigo',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha'};
+const musicMode=setupMusic(el('music'));
 function classPreview(){
   const kind=el('class').value;
   const description=document.createElement('span');
@@ -130,6 +132,16 @@ function resetAnimation(){
   el('animations').replaceChildren();
 }
 function impact(event){
+  if(event.kind==='blast'){
+    for(const pos of event.area){
+      const flash=document.createElement('span');
+      flash.className='fire-flash';
+      Object.assign(flash.style,boardPoint(pos));
+      el('animations').append(flash);
+      setTimeout(()=>flash.remove(),600);
+    }
+    return;
+  }
   const tag=document.createElement('span');
   tag.className='impact '+event.kind;
   tag.textContent=(event.kind==='heal'?'+':'−')+event.amount+(event.critical?' ✷':'');
@@ -182,9 +194,9 @@ function setState(next,initial=false){
   }
   if(newFloor||previous?.turn!==next.turn||previous?.phase!==next.phase||previous?.rounds!==next.rounds){
     selected=null;
-    preview=null;
   }
   state=next;
+  musicMode(next.phase==='combat');
   render();
   animate();
 }
@@ -203,6 +215,7 @@ function paintPath(path,origin){
     const cell=board.children[pos];
     if(!cell)return;
     cell.classList.add('route');
+    cell.dataset.step=index+1;
     if(index===path.length-1)cell.classList.add('destination');
     const arrow=document.createElement('span');
     arrow.className='route-arrow';
@@ -210,6 +223,11 @@ function paintPath(path,origin){
     arrow.setAttribute('aria-hidden','true');
     cell.append(arrow);
   });
+}
+function paintArea(area=[]){
+  const board=el('board');
+  for(const cell of board.querySelectorAll('.area-preview'))cell.classList.remove('area-preview');
+  for(const pos of area)board.children[pos]?.classList.add('area-preview');
 }
 function drawBoard(turn,walking,skill){
   const board=el('board');
@@ -225,26 +243,30 @@ function drawBoard(turn,walking,skill){
     const unit=state.units.find(u=>u.hp>0&&u.pos===pos);
     const wall=state.walls.includes(pos);
     const glyph=state.glyphs.find(g=>g.cells.includes(pos));
-    const aim=skill&&targetable(state,turn,unit,skill);
+    const castRange=skill&&inRange(state,turn,pos,skill);
+    const blast=skill?.[5]==='blast';
+    const aim=castRange&&(blast||targetable(state,turn,unit,skill));
     const path=walking.get(pos);
-    const cell=btn('',event=>{
+    const cell=btn('',()=>{
       if(aim){send({type:'skill',pos,skill:selected});return;}
-      if(!path)return;
-      if(preview!==pos||event.detail===0){
-        preview=pos;
-        paintPath(path,turn.pos);
-        el('path-status').textContent='Ruta de '+path.length+' casilla'+(path.length===1?'':'s')+'. Confirma para mover.';
-      }else send({type:'move',pos});
+      if(path)send({type:'move',pos});
     });
     const shadesIndex=((Math.imul(pos+1,2654435761)^state.mapSeed)>>>6)%shades.length;
     cell.style.setProperty('--tile',shades[shadesIndex]);
-    cell.className=['cell',wall&&'wall',path&&'walk',aim&&'aim',glyph&&'glyph-'+glyph.kind,glyph?.warn&&'warn'].filter(Boolean).join(' ');
+    cell.className=['cell',wall&&'wall',path&&'walk',castRange&&'cast-range',aim&&'aim',glyph&&'glyph-'+glyph.kind,glyph?.warn&&'warn'].filter(Boolean).join(' ');
     cell.setAttribute('aria-label',(unit?.name||(wall?'Muro':'Casilla'))+' '+(pos%state.width+1)+', '+(Math.floor(pos/state.width)+1));
     if(path){
-      cell.onpointerenter=()=>paintPath(path,turn.pos);
-      cell.onpointerleave=()=>paintPath(walking.get(preview),turn.pos);
-      cell.onfocus=()=>paintPath(path,turn.pos);
-      cell.onblur=()=>paintPath(walking.get(preview),turn.pos);
+      cell.onpointerenter=cell.onfocus=()=>{
+        paintPath(path,turn.pos);
+        el('path-status').textContent=path.length+' PM · Clic para moverte';
+      };
+      cell.onpointerleave=cell.onblur=()=>{
+        paintPath();
+        el('path-status').textContent='Azul: casillas a las que puedes moverte.';
+      };
+    }else if(aim&&blast){
+      cell.onpointerenter=cell.onfocus=()=>paintArea(spellArea(state,pos,skill));
+      cell.onpointerleave=cell.onblur=()=>paintArea();
     }
     if(unit){
       const pawn=document.createElement('span');
@@ -262,7 +284,6 @@ function drawBoard(turn,walking,skill){
     fragment.append(cell);
   }
   board.append(fragment);
-  paintPath(walking.get(preview),turn.pos);
 }
 function render(){
   el('entry').hidden=!!state;
@@ -301,24 +322,19 @@ function render(){
     const stats=document.createElement('span');
     stats.className='resource';
     stats.textContent=state.ap+' PA · '+state.mp+' PM';
-    controls.append(stats,btn('Mover',()=>{selected=null;preview=null;render();},selected===null));
+    controls.append(stats,btn('Mover',()=>{selected=null;render();},selected===null));
     classes[turn.classId].skills.forEach(([name,cost,range,min,max,kind,symbol,minRange=0],i)=>{
-      const b=btn(name,()=>{selected=selected===i?null:i;preview=null;render();},selected===i);
+      const b=btn(name,()=>{selected=selected===i?null:i;render();},selected===i);
       b.className='ability';
       b.prepend(spellIcon(kind,symbol));
       b.title=cost+' PA · alcance '+minRange+'–'+(range+(range>1?turn.stats.reach:0))+' · '+min+'–'+max+' '+(['heal','cleanse'].includes(kind)?'cura':'daño base');
       b.disabled=cost>state.ap;
       controls.append(b);
     });
-    if(selected===null){
-      const hint=document.createElement('small');
-      hint.id='path-status';
-      hint.textContent='Elige una casilla para ver la ruta.';
-      controls.append(hint,btn('Confirmar movimiento',()=>{
-        if(preview!==null)send({type:'move',pos:preview});
-        else hint.textContent='Primero elige una casilla marcada.';
-      }));
-    }
+    const hint=document.createElement('small');
+    hint.id='path-status';
+    hint.textContent=selected===null?'Azul: casillas a las que puedes moverte.':skill[5]==='blast'?'Morado: puntos de lanzamiento. Naranja: área de impacto.':'Morado: alcance. Dorado: objetivos válidos.';
+    controls.append(hint);
     controls.append(actionButton('Terminar turno','end'));
   }
   drawBoard(turn,walking,skill);
@@ -354,7 +370,6 @@ async function send(action){
       act(next,session.id,action);
     }
     selected=null;
-    preview=null;
     error('');
     setState(next);
   }catch(e){if(epoch===generation)error(e.message);}
@@ -396,8 +411,9 @@ async function enter(creating){
 el('create').onclick=()=>enter(true);
 el('join').onclick=()=>enter(false);
 el('leave').onclick=()=>{
-  generation++;busy=false;state=null;session=null;selected=null;preview=null;rendered='';
+  generation++;busy=false;state=null;session=null;selected=null;rendered='';
   resetAnimation();
+  musicMode(false);
   sessionStorage.removeItem('amber-session');
   error('');render();
 };

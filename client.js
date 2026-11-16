@@ -1,8 +1,8 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement,nodeKinds,modText,trapInfo} from './engine.js?v=17';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=17';
-import {setupSfx} from './music.js?v=17';
-import {icon} from './icons.js?v=17';
+  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement,nodeKinds,modText,trapInfo} from './engine.js?v=18';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=18';
+import {setupSfx} from './music.js?v=18';
+import {icon} from './icons.js?v=18';
 
 const el=id=>document.getElementById(id);
 let state,session,selected=null,busy=false,polling=false,generation=0,revision=0,rendered='';
@@ -86,7 +86,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=17').then(({createIso})=>{
+import('./isometric.js?v=18').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -354,16 +354,31 @@ function statLine(key,value,tag='li'){
   return line;
 }
 const statList=(stats,className='stat-list')=>h('ul',className,...Object.entries(stats).map(([key,value])=>statLine(key,value)));
+/** Modificadores al estilo ARPG: afijos primero, luego sufijos, con su tier. */
+function affixList(item,className='stat-list'){
+  if(!item.affixes)return statList(item.stats,className);
+  const sorted=[...item.affixes].sort((a,b)=>a.type===b.type?0:a.type==='prefix'?-1:1);
+  return h('ul',className+' affix-list',...sorted.map(mod=>{
+    const line=statLine(mod.stat,mod.value);
+    line.classList.add('affix',mod.type);
+    const tier=h('span','tier tier-'+mod.tier+(mod.tier===mod.tiers?' top':''),'T'+mod.tier);
+    tier.title=(mod.type==='prefix'?'Afijo':'Sufijo')+' «'+mod.label+'» · tier '+mod.tier+' de '+mod.tiers;
+    line.append(tier);
+    return line;
+  }));
+}
+const itemSubtitle=item=>item.kind==='rune'?'Runa · nivel '+(item.ilvl||1):
+  [item.grade>=2?item.base:slots[item.slot],item.rarity,'nivel '+(item.ilvl||1)].filter(Boolean).join(' · ');
 const rarityTone=item=>item?.kind==='rune'?'rune':'grade'+(item?.grade||0);
 function itemRow(item,title,actions=[]){
   const row=h('div','item');
   const name=h('b',rarityTone(item),title+(item?.name||'Vacío'));
   const heading=h('div','item-heading');
   if(item)heading.append(equipmentIcon(item.kind==='rune'?'rune':item.slot));
-  heading.append(h('div','item-title',name,item?h('small',null,item.kind==='rune'?'Runa':(slots[item.slot]||'')+(item.rarity?' · '+item.rarity:'')):null));
+  heading.append(h('div','item-title',name,item?h('small',null,itemSubtitle(item)):null));
   row.append(heading);
   if(item){
-    row.append(statList(item.stats));
+    row.append(affixList(item));
     if(item.socket)row.append(h('div','item-socket',equipmentIcon('rune'),h('span',null,item.socket.name),statList(item.socket.stats,'stat-list compact')));
   }
   if(actions.length)row.append(h('div','item-actions',...actions));
@@ -371,7 +386,7 @@ function itemRow(item,title,actions=[]){
 }
 function itemTip(item,anchor){
   const nodes=[tipHead(h('span','tip-item-art '+rarityTone(item),equipmentIcon(item.kind==='rune'?'rune':item.slot)),item.name,
-    item.kind==='rune'?'Runa engarzable':(slots[item.slot]||'')+(item.rarity?' · '+item.rarity:''),null),statList(item.stats,'stat-list tip-stats')];
+    itemSubtitle(item),null),affixList(item,'stat-list tip-stats')];
   if(item.socket)nodes.push(h('div','item-socket',equipmentIcon('rune'),h('span',null,'Engarzada: '+item.socket.name),statList(item.socket.stats,'stat-list compact')));
   showTip(nodes,anchor,'tip-item '+rarityTone(item));
 }
@@ -399,15 +414,15 @@ function comparison(item,player){
 }
 function lootCard(item,player){
   const card=document.createElement('article');
-  card.className='loot-card grade'+(item.kind==='rune'?3:item.grade);
+  card.className='loot-card '+(item.kind==='rune'?'rune':'grade'+item.grade);
   const visual=document.createElement('div');
   visual.className='loot-icon';
   visual.append(equipmentIcon(item.kind==='rune'?'rune':item.slot));
   const title=document.createElement('h4');
   title.textContent=item.name;
   const type=document.createElement('small');
-  type.textContent=item.kind==='rune'?'Runa · Engarzable':slots[item.slot]+' · '+item.rarity;
-  const stats=statList(item.stats);
+  type.textContent=itemSubtitle(item);
+  const stats=affixList(item);
   card.append(visual,title,type,stats);
   if(item.kind==='gear')card.append(comparison(item,player));
   const take=actionButton('A la mochila','reward',{item:item.id});

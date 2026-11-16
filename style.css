@@ -16,7 +16,7 @@
   --pa:#8fd3ff;--pa-bg:#17324a;--pm:#b5ea98;--pm-bg:#1e3a26;
   --fire:#ff9a5c;--ice:#93e2ff;--arcane:#c5a9ff;--shadow:#d79bf0;--physical:#e8d6b4;--poison:#c3e276;
 
-  --rarity-common:#a69cb5;--rarity-uncommon:#9fd06f;--rarity-rare:#6fb2ff;--rarity-epic:#c890ff;
+  --rarity-common:#e6e1d8;--rarity-uncommon:#6fa8ff;--rarity-rare:#ffe066;--rarity-epic:#ffa733;
 
   --radius:10px;--radius-sm:6px;
   --shadow-1:0 1px 0 #ffffff0a inset,0 8px 24px #05030b99;
@@ -417,7 +417,7 @@ summary{cursor:pointer}
 .item-title{display:grid;min-width:0}
 .item-title b{font-size:.88rem;line-height:1.2}
 .item-title small{color:var(--muted);font-size:.7rem}
-.item .grade0{color:#efe6d6}.item .grade1,.tip .grade1{color:var(--rarity-uncommon)}.item .grade2{color:var(--rarity-rare)}.item .grade3,.item .rune{color:var(--rarity-epic)}
+.item .grade0{color:#efe6d6}.item .grade1,.tip .grade1{color:var(--rarity-uncommon)}.item .grade2{color:var(--rarity-rare)}.item .grade3{color:var(--rarity-epic)}.item .rune{color:#c890ff}
 .item-actions{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .item-actions button{font-size:.72rem;padding:.3em .6em}
 .item-socket{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:6px;padding:5px 6px;border-radius:6px;background:#c890ff12;border:1px solid #c890ff33;font-size:.72rem;color:#e5ccff}
@@ -442,7 +442,7 @@ summary{cursor:pointer}
 }
 .loot-card::before{content:"";position:absolute;inset:0 0 auto;height:3px;border-radius:10px 10px 0 0;background:var(--rarity);box-shadow:0 0 12px var(--rarity)}
 .loot-card:hover{transform:translateY(-3px);box-shadow:0 0 0 1px var(--rarity),0 14px 30px #000a,0 0 24px color-mix(in srgb,var(--rarity) 30%,transparent)}
-.loot-card.grade1{--rarity:var(--rarity-uncommon)}.loot-card.grade2{--rarity:var(--rarity-rare)}.loot-card.grade3{--rarity:var(--rarity-epic)}
+.loot-card.rune{--rarity:#c890ff}.loot-card.grade1{--rarity:var(--rarity-uncommon)}.loot-card.grade2{--rarity:var(--rarity-rare)}.loot-card.grade3{--rarity:var(--rarity-epic)}
 .loot-icon{display:grid;place-items:center;align-self:center;width:58px;height:58px;border-radius:12px;border:1px solid var(--rarity);background:radial-gradient(circle,color-mix(in srgb,var(--rarity) 25%,#15111f),#0d0b14 75%);margin:4px 0}
 .loot-icon .equipment-icon{width:42px;height:42px}
 .loot-card h4{font-size:1.05rem;line-height:1.15;text-align:center;color:#f7e7c5;overflow-wrap:anywhere}
@@ -472,7 +472,7 @@ summary{cursor:pointer}
 @keyframes tip-in{from{opacity:0;translate:0 4px}}
 .tip.tip-foe{border-color:#7c3a46}.tip.tip-ally{border-color:#4f6a54}.tip.tip-skill{border-color:var(--line-gold)}
 .tip.tip-item{border-color:color-mix(in srgb,var(--rarity,var(--rarity-common)) 70%,transparent)}
-.tip.grade1{--rarity:var(--rarity-uncommon)}.tip.grade2{--rarity:var(--rarity-rare)}.tip.grade3,.tip.rune{--rarity:var(--rarity-epic)}
+.tip.grade0{--rarity:var(--rarity-common)}.tip.grade1{--rarity:var(--rarity-uncommon)}.tip.grade2{--rarity:var(--rarity-rare)}.tip.grade3{--rarity:var(--rarity-epic)}.tip.rune{--rarity:#c890ff}
 .tip-head{display:flex;align-items:center;gap:9px;margin-bottom:8px}
 .tip-head>canvas,.tip-head>.spell-icon,.tip-item-art{flex:none}
 .tip-head>canvas{width:30px;height:auto;image-rendering:pixelated;padding:3px;border-radius:8px;background:#0d0b14;border:1px solid var(--line);box-sizing:content-box}
@@ -509,6 +509,14 @@ summary{cursor:pointer}
 .tip-glyph small{color:var(--gold-2);font-weight:700}
 .tip-glyph.glyph-damage .icon{color:#ff9e7e}.tip-glyph.glyph-poison .icon{color:var(--poison)}.tip-glyph.glyph-slow .icon{color:#a8c4ff}
 .tip-note{margin-top:7px;color:var(--muted);font-size:.74rem}
+.affix-list .stat-line{position:relative}
+.affix-list .affix.suffix:first-of-type,.affix-list .affix.prefix+.affix.suffix{border-top:1px dashed #ffffff18;padding-top:3px;margin-top:2px}
+.tier{margin-left:auto;padding:0 5px;border-radius:4px;font-size:.62rem;font-weight:800;color:var(--faint);border:1px solid #ffffff1c;background:#0d0b14;cursor:help}
+.tier-2{color:#c9d6e8}.tier-3{color:#8fd3ff;border-color:#8fd3ff44}.tier-4{color:#ffe066;border-color:#ffe06655}.tier-5{color:#ffa733;border-color:#ffa73366}
+.tier.top{box-shadow:0 0 6px currentColor}
+.item .grade3,.tip-item.grade3 .tip-title strong,.loot-card.grade3 h4{color:var(--rarity-epic);text-shadow:0 0 10px #ffa73355}
+.item .grade2,.tip-item.grade2 .tip-title strong,.loot-card.grade2 h4{color:var(--rarity-rare)}
+.item .grade1,.tip-item.grade1 .tip-title strong,.loot-card.grade1 h4{color:var(--rarity-uncommon)}
 .tip-row.yes .tip-value{color:var(--good)}.tip-row.no .tip-value{color:var(--faint)}
 .tip-row.element-fire .tip-value{color:var(--fire)}.tip-row.element-ice .tip-value{color:var(--ice)}.tip-row.element-arcane .tip-value{color:var(--arcane)}.tip-row.element-shadow .tip-value{color:var(--shadow)}.tip-row.element-physical .tip-value{color:var(--physical)}
 .preview-skills li{cursor:help;padding:3px 4px;border-radius:6px}

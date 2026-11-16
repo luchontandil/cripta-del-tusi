@@ -61,7 +61,7 @@ export const modifiableRange=skill=>skill[2]>1&&skill[5]!=='dash';
 export const slots = {weapon:'Arma',helmet:'Casco',armor:'Armadura',gloves:'Guantes',belt:'Cinturón',boots:'Botas',ring:'Anillo',amulet:'Amuleto',charm:'Talismán'};
 export const statNames = {...Object.fromEntries(Object.entries(elements).map(([key,name])=>[key,'Daño '+name.toLowerCase()])),
   vitality:'Vida',reach:'Alcance',ward:'Armadura',critical:'Crítico',movement:'PM',action:'PA'};
-const rarities = ['Común','Poco común','Raro','Épico'];
+export const rarities = ['Normal','Poco común','Raro','Legendario'];
 const bases = {
   weapon:['Arco de tejo','Sable de cobre','Cetro de ónice','Lanza de vigía'],
   helmet:['Yelmo del centinela','Capucha del eco','Corona de hollín'],
@@ -73,12 +73,45 @@ const bases = {
   amulet:['Amuleto de luna','Colgante de ámbar','Lágrima del alba'],
   charm:['Ojo de la cripta','Diente de vigía','Llave de los ecos']
 };
-const pools = {
-  weapon:['element','reach','critical'],helmet:['vitality','ward','critical'],armor:['vitality','ward','element'],
-  gloves:['element','critical','reach'],belt:['vitality','ward','element'],boots:['movement','vitality','ward'],
-  ring:['critical','reach','element'],amulet:['vitality','action','reach'],charm:['element','critical','reach']
-};
 const actionWeapons=new Set(['Cetro de ónice','Lanza de vigía']);
+/**
+ * Modificadores al estilo Diablo 2 / Path of Exile.
+ * Afijos (prefijos, delante del nombre) y sufijos ("del…"). Cada tier tiene
+ * un nivel mínimo de objeto (ilvl), un rango de valores, un nombre y un peso.
+ */
+export const affixes={
+  prefix:{
+    physical:[[1,1,2,'Cortante'],[2,2,3,'Brutal'],[3,3,5,'Implacable'],[5,5,7,'Feroz'],[7,7,9,'Letal']],
+    fire:[[1,1,2,'Humeante'],[2,2,3,'Ardiente'],[3,3,5,'Candente'],[5,5,7,'Infernal'],[7,7,9,'Calcinante']],
+    ice:[[1,1,2,'Invernal'],[2,2,3,'Polar'],[3,3,5,'Glacial'],[5,5,7,'Boreal'],[7,7,9,'Hiemal']],
+    arcane:[[1,1,2,'Brillante'],[2,2,3,'Estelar'],[3,3,5,'Astral'],[5,5,7,'Celestial'],[7,7,9,'Sideral']],
+    shadow:[[1,1,2,'Lúgubre'],[2,2,3,'Sepulcral'],[3,3,5,'Umbral'],[5,5,7,'Abisal'],[7,7,9,'Espectral']],
+    ward:[[1,1,1,'Firme'],[3,1,2,'Resistente'],[5,2,3,'Inquebrantable'],[7,3,4,'Impenetrable']]
+  },
+  suffix:{
+    vitality:[[1,3,5,'del Zorro'],[2,5,8,'del Oso'],[3,8,12,'de la Ballena'],[5,12,16,'del Coloso'],[7,16,22,'del Titán']],
+    critical:[[1,3,5,'del Halcón'],[2,5,8,'del Cazador'],[4,8,11,'del Asesino'],[6,11,15,'del Verdugo']],
+    reach:[[1,1,1,'del Vigía'],[6,2,2,'del Horizonte']],
+    movement:[[1,1,1,'de la Liebre'],[7,2,2,'del Viento']],
+    action:[[3,1,1,'del Erudito']]
+  }
+};
+const elementsAll=['physical','fire','ice','arcane','shadow'];
+const slotAffixes={
+  weapon:{prefix:elementsAll,suffix:['critical','reach','action']},
+  helmet:{prefix:['ward','fire','ice','arcane'],suffix:['vitality','critical','reach']},
+  armor:{prefix:['ward','physical','shadow'],suffix:['vitality','critical']},
+  gloves:{prefix:elementsAll,suffix:['critical','reach']},
+  belt:{prefix:['ward','physical','fire'],suffix:['vitality','critical']},
+  boots:{prefix:['ward','ice','shadow'],suffix:['movement','vitality']},
+  ring:{prefix:elementsAll,suffix:['critical','reach','vitality']},
+  amulet:{prefix:['arcane','fire','shadow','ward'],suffix:['action','vitality','reach']},
+  charm:{prefix:elementsAll,suffix:['critical','reach']}
+};
+const rareFirst=['Lamento','Colmillo','Susurro','Ruina','Presagio','Garra','Aullido','Eco','Lamento','Fauces','Maldición','Grito'];
+const rareSecond=['sombrío','de hueso','carmesí','del ocaso','funesto','de la cripta','errante','voraz','silente','de ceniza','eterno','roto'];
+const legendaryNames=['La Última Brasa','Juramento del Umbral','El Ojo Insomne','Lágrima de Tusi','Promesa Rota','Corona del Rey Caído',
+  'Fauces del Abismo','Canción de Ceniza','El Vigía Eterno','Pacto de Sangre','Aliento del Oráculo','Silencio del Osario'];
 const inscriptions = [
   ['Brasa','fire',2],['Escarcha','ice',2],['Acero','physical',2],['Éter','arcane',2],['Umbría','shadow',2],['Brújula','reach',1],
   ['Muralla','ward',1], ['Centella','critical',8], ['Pulso','vitality',5]
@@ -92,27 +125,62 @@ function floorRandom(seed) {
     return seed/4294967296;
   };
 }
-function rollItem(s,rng,{bonus=0,gear=false}={}) {
+/** Elige con pesos: [[valor,peso],...]. */
+function weighted(entries,rng){
+  const total=entries.reduce((sum,[,w])=>sum+w,0);
+  let r=rng()*total;
+  for(const [value,w] of entries){if((r-=w)<0)return value;}
+  return entries.at(-1)[0];
+}
+const tierWeights=[100,45,22,11,5];
+/**
+ * Tier de un modificador: solo los que el ilvl permite. Un tier recién
+ * desbloqueado es raro; con cada nivel por encima de su mínimo, los tiers
+ * antiguos pierden peso y los altos se vuelven proporcionalmente más comunes.
+ */
+function rollTier(tiers,ilvl,rng){
+  const options=tiers.map((tier,i)=>[i,tier[0]<=ilvl?tierWeights[i]*Math.pow(.62,ilvl-tier[0]):0]).filter(([,w])=>w>0);
+  return weighted(options,rng);
+}
+/** Rareza según el nivel del objeto y la suerte extra (élite, eventos). */
+function rollRarity(ilvl,bonus,rng,minGrade=0){
+  const weights=[60,30,8+ilvl*2.2,1+ilvl*1.1].map((w,i)=>i<minGrade?0:w*(i>=2?1+bonus*3:1));
+  return weighted(weights.map((w,i)=>[i,w]),rng);
+}
+export const itemLevel=(s,extra=0)=>Math.max(1,s.floor+extra);
+export function rollItem(s,rng,{bonus=0,gear=false,ilvl,minGrade=0}={}) {
   const itemId = ++s.itemId;
-  if (!gear&&rng()<.28) {
+  const level=ilvl??itemLevel(s);
+  if (!gear&&!minGrade&&rng()<.22) {
     const [name,key,value]=pick(inscriptions,rng);
-    return {id:itemId,name:'Runa de '+name,kind:'rune',price:7+2*s.floor,stats:{[key]:value}};
+    const power=value*(1+Math.floor((level-1)/3));
+    return {id:itemId,name:'Runa de '+name,kind:'rune',ilvl:level,price:7+2*level,stats:{[key]:power}};
   }
   const slot=pick(Object.keys(slots),rng);
-  const name=pick(bases[slot],rng);
-  const luck=rng()+s.floor*.055+bonus;
-  const rarity=luck>1.08?3:luck>.83?2:luck>.53?1:0;
-  const choices=[...pools[slot]];
-  if(slot==='weapon'&&actionWeapons.has(name)&&rarity>=2)choices.push('action');
-  const stats={};
-  for (let i=0;i<Math.min(choices.length,1+rarity);i++) {
-    const key=choices.splice(roll(0,choices.length-1,rng),1)[0];
-    if(key==='element')stats[pick(damageKeys,rng)]=roll(1,2+rarity,rng);
-    else if(key==='vitality')stats[key]=roll(3,5+rarity*3,rng);
-    else if(key==='critical')stats[key]=roll(4,7+3*rarity,rng);
-    else stats[key]=key==='ward'&&rarity>=2?2:1;
+  const base=pick(bases[slot],rng);
+  const grade=rollRarity(level,bonus,rng,minGrade);
+  const counts=[rng()<.5?[1,0]:[0,1],[1,1],rng()<.5?[2,1]:[1,2],[2,2]][grade];
+  const pool={prefix:[...slotAffixes[slot].prefix],suffix:slotAffixes[slot].suffix.filter(stat=>stat!=='action'||(slot==='amulet'||actionWeapons.has(base)))};
+  const mods=[];
+  for(const [type,count] of [['prefix',counts[0]],['suffix',counts[1]]]){
+    for(let i=0;i<count;i++){
+      const available=pool[type].filter(stat=>affixes[type][stat].some(tier=>tier[0]<=level));
+      if(!available.length)break;
+      const stat=pick(available,rng);
+      pool[type].splice(pool[type].indexOf(stat),1);
+      const tierIndex=rollTier(affixes[type][stat],level,rng);
+      const [,low,high,label]=affixes[type][stat][tierIndex];
+      mods.push({type,stat,tier:tierIndex+1,tiers:affixes[type][stat].length,value:roll(low,high,rng),label});
+    }
   }
-  return {id:itemId,name,kind:'gear',slot,rarity:rarities[rarity],grade:rarity,stats,price:6+rarity*7+s.floor,socket:null};
+  const stats={};
+  for(const mod of mods)stats[mod.stat]=(stats[mod.stat]||0)+mod.value;
+  const prefix=mods.find(m=>m.type==='prefix')?.label;
+  const suffix=mods.find(m=>m.type==='suffix')?.label;
+  const name=grade===3?pick(legendaryNames,rng):grade===2?pick(rareFirst,rng)+' '+pick(rareSecond,rng):
+    [base,prefix?.toLowerCase(),suffix].filter(Boolean).join(' ');
+  const price=5+grade*8+mods.reduce((sum,m)=>sum+m.tier*2,0)+level;
+  return {id:itemId,name,base,kind:'gear',slot,rarity:rarities[grade],grade,ilvl:level,affixes:mods,stats,price,socket:null};
 }
 function sumStats(equipment) {
   const totals=Object.fromEntries(Object.keys(statNames).map(key=>[key,0]));
@@ -121,7 +189,7 @@ function sumStats(equipment) {
       for (const [key,value] of Object.entries(stats)){
         if(!Object.hasOwn(totals,key))continue;
         if(key==='movement'&&gear.slot!=='boots')continue;
-        if(key==='action'&&gear.slot!=='amulet'&&!(gear.slot==='weapon'&&actionWeapons.has(gear.name)))continue;
+        if(key==='action'&&gear.slot!=='amulet'&&!(gear.slot==='weapon'&&actionWeapons.has(gear.base||gear.name)))continue;
         totals[key]+=value;
       }
     }
@@ -474,7 +542,8 @@ function finish(s,rng) {
       p.xp=100;
       p.trained=false;
       p.gold+=Math.round((10+s.floor*4)*(elite?1.5:1));
-      s.offers[p.id]=Array.from({length:3},(_,i)=>rollItem(s,rng,elite?{bonus:.35,gear:i===0}:{}));
+      const ilvl=itemLevel(s,(elite?1:0)+(s.floor%3===0?2:0));
+      s.offers[p.id]=Array.from({length:3},(_,i)=>rollItem(s,rng,{ilvl,...(elite?{bonus:.35,gear:i===0}:{})}));
     }
     s.stock=[];
     note(s,elite?'Victoria de élite · Botín mejorado y más tusi.':'Victoria · Elige botín y prepara tu equipo.');
@@ -662,11 +731,11 @@ const events={
     {label:'Llenar los odres',detail:'Todo el grupo recupera un 30 % de su vida.',apply:s=>healParty(s,.3)},
     {label:'Seguir adelante',detail:'Cada jugador recibe 8 de tusi.',apply:s=>{for(const p of s.players)p.gold+=8;}}]},
   altar:{title:'Altar de sangre',text:'Un altar antiguo exige un tributo. Las runas talladas laten al acercaros.',options:[
-    {label:'Ofrecer sangre',detail:'Todos pierden un 25 % de su vida actual y reciben un objeto raro o mejor.',apply:(s,rng)=>{hurtParty(s,.25);giveAll(s,()=>rollItem(s,rng,{bonus:.6,gear:true}));}},
+    {label:'Ofrecer sangre',detail:'Todos pierden un 25 % de su vida actual y reciben un objeto raro o mejor.',apply:(s,rng)=>{hurtParty(s,.25);giveAll(s,()=>rollItem(s,rng,{gear:true,minGrade:2,ilvl:itemLevel(s,1)}));}},
     {label:'Rezar',detail:'+1 PA en el próximo combate, pero los enemigos tendrán un 15 % más de vida.',apply:s=>{addMod(s,'ap',1);s.pending.enemyHp=(s.pending.enemyHp||1)*1.15;}},
     {label:'Marcharse',detail:'No ocurre nada.',apply:()=>{}}]},
   chest:{title:'Cofre encadenado',text:'Un cofre cubierto de cadenas. Algo dentro tintinea… y algo en la oscuridad os observa.',options:[
-    {label:'Forzar el cofre',detail:'Cada uno recibe un objeto épico, pero los enemigos del próximo combate tendrán un 25 % más de vida.',apply:(s,rng)=>{giveAll(s,()=>rollItem(s,rng,{bonus:1.2,gear:true}));s.pending.enemyHp=(s.pending.enemyHp||1)*1.25;}},
+    {label:'Forzar el cofre',detail:'Cada uno recibe un objeto legendario, pero los enemigos del próximo combate tendrán un 25 % más de vida.',apply:(s,rng)=>{giveAll(s,()=>rollItem(s,rng,{gear:true,minGrade:3,ilvl:itemLevel(s,1)}));s.pending.enemyHp=(s.pending.enemyHp||1)*1.25;}},
     {label:'Buscar la llave',detail:'Cada uno recibe 15 de tusi.',apply:s=>{for(const p of s.players)p.gold+=15;}}]},
   camp:{title:'Campamento abandonado',text:'Restos de una hoguera todavía tibia. Alguien estuvo aquí hace poco.',needsHeroes:true,options:[
     {label:'Descansar',detail:'Todo el grupo recupera un 50 % de su vida.',apply:s=>healParty(s,.5)},
@@ -696,7 +765,7 @@ function startShop(s,rng){
   s.vote=null;
   s.event=null;
   s.ready=[];
-  s.stock=Array.from({length:6},(_,i)=>rollItem(s,rng,{bonus:.12,gear:i<4}));
+  s.stock=Array.from({length:6},(_,i)=>rollItem(s,rng,{bonus:.12,gear:i<4,ilvl:itemLevel(s)}));
   s.turnStarted=Date.now();
   s.deadline=s.turnStarted+shopTime;
   note(s,'Piso '+s.floor+' · Tienda del mercader.');

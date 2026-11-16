@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices} from './engine.js';
+import {rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -168,11 +168,12 @@ test('el generador solo ofrece PM en botas y PA en amuletos y armas elegibles',(
     const hero=s.units[0], foe=s.units[1];
     foe.pos=hero.pos-1;
     foe.hp=1;
+    s.floor=4;
     act(s,'p0',{type:'skill',skill:0,pos:foe.pos},rand);
     for(const item of [...s.offers.p0,...s.stock]){
       if(item.stats.movement){assert.equal(item.slot,'boots');seen.add('PM');}
       if(item.stats.action){
-        assert.ok(item.slot==='amulet'||(item.slot==='weapon'&&['Cetro de ónice','Lanza de vigía'].includes(item.name)));
+        assert.ok(item.slot==='amulet'||(item.slot==='weapon'&&['Cetro de ónice','Lanza de vigía'].includes(item.base)));
         seen.add('PA');
       }
     }
@@ -434,4 +435,28 @@ test('los jugadores pueden darse objetos y tusi fuera del combate',()=>{
   assert.throws(()=>act(s,'p0',{type:'give',to:'p0',gold:1},rng),/otro jugador/);
   enterCombat(s);
   assert.throws(()=>act(s,s.units[s.turn].id,{type:'give',to:'p1',gold:1},rng),/fuera del combate/);
+});
+
+test('los objetos siguen las reglas de rareza, afijos/sufijos y tiers por nivel',()=>{
+  const sample=(floor,n=600)=>{
+    let x=floor*977;const random=()=>((x=(Math.imul(x,1664525)+1013904223)>>>0)/4294967296);
+    const s=create();s.floor=floor;
+    return Array.from({length:n},()=>rollItem(s,random,{gear:true}));
+  };
+  const rules=[[1,0,1,0],[1,1,1,1],[3,3,1,2],[2,2,2,2]];
+  for(const item of sample(3)){
+    const pre=item.affixes.filter(a=>a.type==='prefix').length;
+    const suf=item.affixes.filter(a=>a.type==='suffix').length;
+    const [total,,maxPre,maxSuf]=[pre+suf,0,2,2];
+    if(item.grade===0)assert.equal(total,1);
+    if(item.grade===1)assert.deepEqual([pre,suf],[1,1]);
+    if(item.grade===2)assert.ok((pre===2&&suf===1)||(pre===1&&suf===2));
+    if(item.grade===3)assert.deepEqual([pre,suf],[2,2]);
+    assert.equal(new Set(item.affixes.map(a=>a.stat)).size,item.affixes.length);
+  }
+  const avgTier=items=>{const t=items.flatMap(i=>i.affixes.map(a=>a.tier));return t.reduce((a,b)=>a+b,0)/t.length;};
+  const early=sample(1),late=sample(6);
+  assert.ok(avgTier(late)>avgTier(early)+.8);
+  assert.ok(early.every(i=>i.affixes.every(a=>a.tier<=2)));
+  assert.ok(late.filter(i=>i.grade>=2).length>early.filter(i=>i.grade>=2).length);
 });

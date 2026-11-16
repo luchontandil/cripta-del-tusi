@@ -104,6 +104,45 @@ export function encounter(floor,size) {
 }
 export const distance = (s,a,b) => Math.abs(a%s.width-b%s.width)+Math.abs(Math.floor(a/s.width)-Math.floor(b/s.width));
 const adjacent = (s,pos) => [pos-s.width,pos+s.width,pos-1,pos+1].filter(n=>n>=0&&n<s.width*s.height&&distance(s,pos,n)===1);
+const layouts=[
+  {name:'Galería de pilares', pillars:['.......','..#.#..','.......','...#...','.......','..#.#..','.......']},
+  {name:'Pasajes quebrados', pillars:['.......','##...#.','.#...#.','.......','...##..','...#...','.......']},
+  {name:'Patio de losas', pillars:['.......','..##...','..#....','.....#.','.....#.','..#....','.......']},
+  {name:'Cruce de sepulcros', pillars:['.......','..#....','..#.#..','.......','.#..#..','....#..','.......']},
+  {name:'Cámaras gemelas', pillars:['.......','.#...#.','.#...#.','.......','..#.#..','..#.#..','.......']}
+];
+function makeLayout(s,rng){
+  const available=layouts.filter(layout=>layout.name!==s.layoutName);
+  const layout=pick(available,rng);
+  const flip=rng()<.5;
+  const invert=rng()<.5;
+  const w=s.width;
+  const h=s.height;
+  const offset=Math.floor((w-7)/2);
+  const top=Math.floor((h-7)/2);
+  const walls=[];
+  layout.pillars.forEach((row,y)=>[...row].forEach((tile,x)=>{
+    if(tile!=='#')return;
+    const col=offset+(flip?6-x:x);
+    const line=top+(invert?6-y:y);
+    if(col>=4&&col<=w-5)walls.push(line*w+col);
+  }));
+  const boundary=new Set(walls);
+  const candidates=Array.from({length:w*h},(_,pos)=>pos).filter(pos=>pos%w>=4&&pos%w<=w-5&&Math.floor(pos/w)>0&&Math.floor(pos/w)<h-1&&!boundary.has(pos));
+  function connected(){
+    const visited=new Set([0]);
+    for(const pos of visited)for(const next of adjacent(s,pos)){
+      if(!boundary.has(next))visited.add(next);
+    }
+    return visited.size+boundary.size===w*h;
+  }
+  for(let i=0;i<2+Math.floor(s.floor/2)&&candidates.length;i++){
+    const pos=candidates.splice(roll(0,candidates.length-1,rng),1)[0];
+    boundary.add(pos);
+    if(!connected())boundary.delete(pos);
+  }
+  return {name:layout.name,walls:[...boundary]};
+}
 function openFloor(s,rng) {
   s.phase='combat';
   s.floor++;
@@ -124,15 +163,17 @@ function openFloor(s,rng) {
       hp:previous?Math.min(max,Math.max(previous.hp,0)+Math.ceil(max*.45)):max,
       pos:w*(mid+[0,-1,1,-2][i])+1,effects:{}};
   });
-  const foes=encounter(s.floor,s.players.length).map((u,i)=>({...u,max:u.hp,pos:w*(i%s.height)+w-2-(i%2)}));
-  const candidates=Array.from({length:w*s.height},(_,pos)=>pos).filter(pos=>pos%w>=4&&pos%w<=w-5&&Math.floor(pos/w)!==mid);
-  s.walls=[];
-  for(let i=0;i<Math.min(candidates.length,3+s.floor+s.players.length);i++) {
-    s.walls.push(candidates.splice(roll(0,candidates.length-1,mapRng),1)[0]);
-  }
+  const layout=makeLayout(s,mapRng);
+  s.layoutName=layout.name;
+  s.walls=layout.walls;
+  const spawns=Array.from({length:(s.height-2)*2},(_,i)=>w*(1+Math.floor(i/2))+w-2-i%2);
+  const foes=encounter(s.floor,s.players.length).map(u=>{
+    const pos=spawns.splice(roll(0,spawns.length-1,mapRng),1)[0];
+    return {...u,max:u.hp,pos};
+  });
   s.units=[...heroes,...foes].sort((a,b)=>b.initiative-a.initiative);
   s.turn=0;
-  note(s,'Piso '+s.floor+' · '+(s.floor%3===0?'Cámara del jefe':s.biome==='roots'?'Galería de raíces':'Cripta hundida'));
+  note(s,'Piso '+s.floor+' · '+s.layoutName+(s.floor%3===0?' · Cámara del jefe':''));
   beginTurn(s);
 }
 export function lineOfSight(s,from,to) {

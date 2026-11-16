@@ -27,21 +27,52 @@ function btn(label,action,pressed){
   return b;
 }
 const actionButton=(label,type,data={})=>btn(label,()=>send({type,...data}));
-function paintClock(active){
+function paintClock(){
   const clock=el('clock');
-  clock.hidden=!active;
-  if(!active)return;
   const remaining=Math.max(0,state.deadline-Date.now());
   const seconds=Math.ceil(remaining/1000);
-  el('seconds').textContent=seconds+' s';
-  el('timebar').max=(state.deadline-state.turnStarted)/1000;
-  el('timebar').value=remaining/1000;
-  clock.classList.toggle('urgent',seconds<=10);
+  const duration=state.deadline-state.turnStarted;
+  el('seconds').textContent=seconds;
+  clock.style.setProperty('--time',Math.min(1,remaining/Math.max(1,duration))+'turn');
+  clock.setAttribute('aria-valuemax',Math.ceil(duration/1000));
+  clock.setAttribute('aria-valuenow',seconds);
+  clock.setAttribute('aria-valuetext',seconds+' segundos');
+  clock.classList.toggle('urgent',duration>10000&&seconds<=10);
 }
 function unitLabel(u){
   const effects=Object.entries(u.effects||{}).map(([key,value])=>iconName[key]+' '+value.value+' ('+value.turns+' t)');
   return u.name+' · '+u.hp+'/'+u.max+' PV'+(effects.length?' · '+effects.join(' · '):'');
 }
+function hideUnit(){
+  el('unit-tooltip').hidden=true;
+}
+function inspectUnit(unit,cell){
+  const tooltip=el('unit-tooltip');
+  const heading=document.createElement('strong');
+  heading.textContent=unit.name+' · '+(unit.enemy?'Enemigo':classes[unit.classId].name);
+  const effects=Object.entries(unit.effects||{}).map(([key,status])=>iconName[key]+' '+status.value+' · '+status.turns+' turno'+(status.turns===1?'':'s'));
+  const rows=[
+    'Vida: '+unit.hp+'/'+unit.max+' PV',
+    'Protección: '+(unit.stats?.ward||0)+' de reducción por golpe',
+    'Iniciativa: '+unit.initiative,
+    'Movimiento base: '+(3+(unit.stats?.movement||0))+' PM'
+  ];
+  if(unit.enemy)rows.push('Ataque: '+unit.damage+'–'+(unit.damage+2),'Alcance: '+unit.range+' casillas');
+  else rows.push(...Object.entries(unit.stats||{}).filter(([key,value])=>value&&!['ward','movement','vitality'].includes(key)).map(([key,value])=>statNames[key]+': +'+value));
+  rows.push(effects.length?'Efectos: '+effects.join(' / '):'Sin efectos activos');
+  tooltip.replaceChildren(heading,...rows.map(text=>{
+    const row=document.createElement('div');
+    row.textContent=text;
+    return row;
+  }));
+  tooltip.hidden=false;
+  const anchor=cell.getBoundingClientRect();
+  const left=Math.max(6,Math.min(anchor.left,window.innerWidth-tooltip.offsetWidth-6));
+  const above=anchor.top-tooltip.offsetHeight-7;
+  tooltip.style.left=left+'px';
+  tooltip.style.top=(above>=6?above:Math.min(anchor.bottom+7,window.innerHeight-tooltip.offsetHeight-6))+'px';
+}
+window.addEventListener('scroll',hideUnit,{passive:true});
 function initiative(turn){
   const units=state.units.length?state.units:state.players;
   return units.map(u=>{
@@ -77,28 +108,61 @@ function itemRow(item,title,actions=[]){
   row.append(...actions);
   return row;
 }
+const slotIcons={weapon:'⚔',armor:'⛨',boots:'➟',charm:'◇'};
+function inventorySlot(item,label,actions=[],fallback=''){
+  const tile=document.createElement(item?'details':'div');
+  tile.className='inventory-slot '+(item?'filled grade'+(item.grade||0):'empty');
+  const face=document.createElement(item?'summary':'span');
+  const icon=document.createElement('b');
+  icon.textContent=item?.kind==='rune'?'✧':slotIcons[item?.slot]||fallback;
+  face.append(icon);
+  if(label){
+    const name=document.createElement('small');
+    name.textContent=label;
+    face.append(name);
+  }
+  face.title=item?.name||label||'Ranura vacía';
+  if(item)face.setAttribute('aria-label',(label?label+' · ':'')+item.name);
+  tile.append(face);
+  if(item)tile.append(itemRow(item,'',actions));
+  return tile;
+}
 function renderInventory(player){
   const holder=el('inventory');
-  holder.hidden=state.phase!=='reward';
-  if(holder.hidden){holder.replaceChildren();return;}
+  const rewards=el('rewards');
+  const trading=state.phase==='reward';
+  holder.hidden=state.phase==='lobby';
+  rewards.hidden=!trading;
+  if(holder.hidden){holder.replaceChildren();rewards.replaceChildren();return;}
   const gear=panel('Equipo · '+player.gold+' oro');
+  const gearGrid=document.createElement('div');
+  gearGrid.className='equipment-grid';
   for(const [slot,label] of Object.entries(slots)){
     const item=player.equipment[slot];
-    const actions=item?[actionButton('Quitar','unequip',{slot})]:[];
-    if(item?.socket)actions.push(actionButton('Extraer runa','unsocket',{slot}));
-    gear.append(itemRow(item,label+' · ',actions));
+    const actions=item&&trading?[actionButton('Quitar','unequip',{slot})]:[];
+    if(trading&&item?.socket)actions.push(actionButton('Extraer runa','unsocket',{slot}));
+    gearGrid.append(inventorySlot(item,label,actions,slotIcons[slot]));
   }
+  gear.append(gearGrid);
   const bag=panel('Mochila');
-  if(!player.bag.length)bag.append('Vacía');
+  const bagGrid=document.createElement('div');
+  bagGrid.className='bag-grid';
   for(const item of player.bag){
     const actions=[];
-    if(item.kind==='gear')actions.push(actionButton('Equipar','equip',{item:item.id}));
-    else for(const [slot,label] of Object.entries(slots)){
-      if(player.equipment[slot])actions.push(actionButton('Engarzar en '+label.toLowerCase(),'socket',{item:item.id,slot}));
+    if(trading){
+      if(item.kind==='gear')actions.push(actionButton('Equipar','equip',{item:item.id}));
+      else for(const [slot,label] of Object.entries(slots)){
+        if(player.equipment[slot])actions.push(actionButton('Engarzar en '+label.toLowerCase(),'socket',{item:item.id,slot}));
+      }
+      actions.push(actionButton('Vender · '+(Math.floor(item.price/2)+(item.socket?Math.floor(item.socket.price/2):0))+' oro','sell',{item:item.id}));
     }
-    actions.push(actionButton('Vender · '+(Math.floor(item.price/2)+(item.socket?Math.floor(item.socket.price/2):0))+' oro','sell',{item:item.id}));
-    bag.append(itemRow(item,'',actions));
+    bagGrid.append(inventorySlot(item,'',actions));
   }
+  const visibleSlots=Math.max(12,Math.ceil(player.bag.length/4)*4);
+  for(let index=player.bag.length;index<visibleSlots;index++)bagGrid.append(inventorySlot(null,''));
+  bag.append(bagGrid);
+  holder.replaceChildren(gear,bag);
+  if(!trading){rewards.replaceChildren();return;}
   const shop=panel('Mercader');
   if(!state.stock.length)shop.append('Todo vendido');
   for(const item of state.stock){
@@ -113,7 +177,13 @@ function renderInventory(player){
     for(const item of choices)loot.append(itemRow(item,'',[actionButton('Elegir','reward',{item:item.id})]));
     loot.append(actionButton('Pasar','reward',{item:null}));
   }
-  holder.replaceChildren(loot,gear,bag,shop);
+  rewards.replaceChildren(loot,shop);
+}
+function pawnName(name){
+  const tag=document.createElement('span');
+  tag.className='pawn-name';
+  tag.textContent=name;
+  return tag;
 }
 function boardPoint(pos){
   const col=pos%state.width;
@@ -163,7 +233,9 @@ async function animate(){
     pawn.style.width=(100/state.width)+'%';
     pawn.style.height=(100/state.height)+'%';
     Object.assign(pawn.style,boardPoint(event.from));
+    const name=state.units.find(u=>u.id===event.unit)?.name;
     pawn.append(portrait(event.look));
+    if(name)pawn.append(pawnName(name));
     el('animations').append(pawn);
     updatePawns();
     let from=boardPoint(event.from);
@@ -232,6 +304,7 @@ function paintArea(area=[]){
 function drawBoard(turn,walking,skill){
   const board=el('board');
   const field=el('battlefield');
+  hideUnit();
   field.hidden=!state.units.length;
   board.replaceChildren();
   if(field.hidden)return;
@@ -277,8 +350,12 @@ function drawBoard(turn,walking,skill){
       hp.className='hp';
       hp.style.setProperty('--hp',(unit.hp/unit.max*100)+'%');
       hp.append(document.createElement('i'));
-      pawn.append(portrait(unit.look||unit.classId),hp);
+      pawn.append(portrait(unit.look||unit.classId),hp,pawnName(unit.name));
       cell.append(pawn);
+      cell.addEventListener('pointerenter',()=>inspectUnit(unit,cell));
+      cell.addEventListener('pointerleave',hideUnit);
+      cell.addEventListener('focus',()=>inspectUnit(unit,cell));
+      cell.addEventListener('blur',hideUnit);
     }
     if(glyph)cell.title=[cell.title,{damage:'Brasas',poison:'Veneno',slow:'Cadenas'}[glyph.kind],glyph.warn?'Se activa en el próximo turno del jefe':'Glifo activo'].filter(Boolean).join(' · ');
     fragment.append(cell);
@@ -292,9 +369,10 @@ function render(){
   const turn=state.units[state.turn];
   const mine=state.phase==='combat'&&turn?.id===session.id;
   const host=state.players[0]?.id===session.id;
-  const title={lobby:'Sala de expedición',combat:'Piso '+state.floor+' · '+turn?.name+(mine?' (tú)':''),reward:'Botín y mercader',won:'Expedición completada',lost:'El grupo ha caído'}[state.phase];
+  const title={lobby:'Sala de expedición',combat:'Piso '+state.floor+' · '+state.layoutName+' · '+turn?.name+(mine?' (tú)':''),reward:'Botín y mercader',won:'Expedición completada',lost:'El grupo ha caído'}[state.phase];
   el('phase').textContent=title;
-  paintClock((state.phase==='combat'&&!turn.enemy)||state.phase==='reward');
+  el('turn-bar').hidden=!['combat','reward'].includes(state.phase);
+  if(!el('turn-bar').hidden)paintClock();
   const signature=JSON.stringify([state,selected]);
   if(signature===rendered)return;
   rendered=signature;
@@ -309,6 +387,9 @@ function render(){
   }));
   const controls=el('controls');
   controls.replaceChildren();
+  el('end-turn').disabled=!mine;
+  el('pa').textContent=state.phase==='combat'&&!turn.enemy?state.ap:'—';
+  el('pm').textContent=state.phase==='combat'&&!turn.enemy?state.mp:'—';
   if(state.phase==='lobby'&&host)controls.append(actionButton('Iniciar expedición','start'));
   if(state.phase==='reward'&&host){
     const next=actionButton('Siguiente piso','next');
@@ -319,14 +400,16 @@ function render(){
   const walking=mine&&selected===null?paths(state,turn,state.mp):new Map();
   const skill=mine&&selected!==null?classes[turn.classId].skills[selected]:null;
   if(mine){
-    const stats=document.createElement('span');
-    stats.className='resource';
-    stats.textContent=state.ap+' PA · '+state.mp+' PM';
-    controls.append(stats,btn('Mover',()=>{selected=null;render();},selected===null));
+    controls.append(btn('Mover',()=>{selected=null;render();},selected===null));
     classes[turn.classId].skills.forEach(([name,cost,range,min,max,kind,symbol,minRange=0],i)=>{
-      const b=btn(name,()=>{selected=selected===i?null:i;render();},selected===i);
+      const b=btn(name,()=>selectSpell(i),selected===i);
       b.className='ability';
       b.prepend(spellIcon(kind,symbol));
+      const shortcut=document.createElement('kbd');
+      shortcut.textContent=i+1;
+      shortcut.setAttribute('aria-hidden','true');
+      b.append(shortcut);
+      b.setAttribute('aria-keyshortcuts',String(i+1));
       b.title=cost+' PA · alcance '+minRange+'–'+(range+(range>1?turn.stats.reach:0))+' · '+min+'–'+max+' '+(['heal','cleanse'].includes(kind)?'cura':'daño base');
       b.disabled=cost>state.ap;
       controls.append(b);
@@ -335,11 +418,32 @@ function render(){
     hint.id='path-status';
     hint.textContent=selected===null?'Azul: casillas a las que puedes moverte.':skill[5]==='blast'?'Morado: puntos de lanzamiento. Naranja: área de impacto.':'Morado: alcance. Dorado: objetivos válidos.';
     controls.append(hint);
-    controls.append(actionButton('Terminar turno','end'));
   }
   drawBoard(turn,walking,skill);
   renderInventory(state.players.find(p=>p.id===session.id));
 }
+function endTurn(){
+  if(state?.phase==='combat'&&state.units[state.turn]?.id===session?.id)send({type:'end'});
+}
+function selectSpell(index){
+  const unit=state?.units[state.turn];
+  if(state?.phase!=='combat'||unit?.id!==session?.id)return;
+  const skill=classes[unit.classId].skills[index];
+  if(!skill||skill[1]>state.ap)return;
+  selected=selected===index?null:index;
+  render();
+}
+el('end-turn').onclick=endTurn;
+document.addEventListener('keydown',event=>{
+  if(state?.phase!=='combat'||event.altKey||event.ctrlKey||event.metaKey)return;
+  if(event.key==='F1'){
+    event.preventDefault();
+    if(!event.repeat)endTurn();
+  }else if(/^[1-9]$/.test(event.key)&&!event.repeat&&
+    !event.target.closest?.('input, textarea, select, [contenteditable]')){
+    selectSpell(Number(event.key)-1);
+  }
+},true);
 el('copy-code').onclick=async()=>{
   try{await navigator.clipboard.writeText(session.code);el('copy-code').textContent='Copiado';setTimeout(()=>{el('copy-code').textContent='Copiar código';},1200);}
   catch{error('Código de sala: '+session.code);}
@@ -413,6 +517,7 @@ el('join').onclick=()=>enter(false);
 el('leave').onclick=()=>{
   generation++;busy=false;state=null;session=null;selected=null;rendered='';
   resetAnimation();
+  hideUnit();
   musicMode(false);
   sessionStorage.removeItem('amber-session');
   error('');render();

@@ -125,6 +125,25 @@ test('el Mago puede lanzar a una casilla vacía y dañar a dos enemigos en cruz'
   assert.equal(second.max-second.hp,8);
   assert.equal(ally.hp,ally.max);
 });
+test('los pisos alternan diseños y todas las casillas libres están conectadas',()=>{
+  const names=new Set();
+  for(let size=1;size<=4;size++){
+    const s=battle(...Array(size).fill('tirador'));
+    for(let floor=1;floor<=6;floor++){
+      names.add(s.layoutName);
+      assert.equal(paths({...s,units:[]},{pos:0},s.width*s.height).size,s.width*s.height-s.walls.length-1);
+      assert.equal(new Set(s.units.map(u=>u.pos)).size,s.units.length);
+      assert.ok(s.units.every(u=>!s.walls.includes(u.pos)));
+      if(floor===6)break;
+      const previous=s.layoutName;
+      s.phase='reward';
+      s.picks=s.players.map(p=>p.id);
+      act(s,'p0',{type:'next'},()=>((size*17+floor*13)%97)/97);
+      assert.notEqual(s.layoutName,previous);
+    }
+  }
+  assert.ok(names.size>=4);
+});
 test('dos clientes reciben la misma trayectoria completa y el cambio de turno', {timeout:10000}, async t=>{
   server.listen(0,'127.0.0.1');
   await once(server,'listening');

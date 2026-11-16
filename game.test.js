@@ -633,10 +633,10 @@ test('habilidades estilo Dofus: Ninja con shuriken, cono, línea, empuje con cho
   act(s,'p0',{type:'skill',skill:3,pos:foe.pos},()=>.5);
   assert.equal(foe.pos,g.pos-2);
   assert.ok(before-foe.hp>=4+6);
-  // Cadena del carcelero: atrae al enemigo hacia el Guardián.
+  // Gancho: atrae al enemigo en línea recta hasta el cuerpo a cuerpo.
   s.walls=[];foe.pos=g.pos-4;s.ap=6;
   act(s,'p0',{type:'skill',skill:5,pos:foe.pos},()=>.5);
-  assert.equal(foe.pos,g.pos-2);
+  assert.equal(foe.pos,g.pos-1);
   // Rango máximo: Tajo gana crítico, Golpe de brasas pasa a alcance modificable.
   const top={classId:'guardia',skillRanks:[3,1,1,1,1,1,1,3]};
   assert.equal(skillFor(top,0)[8].crit,15);
@@ -650,4 +650,30 @@ test('habilidades estilo Dofus: Ninja con shuriken, cono, línea, empuje con cho
   const [a,b]=[ninja.pos,ninja.pos-3];enemy.pos=b;
   act(n,'p0',{type:'skill',skill:6,pos:b},rng);
   assert.deepEqual([ninja.pos,enemy.pos],[b,a]);
+});
+
+test('el Guardián tiene más vida y su Gancho atrae en línea recta a aliados y enemigos hasta el cuerpo a cuerpo',()=>{
+  assert.ok(classes.guardia.hp>=56);
+  const s=battle('guardia','mago');
+  s.walls=[];s.water=[];s.traps=[];
+  const guard=s.units.find(u=>u.id==='p0'),mage=s.units.find(u=>u.id==='p1'),foe=s.units.find(u=>u.enemy);
+  const hook=classes.guardia.skills.findIndex(k=>k[0]==='Gancho');
+  guard.skillRanks[hook]=1;s.players[0].skillRanks[hook]=1;
+  s.turn=s.units.indexOf(guard);s.ap=6;
+  const w=s.width;
+  guard.pos=3*w+8;
+  for(const u of s.units)if(u!==guard)u.pos=-99;
+  foe.pos=guard.pos-4;
+  mage.pos=guard.pos-2*w-2;
+  const skill=skillFor(guard,hook);
+  assert.equal(hasRange(s,guard,mage.pos,skill),false,'nada en diagonal');
+  const hp=foe.hp;
+  act(s,'p0',{type:'skill',skill:hook,pos:foe.pos},rng);
+  assert.equal(foe.pos,guard.pos-1);
+  assert.ok(foe.hp<hp);
+  mage.pos=guard.pos+3*w;
+  const mageHp=mage.hp;
+  act(s,'p0',{type:'skill',skill:hook,pos:mage.pos},rng);
+  assert.equal(mage.pos,guard.pos+w);
+  assert.equal(mage.hp,mageHp);
 });

@@ -419,7 +419,7 @@ function skillEffectText(skill){
     venom:'Veneno: '+(o.value||3)+' PV por turno durante 2 turnos',
     blast:'Daño en área',
     push:'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' en línea (si choca, recibe daño extra)',
-    pull:'Atrae '+(o.pull||1)+(o.pull>1?' casillas':' casilla')+' hacia ti',
+    pull:o.pull==='melee'?'Atrae al objetivo (aliado o enemigo) hasta el cuerpo a cuerpo; a los aliados no les hace daño':'Atrae '+(o.pull||1)+(o.pull>1?' casillas':' casilla')+' hacia ti',
     cleanse:'Elimina todos los efectos negativos del aliado',
     heal:'Cura a un aliado o a ti mismo',
     shield:'+'+(o.value||3)+' de armadura durante 2 turnos',
@@ -451,18 +451,20 @@ function skillRows(unit,skill){
     rows.push(statRow('critical','Crítico',f.crit+' % · ×1,5'));
   }
   if(o.area)rows.push(statRow('blast','Área',areaNames[o.area]+(o.size>1?' · tamaño '+o.size:'')));
-  if(o.push||o.pull)rows.push(statRow('mp',o.push?'Empuje':'Atracción',(o.push||o.pull)+((o.push||o.pull)>1?' casillas':' casilla')));
+  if(o.push||o.pull)rows.push(statRow('mp',o.push?'Empuje':'Atrae',o.pull==='melee'?'Hasta el contacto':(o.push||o.pull)+((o.push||o.pull)>1?' casillas':' casilla')));
+  if(o.inLine)rows.push(statRow('move','Lanzar','En línea recta'));
+  if(o.anyTarget)rows.push(statRow('users','Objetivo','Aliado o enemigo'));
   rows.push(statRow('range','Alcance',(f.minRange?f.minRange+'–':'')+f.maxRange+(f.maxRange===1?' casilla':' casillas')+(f.reach?' (+'+f.reach+')':'')));
   rows.push(statRow('reach','Alcance modificable',f.modifiable?'Sí':'No',f.modifiable?'yes':'no'));
   rows.push(statRow('info','Línea de visión',o.los===false?'No necesaria':'Necesaria'));
   return rows;
 }
-function skillTipNodes(unit,index,skill,rank){
+function skillTipNodes(unit,index,skill,rank,hotkey=null){
   const [name,,,,,kind,symbol]=skill;
   const effect=skillEffectText(skill);
   const base=classes[unit.classId]?.skills[index??classes[unit.classId].skills.findIndex(s=>s[0]===name)];
   const bonus=maxBonusText(base||skill);
-  return [tipHead(spellIcon(kind,symbol),name,rank?'Nivel '+rank+' de 3':'Sin aprender',index!==null?String(index+1):null),
+  return [tipHead(spellIcon(kind,symbol),name,rank?'Nivel '+rank+' de 3':'Sin aprender',hotkey?String(hotkey):null),
     h('div','tip-stats',...skillRows(unit,skill)),
     effect?h('p','tip-note',effect):null,
     bonus?h('p','tip-note max-bonus'+(rank>=3?' active':''),icon('xp'),(rank>=3?'Rango máximo: ':'Al rango 3: ')+bonus):null].filter(Boolean);
@@ -1320,14 +1322,16 @@ function render(){
   const walking=mine&&selected===null?paths(state,turn,state.mp):new Map();
   const skill=mine&&selected!==null?skillFor(turn,selected):null;
   if(mine){
+    let slot=0;
     classes[turn.classId].skills.forEach((_,i)=>{
       const current=skillFor(turn,i);
       if(!current)return;
+      const hotkey=++slot;
       const [name,cost,range,min,max,kind,symbol,minRange=0]=current;
       const b=btn('',()=>selectSpell(i),selected===i);
       b.className='ability';
       const rank=turn.skillRanks[i];
-      const key=h('kbd',null,String(i+1));
+      const key=h('kbd',null,String(hotkey));
       key.setAttribute('aria-hidden','true');
       b.append(spellIcon(kind,symbol),h('span','ability-name',name),h('span','ability-cost stat-pa',cost+' PA'),key);
       if(rank>1)b.append(h('span','ability-rank',rank+'/3'));
@@ -1335,13 +1339,13 @@ function render(){
         const element=skillElement(turn,current);
         b.append(h('span','ability-element element-'+element,icon(element)));
       }
-      b.setAttribute('aria-keyshortcuts',String(i+1));
+      b.setAttribute('aria-keyshortcuts',String(hotkey));
       const maxRange=range+(modifiableRange(current)?turn.stats.reach:0);
       const healing=['heal','cleanse'].includes(kind);
       b.setAttribute('aria-description',cost+' PA · alcance '+minRange+'–'+maxRange);
       b.onpointerenter=b.onfocus=()=>{
         const rect=b.getBoundingClientRect();
-        showTip(skillTipNodes(turn,i,current,rank),{left:rect.left,top:rect.top,bottom:rect.bottom},'tip-skill');
+        showTip(skillTipNodes(turn,i,current,rank,hotkey),{left:rect.left,top:rect.top,bottom:rect.bottom},'tip-skill');
       };
       b.onpointerleave=b.onblur=hideUnit;
       b.disabled=cost>state.ap;
@@ -1391,7 +1395,11 @@ document.addEventListener('keydown',event=>{
     if(!event.repeat)endTurn();
   }else if(/^[1-9]$/.test(event.key)&&!event.repeat&&
     !event.target.closest?.('input, textarea, select, [contenteditable]')){
-    selectSpell(Number(event.key)-1);
+    // Las teclas siguen el orden de la barra: 1 = primera habilidad aprendida, 2 = la segunda...
+    const unit=state.units[state.turn];
+    const learned=classes[unit.classId].skills.map((_,i)=>i).filter(i=>skillFor(unit,i));
+    const index=learned[Number(event.key)-1];
+    if(index!==undefined)selectSpell(index);
   }
 },true);
 el('copy-code').onclick=async()=>{

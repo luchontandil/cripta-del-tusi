@@ -5,13 +5,13 @@
  * max: bonificación al llegar a rango 3 → {range:1}|{modifiable:true}|{crit:10}|{cost:-1}|{value:1}|{push:1}|{size:1}.
  */
 export const classes = {
-  guardia: {name:'Guardián', hp:46, initiative:10, skills:[
+  guardia: {name:'Guardián', hp:58, initiative:10, skills:[
     ['Tajo',2,1,7,10,'damage','⚔',0,{element:'physical',max:{crit:15}}],
     ['Quebrar armadura',2,1,3,5,'expose','✷',0,{element:'physical',value:3,max:{value:2}}],
     ['Segundo aliento',2,0,5,8,'heal','✚',0,{max:{range:2}}],
     ['Empujón de escudo',2,1,4,6,'push','➶',0,{element:'physical',push:3,max:{push:1}}],
     ['Barrido',3,1,5,8,'damage','⚔',0,{element:'physical',area:'cone',max:{cost:-1}}],
-    ['Cadena del carcelero',2,4,3,5,'pull','↢',2,{element:'physical',pull:2,max:{range:1}}],
+    ['Gancho',2,4,2,4,'pull','↢',2,{element:'physical',pull:'melee',inLine:true,anyTarget:true,max:{range:1}}],
     ['Muralla',2,3,0,0,'shield','⛨',0,{value:3,max:{value:1}}],
     ['Golpe de brasas',2,2,8,12,'damage','✹',0,{element:'fire',max:{modifiable:true}}]
   ]},
@@ -1185,6 +1185,8 @@ export function hasRange(s,unit,pos,skill) {
   const [,cost,range,,,,,min=0]=skill;
   if(!onBoard(s,pos)||s.walls.includes(pos)||cost>s.ap)return false;
   const d=distance(s,unit.pos,pos);
+  // Hechizos en línea recta: solo en la misma fila o columna que el lanzador.
+  if(skillOptions(skill).inLine&&pos%s.width!==unit.pos%s.width&&Math.floor(pos/s.width)!==Math.floor(unit.pos/s.width))return false;
   return d>=min&&d<=range+(modifiableRange(skill)?(unit.stats?.reach||0):0);
 }
 export function inRange(s,unit,pos,skill) {
@@ -1236,7 +1238,7 @@ export function spellArea(s,pos,skill,caster=null) {
 }
 export function targetable(s,unit,target,skill) {
   if(!target||!alive(target)||!inRange(s,unit,target.pos,skill))return false;
-  if(skill[5]==='swap')return target!==unit;
+  if(skill[5]==='swap'||skillOptions(skill).anyTarget)return target!==unit;
   return !!target.enemy!==supportKinds.includes(skill[5]);
 }
 /** Empuja (o atrae) a una unidad casilla a casilla; si choca, recibe daño por cada casilla que faltaba. */
@@ -1280,7 +1282,8 @@ function applySkill(s,unit,target,skill,rng){
     note(s,unit.name+' intercambia su posición con '+target.name+'.');
     return;
   }
-  if(max>0){
+  // Los hechizos que pueden apuntar a aliados (como el Gancho) no les hacen daño.
+  if(max>0&&!!target.enemy!==!!unit.enemy){
     const element=skillElement(unit,skill);
     const critical=rng()<Math.min(1,critChance(unit)+(opts.crit||0)/100);
     hit(s,unit,target,roll(min,max,rng)+(unit.stats?.[element]||0),'damage',critical,element);
@@ -1290,7 +1293,7 @@ function applySkill(s,unit,target,skill,rng){
   if(kind==='slow')effect(target,'slow',value||2,1);
   if(kind==='venom'){effect(target,'poison',value||3,2);note(s,target.name+' queda envenenado.');}
   if(kind==='push')shove(s,unit,target,opts.push||1,false);
-  if(kind==='pull')shove(s,unit,target,opts.pull||1,true);
+  if(kind==='pull')shove(s,unit,target,opts.pull==='melee'?Math.max(0,distance(s,unit.pos,target.pos)-1):opts.pull||1,true);
 }
 function gearAction(s,p,a,rng) {
   const bagIndex=p.bag.findIndex(item=>item.id===a.item);

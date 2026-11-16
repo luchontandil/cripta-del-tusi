@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#17131c"><title>Cripta del tusi</title><link rel="stylesheet" href="./style.css"></head>
+<body><main>
+<header><div class="crest" aria-hidden="true">◆</div><h1>Cripta del tusi</h1><p>Una expedición táctica para 1–4 aventureros</p></header>
+<section id="entry" class="panel">
+  <label>Nombre <input id="name" maxlength="22" placeholder="Aventurero"></label>
+  <label>Clase <select id="class"><option value="guardia">Guardián</option><option value="tirador">Tirador</option><option value="mistico">Místico</option></select></label>
+  <button id="solo" class="primary">Jugar en solitario</button>
+  <details><summary>Jugar con amigos</summary>
+    <label>Dirección del servidor <input id="server" type="url" placeholder="https://tu-servidor.example"></label>
+    <button id="create">Crear sala</button>
+    <label>Código de sala <input id="code" maxlength="6" placeholder="A1B2C3"></label>
+    <button id="join">Unirse</button>
+  </details>
+</section>
+<p id="error" role="status"></p>
+<section id="game" hidden>
+  <div class="status"><div id="room"></div><button id="leave">Salir</button></div>
+  <div class="layout">
+    <div><h2 id="phase"></h2><div id="board"></div><div id="controls"></div></div>
+    <aside class="panel"><h2>Expedición</h2><ol id="turns"></ol><h2>Registro</h2><ul id="log"></ul></aside>
+  </div>
+</section>
+</main><script type="module" src="./client.js"></script></body></html>

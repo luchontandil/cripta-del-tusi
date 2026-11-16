@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -75,8 +75,8 @@ test('la vulnerabilidad se aplica a otro atacante y el clérigo cura a un aliado
 });
 test('el jefe anuncia una sola cruz y, al activarla en su turno, las cadenas dañan y restan PM',()=>{
   const s=battle('tirador');
-  s.route=makeRoute(rng,2);
-  s.floor=15;
+  s.route=makeRoute(rng,1);
+  s.floor=7;
   s.phase='reward';
   s.picks=['p0'];
   act(s,'p0',{type:'next'},rng);
@@ -482,7 +482,7 @@ test('los enemigos se adaptan al poder real del grupo',()=>{
 });
 
 test('cada jefe usa sus poderes sin romper el combate',()=>{
-  for(const [boss,floor] of [['cerberus',4],['oracle',8],['skeletonking',12],['umbralking',16],['firedemon',20],['vampqueen',24]]){
+  for(const [boss,floor] of [['skeletonking',4],['umbralking',8],['cerberus',12],['sporemother',16],['oracle',20],['vampqueen',20],['firedemon',24]]){
     const s=battle('guardia','mago');
     s.walls=[];s.water=[];s.traps=[];
     s.floor=floor;
@@ -501,6 +501,7 @@ test('cada jefe usa sus poderes sin romper el combate',()=>{
     assert.equal(s.phase,'combat',boss);
     if(boss==='skeletonking')assert.ok(s.units.some(u=>u.minion),'el Rey Osario invoca');
     if(boss==='cerberus')assert.ok(heroes.some(h=>h.hp<999),'Cancerbero muerde');
+    if(boss==='sporemother')assert.ok(s.units.some(u=>u.minion&&u.look==='plant'),'la Madre Espora hace brotar plantas');
   }
 });
 test('una partida completa recorre los 3 actos y termina en victoria',()=>{
@@ -663,7 +664,7 @@ test('el Guardián tiene más vida y su Gancho atrae en línea recta a aliados y
   const w=s.width;
   guard.pos=3*w+8;
   for(const u of s.units)if(u!==guard)u.pos=-99;
-  foe.pos=guard.pos-4;
+  foe.pos=guard.pos-4;foe.stats.ward=0;
   mage.pos=guard.pos-2*w-2;
   const skill=skillFor(guard,hook);
   assert.equal(hasRange(s,guard,mage.pos,skill),false,'nada en diagonal');
@@ -676,4 +677,31 @@ test('el Guardián tiene más vida y su Gancho atrae en línea recta a aliados y
   act(s,'p0',{type:'skill',skill:hook,pos:mage.pos},rng);
   assert.equal(mage.pos,guard.pos+w);
   assert.equal(mage.hp,mageHp);
+});
+
+test('cada acto tiene su ambientación, su fauna y salas generadas al azar',()=>{
+  assert.deepEqual(actBiomes,['crypt','jungle','hell']);
+  const looks=act=>new Set(Array.from({length:8},(_,i)=>encounter((act-1)*8+1+i,4,{elite:i%3===0})).flat().map(u=>u.look));
+  const crypt=looks(1),jungle=looks(2),hell=looks(3);
+  assert.ok(crypt.has('skeleton')&&crypt.has('slime'));
+  assert.ok(jungle.has('slug')&&jungle.has('bat')&&jungle.has('plant'));
+  assert.ok(hell.has('lavaslime')&&hell.has('imp'));
+  assert.ok(!jungle.has('skeleton')&&!hell.has('slug')&&!crypt.has('lavaslime'));
+  // Una partida real: cada sala nueva sale distinta (obstáculos, contorno, estilo y nombre).
+  let r=7;
+  const seq=()=>{r=(r*16807)%2147483647;return r/2147483647;};
+  const s=create();join(s,'p0','A','guardia');act(s,'p0',{type:'start'},seq);
+  const seen=new Set(),styles=new Set(),names=new Set();
+  for(let i=0;i<22;i++){
+    for(let k=0;k<8&&s.phase!=='combat';k++){
+      if(s.phase==='map'){const o=Math.max(0,s.vote.options.findIndex(id=>s.route.rows.flat().find(n=>n.id===id).kind==='combat'));act(s,'p0',{type:'vote',option:o},seq);}
+      else if(s.phase==='event')act(s,'p0',{type:'vote',option:0},seq);
+    }
+    assert.equal(s.phase,'combat');
+    assert.equal(s.biome,actBiomes[s.act-1]);
+    seen.add(s.walls.join(',')+'|'+s.voids.join(','));styles.add(s.layoutStyle);names.add(s.layoutName);
+    s.phase='reward';s.picks=['p0'];act(s,'p0',{type:'next'},seq);
+  }
+  assert.equal(seen.size,22);
+  assert.ok(styles.size>=5&&names.size>=18,styles.size+' estilos, '+names.size+' nombres');
 });

@@ -1,32 +1,43 @@
 import * as T from './three.module.js';
-import {miniature,obstacle,piece,solid} from './models3d.js?v=22';
-import {playerColors} from './engine.js?v=22';
+import {miniature,obstacle,piece,solid} from './models3d.js?v=23';
+import {playerColors} from './engine.js?v=23';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
 const tilesets={
-  crypt:['#3e485e','#4c506a','#41475c','#575970','#464d63'],
+  crypt:['#2f3446','#383c50','#2c3142','#41435a','#343a4c'],
+  jungle:['#2c4322','#344d27','#283d1f','#3c572c','#304824'],
   roots:['#3c524e','#465c50','#384a4a','#4e5f55','#415450'],
   bones:['#4e4840','#5a5246','#474036','#625a4c','#514a3e'],
   hell:['#3e2420','#4a2a22','#36201c','#542e24','#41261f']
 };
-const biomeLight={crypt:'#ffb46b',roots:'#c1f195',bones:'#9dffb8',hell:'#ff6a2a'};
-const biomeFog={crypt:'#100d1a',roots:'#0d1412',bones:'#12110e',hell:'#1a0806'};
+const biomeLight={crypt:'#ffa45a',jungle:'#e8ff8a',roots:'#c1f195',bones:'#9dffb8',hell:'#ff6a2a'};
+const biomeFog={crypt:'#07060d',jungle:'#0c1a0e',roots:'#0d1412',bones:'#12110e',hell:'#1a0806'};
 const overlayColors={walk:'#448ead',cast:'#725298',aim:'#f1bf71',route:'#b3efff',area:'#ed8855',blocked:'#b34255',damage:'#ea6a50',poison:'#9abe56',slow:'#719add'};
 const ink='#121423';
 const flatTile=new T.PlaneGeometry(1,1).rotateX(-Math.PI/2);
 const waterGeometry=new T.PlaneGeometry(1,1,6,6).rotateX(-Math.PI/2);
 let waterMaterial=null;
 /** Agua animada: olas suaves, reflejos y espuma en los bordes de la casilla. */
-function makeWater(clockUniform){
-  if(waterMaterial)return waterMaterial;
-  waterMaterial=new T.ShaderMaterial({
-    uniforms:{time:clockUniform},
+/** Colores del líquido: agua en la mazmorra, ciénaga en la jungla, lava en el infierno. */
+const liquids={
+  crypt:{deep:[.02,.13,.24],mid:[.06,.36,.52],sky:[.55,.75,.95],foam:[.85,.95,1],glow:0},
+  jungle:{deep:[.02,.08,.03],mid:[.1,.24,.08],sky:[.3,.42,.22],foam:[.5,.62,.32],glow:0},
+  hell:{deep:[.45,.05,0],mid:[1,.42,.05],sky:[1,.85,.35],foam:[1,.95,.6],glow:1}
+};
+const waterMaterials={};
+function makeWater(clockUniform,mode='crypt'){
+  const key=liquids[mode]?mode:'crypt';
+  if(waterMaterials[key])return waterMaterials[key];
+  const l=liquids[key];
+  const v3=a=>new T.Vector3(...a);
+  const waterMaterial=waterMaterials[key]=new T.ShaderMaterial({
+    uniforms:{time:clockUniform,deepC:{value:v3(l.deep)},midC:{value:v3(l.mid)},skyC:{value:v3(l.sky)},foamC:{value:v3(l.foam)},glow:{value:l.glow}},
     vertexShader:`uniform float time; varying vec2 vUv; varying vec3 vWorld;
       void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.);
         w.y+=(sin(w.x*2.6+time*1.6)+sin(w.z*3.1-time*1.2)+sin((w.x+w.z)*4.3+time*2.1)*.5)*.012;
         vWorld=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,
-    fragmentShader:`uniform float time; varying vec2 vUv; varying vec3 vWorld;
+    fragmentShader:`uniform float time; uniform vec3 deepC,midC,skyC,foamC; uniform float glow; varying vec2 vUv; varying vec3 vWorld;
       float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
       float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
         return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
@@ -42,7 +53,7 @@ function makeWater(clockUniform){
         vec3 light=normalize(vec3(-.4,.85,.3));
         float fresnel=pow(1.-max(dot(n,view),0.),3.);
         float spec=pow(max(dot(reflect(-light,n),view),0.),60.);
-        vec3 deep=vec3(.02,.13,.24),mid=vec3(.06,.36,.52),sky=vec3(.55,.75,.95);
+        vec3 deep=deepC,mid=midC,sky=skyC;
         vec3 c=mix(deep,mid,smoothstep(.25,.85,h));
         c=mix(c,sky,fresnel*.55);
         // Cáusticas: líneas brillantes que se mueven.
@@ -55,8 +66,10 @@ function makeWater(clockUniform){
         // Espuma en los bordes de la casilla.
         vec2 q=min(vUv,1.-vUv);float d=min(q.x,q.y);
         float foam=smoothstep(.12,.0,d)*smoothstep(.35,.65,noise(p*14.+time*.6));
-        c=mix(c,vec3(.85,.95,1.),foam*.65);
-        gl_FragColor=vec4(c,.9);
+        c=mix(c,foamC,foam*.65);
+        // Lava: costra oscura que se rompe y brilla.
+        if(glow>.5){float crust=smoothstep(.55,.75,noise(p*3.-time*.15));c=mix(c,vec3(.12,.03,.02),crust*.8);c*=1.+.3*sin(time*2.+p.x*3.);}
+        gl_FragColor=vec4(c,glow>.5?1.:.9);
       }`,
     transparent:true
   });
@@ -113,7 +126,8 @@ export function createIso(mount,onCell){
   const figures=new T.Group();
   const transient=new T.Group();
   scene.add(stage,figures,transient);
-  scene.add(new T.HemisphereLight('#d9dcff','#2a1a33',2.3));
+  const sky=new T.HemisphereLight('#d9dcff','#2a1a33',2.3);
+  scene.add(sky);
   const key=new T.DirectionalLight('#ffd6a8',2.7);
   key.position.set(-5,10,6);
   key.castShadow=true;
@@ -251,6 +265,11 @@ export function createIso(mount,onCell){
     gasPuffs.length=0;
     const mode=state.biome||'crypt';
     scene.fog.color.set(biomeFog[mode]||'#100d1a');
+    // Luz de cada acto: mazmorra fría y oscura, jungla verde y húmeda, infierno rojo.
+    const mood={crypt:['#9aa2d8','#140c1c',1.6,'#ffc890',2.1,'#7a82e0',1.0],jungle:['#c8e8b0','#142010',1.9,'#ffe8a0',2.4,'#6ab890',1.0],
+      hell:['#c88878','#2a0804',1.6,'#ff9a5a',2.1,'#ff4a2a',1.0]}[mode]||['#d9dcff','#2a1a33',2.3,'#ffd6a8',2.7,'#9fa6ff',1.35];
+    sky.color.set(mood[0]);sky.groundColor.set(mood[1]);sky.intensity=mood[2];
+    key.color.set(mood[3]);key.intensity=mood[4];fill.color.set(mood[5]);fill.intensity=mood[6];
     const palette=tilesets[mode]||tilesets.crypt;
     const walls=new Set(state.walls);
     const holes=new Set(state.voids||[]);
@@ -279,7 +298,7 @@ export function createIso(mount,onCell){
         // Hundimos la losa y ponemos la superficie del agua encima.
         piece(stage,'cube','#08131d',coord.x,-.2,coord.z,1,.1,1);
         piece(stage,'cube','#1f3a44',coord.x,-.12,coord.z,.98,.04,.98);
-        const surface=new T.Mesh(waterGeometry,makeWater(clock));
+        const surface=new T.Mesh(waterGeometry,makeWater(clock,mode));
         surface.position.set(coord.x,-.02,coord.z);
         surface.renderOrder=1;
         stage.add(surface);
@@ -326,7 +345,7 @@ export function createIso(mount,onCell){
       torchLights.push(light);
       const halo=piece(stage,'orb',color,x,1.36,z,.5,.5,.5,true);
       halo.material=new T.MeshBasicMaterial({color,transparent:true,opacity:.16,depthWrite:false,blending:T.AdditiveBlending});
-      const crystal=piece(stage,'gem',{roots:'#7da38f',bones:'#c9c0a8',hell:'#ff7a3a'}[mode]||'#8479b5',x+(index===0?.65:-.41),.19,z+.35,.22,.38,.20);
+      const crystal=piece(stage,'gem',{jungle:'#7acb4a',roots:'#7da38f',bones:'#c9c0a8',hell:'#ff7a3a'}[mode]||'#8479b5',x+(index===0?.65:-.41),.19,z+.35,.22,.38,.20);
       crystal.rotation.z=.32;
     });
     stage.add(hoverMarker);
@@ -344,7 +363,7 @@ export function createIso(mount,onCell){
       geometry.setAttribute('position',new T.BufferAttribute(positions,3));
       geometry.setAttribute('seed',new T.BufferAttribute(seeds,1));
       const material=new T.ShaderMaterial({
-        uniforms:{time:clock,tint:{value:new T.Color({roots:'#d4ff9c',bones:'#c9ffd8',hell:'#ff8a3a'}[mode]||'#ffc98a')}},
+        uniforms:{time:clock,tint:{value:new T.Color({jungle:'#e8ff6a',roots:'#d4ff9c',bones:'#c9ffd8',hell:'#ff8a3a'}[mode]||'#ffc98a')}},
         vertexShader:`attribute float seed; uniform float time; varying float vFade;
           void main(){
             vec3 p=position;

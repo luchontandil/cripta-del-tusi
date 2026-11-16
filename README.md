@@ -65,7 +65,13 @@ Ejecuta `npm test` para comprobar el motor y la sincronización de dos clientes.
 
 ## Actos, jefes y monstruos
 
-La expedición tiene **3 actos** (La Cripta, El Osario y El Infierno), cada uno con su propio árbol de **8 pisos** y 3–4 caminos por piso. Hay un jefe a mitad (piso 4) y otro al final (piso 8) de cada acto: Cancerbero (embestida y aullido), Oráculo de Ceniza (glifos y mirada ardiente), Rey Osario (invoca esqueletos y escudo de huesos), Rey del Umbral (glifos y cadena que arrastra), Demonio de Fuego (nova y suelo en llamas) y Reina Vampira (robo de vida y murciélagos). Cada acto tiene su fauna: limos, murciélagos, calaveras flotantes, gusanos, esqueletos, súcubos (encantan), vampiros (roban vida) y diablillos (fuego a distancia). En los dos primeros pisos de cada acto no hay élites, y en solitario hay menos enemigos y más suaves.
+La expedición tiene **3 actos**, cada uno con su ambientación, su fauna y su propio árbol de **8 pisos** con 3–4 caminos por piso:
+
+- **Acto 1 · La Mazmorra** (oscura, agua): esqueletos, limos, calaveras flotantes y gusanos. Jefes: Rey Osario (invoca esqueletos y escudo de huesos) y Rey del Umbral (glifos y cadena que arrastra).
+- **Acto 2 · La Jungla** (ciénagas, árboles y helechos): babosas (su baba resta PM), murciélagos y plantas escupidoras (envenenan, casi no se mueven). Jefes: Cancerbero (embestida y aullido) y Madre Espora (glifos de esporas y hace brotar plantas).
+- **Acto 3 · El Infierno** (ríos de lava, agujas de obsidiana): limos de lava, diablillos, vampiros y súcubos. Jefes: Oráculo de Ceniza o Reina Vampira a mitad, y Demonio de Fuego al final.
+
+Las salas se generan al azar en cada piso: contorno (formas o bordes mordidos), estilo de obstáculos (pilares, muros, salas partidas, escombros, ruinas, columnatas), simetría, charcas y trampas, con un nombre propio de la ambientación. En los dos primeros pisos de cada acto no hay élites, y en solitario hay menos enemigos y más suaves.
 
 ## Habilidades
 

@@ -918,3 +918,9 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 @media(max-width:760px){.account-form{grid-template-columns:1fr}.account-actions{margin-left:0}}
 .tip-note.max-bonus{display:flex;align-items:center;gap:6px;color:#d5b8ff;border-top:1px dashed #ffffff18;padding-top:6px}
 .tip-note.max-bonus.active{color:var(--gold)}
+
+/* Ambientación de cada acto en la vista 2D */
+.jungle .cell.wall{background:radial-gradient(circle at 45% 35%,#57a83f 0 30%,#2f6a2a 55%,#1e3a18 80%);border-color:#7acb4a44}
+.hell .cell.wall{background:linear-gradient(150deg,#2a1c22,#120c10 70%);border-color:#ff6a1a44;box-shadow:inset 0 -5px 0 #0a0608,inset 0 0 6px #ff6a1a55}
+.jungle .cell.water{background:radial-gradient(ellipse at 30% 20%,#7aa04a 0,transparent 55%),linear-gradient(160deg,#2f5a24,#0f2610 75%);border-color:#b8e07a33}
+.hell .cell.water{background:radial-gradient(ellipse at 30% 30%,#ffd36b 0,transparent 45%),linear-gradient(160deg,#ff6a1a,#8a1a04 75%);border-color:#ffb34766;box-shadow:inset 0 0 14px #3a0800cc}

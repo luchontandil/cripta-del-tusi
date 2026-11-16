@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf} from './engine.js?v=22';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=22';
-import {setupSfx} from './music.js?v=22';
-import {icon} from './icons.js?v=22';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=23';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=23';
+import {setupSfx} from './music.js?v=23';
+import {icon} from './icons.js?v=23';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -95,7 +95,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=22').then(({createIso})=>{
+import('./isometric.js?v=23').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -365,10 +365,27 @@ function glyphNodes(glyph){
   return [h('div','tip-glyph glyph-'+glyph.kind,icon('glyph'),h('div',null,h('strong',null,info.name),h('p',null,info.description),
     h('small',null,glyph.warn?'Se activa en el próximo turno del jefe.':'Activo')))];
 }
+/** Qué hace especial a cada monstruo, en una frase. */
+function traitNote(trait={}){
+  const parts=[];
+  if(trait.element&&trait.element!=='physical')parts.push('Ataca con '+elements[trait.element].toLowerCase());
+  if(trait.lifesteal)parts.push('roba vida');
+  if(trait.charm)parts.push('encanta (−1 PM)');
+  if(trait.slime)parts.push('su baba resta 1 PM');
+  if(trait.poison)parts.push('envenena');
+  if(trait.movement<0)parts.push('casi no se mueve');
+  if(trait.movement>0)parts.push('muy rápido');
+  if(!parts.length)return '';
+  const text=parts.join(', ');
+  return text[0].toUpperCase()+text.slice(1)+'.';
+}
 function terrainNodes(pos){
   const trap=state.traps?.find(t=>t.pos===pos);
   if(trap)return [h('div','tip-glyph terrain-'+trap.kind,icon(trap.kind),h('div',null,h('strong',null,trapInfo[trap.kind].name),h('p',null,trapInfo[trap.kind].description(state.floor)),h('small',null,'Afecta a héroes y monstruos')))];
-  if(state.water?.includes(pos))return [h('div','tip-glyph terrain-water',icon('water'),h('div',null,h('strong',null,'Agua'),h('p',null,'No se puede cruzar, pero no bloquea la línea de visión.')))];
+  if(state.water?.includes(pos)){
+    const liquid={jungle:'Ciénaga',hell:'Río de lava'}[state.biome]||'Agua';
+    return [h('div','tip-glyph terrain-water',icon('water'),h('div',null,h('strong',null,liquid),h('p',null,'No se puede cruzar, pero no bloquea la línea de visión.')))];
+  }
   return [];
 }
 function inspectCell(unit,cell,pos,glyph,source,skill,aim){
@@ -401,6 +418,8 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
     }
   }
   nodes.push(stats);
+  const note=unit.boss?bosses[unit.look]?.powers:traitNote(monsterTraits[unit.look]);
+  if(unit.enemy&&note)nodes.push(h('p','tip-note',note));
   const chips=effectChips(unit);
   if(chips)nodes.push(chips);
   if(glyph)nodes.push(...glyphNodes(glyph));
@@ -1213,7 +1232,7 @@ function drawBoard(turn,walking,skill){
   board.style.setProperty('--cols',state.width);
   board.className=(state.biome||'crypt')+(state.voids?.length?' shaped':'');
   const fragment=document.createDocumentFragment();
-  const shades={roots:['#55513a','#4d573b','#60573d','#3f4938'],bones:['#5a5246','#4e473c','#625a4c','#474036'],
+  const shades={jungle:['#3d5a2c','#4a6a32','#36502a','#56763a'],crypt:['#353a4c','#2f3444','#3a3e52','#2b3040'],roots:['#55513a','#4d573b','#60573d','#3f4938'],bones:['#5a5246','#4e473c','#625a4c','#474036'],
     hell:['#4a2a22','#3e2420','#542e24','#36201c']}[state.biome]||['#49524c','#3d4845','#515650','#3b4540'];
   for(let pos=0;pos<state.width*state.height;pos++){
     const unit=state.units.find(u=>u.hp>0&&u.pos===pos);

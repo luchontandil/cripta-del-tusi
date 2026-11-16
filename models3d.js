@@ -50,7 +50,7 @@ function staff(parent,color,arcane){
   piece(parent,'gem',color,0,.42,0,.19,.26,.19,true);
   if(arcane)piece(parent,'ring','#93c7ff',0,.42,0,.29,.29,.29,true);
 }
-const creatures={slime:slime,slimeking:slime,bat:bat,skull:skull,worm:worm,oracle:oracle,umbralking:umbralKing,
+const creatures={slime:slime,slimeking:slime,lavaslime:slime,slug:slug,plant:plant,sporemother:plant,bat:bat,skull:skull,worm:worm,oracle:oracle,umbralking:umbralKing,
   skeleton:skeleton,succubus:succubus,vampire:vampire,imp:imp,cerberus:cerberus,skeletonking:skeletonKing,firedemon:fireDemon,vampqueen:vampQueen};
 const boneMat=()=>new T.MeshStandardMaterial({color:'#e6dfcc',roughness:.6});
 /** Esqueleto: huesos que traquetean, mandíbula que castañetea y espada oxidada. */
@@ -483,11 +483,17 @@ function add(parent,shape,material,x,y,z,sx,sy,sz){
 /** Limo: cuerpo gelatinoso que respira, rebota al moverse y se estira al atacar. */
 function slime(kind){
   const king=kind==='slimeking';
-  const tone=king?'#c77dff':'#6fdc8c';
+  const lava=kind==='lavaslime';
+  const tone=king?'#c77dff':lava?'#ff6a1a':'#6fdc8c';
   const root=new T.Group(),figure=new T.Group(),body=new T.Group();
   root.add(figure);figure.add(body);
   const jelly=add(body,'orb',glass(tone),0,.3,0,.74,.58,.74);
-  add(body,'gem',solid(king?'#ffe27a':'#d9ff9e',true),0,.28,0,.16,.2,.16);
+  add(body,'gem',solid(king?'#ffe27a':lava?'#ffe08a':'#d9ff9e',true),0,.28,0,.16,.2,.16);
+  if(lava){
+    // Costra de roca volcánica y gotas incandescentes.
+    for(const [x,z] of [[-.22,-.1],[.18,-.2],[.05,.22],[-.1,.12]])add(body,'gem',solid('#3a1a12'),x,.52,z,.16,.1,.14).rotation.y=x*9;
+    for(const x of [-.3,.3])add(body,'orb',solid('#ffd36b',true),x,.08,.18,.07,.1,.07);
+  }
   for(const x of [-.13,.13]){
     add(body,'orb',solid('#f6fff6'),x,.42,.3,.13,.15,.08);
     add(body,'orb',solid('#14281a'),x,.42,.335,.065,.085,.04);
@@ -506,7 +512,7 @@ function slime(kind){
     const squash=1+breath*.07-hop*.12+swing*.25;
     body.scale.set(1/Math.sqrt(squash)*(1+(walking?(1-hop)*.12:0)),squash,1/Math.sqrt(squash));
     body.position.z=swing*.22;
-    jelly.material.emissiveIntensity=.18+swing*.6;
+    jelly.material.emissiveIntensity=(lava?.7+Math.sin(t*5)*.15:.18)+swing*.6;
   };
   return {root,figure,legs:[],arms:[],head:.75*size,animate};
 }
@@ -621,6 +627,82 @@ function worm(){
   };
   return {root,figure,legs:[],arms:[],head:.95*1.15,animate};
 }
+
+/** Babosa: se arrastra ondulando, con caparazón y antenas con ojos que se balancean. */
+function slug(){
+  const root=new T.Group(),figure=new T.Group(),body=new T.Group();
+  root.add(figure);figure.add(body);
+  const skin=new T.MeshStandardMaterial({color:'#a8cf4a',roughness:.3,emissive:'#3a5a10',emissiveIntensity:.25});
+  const segments=[0,1,2,3].map(i=>add(body,'orb',skin,0,.16-i*.015,.18-i*.17,.42-i*.06,.3-i*.04,.36));
+  const shell=new T.Group();shell.position.set(0,.36,-.12);body.add(shell);
+  add(shell,'orb',solid('#8a5a2a'),0,0,0,.48,.42,.4);
+  add(shell,'ring',solid('#d9a45a'),0,.02,.0,.5,.5,.5).rotation.y=Math.PI/2;
+  add(shell,'orb',solid('#b07a3a'),.0,.04,.0,.28,.24,.42);
+  const head=new T.Group();head.position.set(0,.3,.34);body.add(head);
+  add(head,'orb',skin,0,0,0,.3,.26,.28);
+  add(head,'cube',solid('#2a3a10'),0,-.04,.14,.1,.02,.02);
+  const stalks=[-1,1].map(side=>{
+    const stalk=new T.Group();stalk.position.set(side*.07,.08,.04);head.add(stalk);
+    add(stalk,'column',skin,0,.13,0,.04,.26,.04);
+    add(stalk,'orb',solid('#f6fff0'),0,.28,0,.09,.09,.09);
+    add(stalk,'orb',solid('#14200a'),0,.28,.04,.045,.045,.03);
+    return stalk;
+  });
+  // Rastro de baba brillante.
+  const trail=add(figure,'disc',glass('#c8f0a0',.35),0,.01,-.35,.5,.01,.9);
+  figure.scale.setScalar(1.25);
+  const animate=(t,{gait,swing,walking,phase})=>{
+    const speed=walking?9:2.4;
+    segments.forEach((seg,i)=>{const wave=Math.sin(t*speed-i*1.1+phase);seg.scale.y=(.3-i*.04)*(1+wave*.12);seg.position.z=.18-i*.17+wave*.02;});
+    shell.position.y=.36+Math.sin(t*speed+phase)*.025;
+    head.position.z=.34+swing*.3+(walking?Math.sin(t*speed)*.04:0);
+    head.rotation.x=-swing*.5;
+    stalks.forEach((stalk,i)=>{stalk.rotation.z=Math.sin(t*2.3+phase+i*1.7)*.35+(i?-.15:.15);stalk.rotation.x=Math.sin(t*1.7+phase+i)*.2;});
+    trail.material.opacity=.25+Math.sin(t*2+phase)*.08;
+  };
+  return {root,figure,legs:[],arms:[],head:.75*1.25,animate};
+}
+/** Planta escupidora (y la Madre Espora, su versión gigante): maceta de raíces, tallo que se mece y fauces con dientes. */
+function plant(kind){
+  const mother=kind==='sporemother';
+  const root=new T.Group(),figure=new T.Group();
+  root.add(figure);
+  add(figure,'column',solid('#4a3020'),0,.07,0,.7,.14,.7);
+  for(const a of [0,1.6,3.1,4.6])add(figure,'cone',solid('#3a2416'),Math.sin(a)*.32,.05,Math.cos(a)*.32,.1,.2,.1).rotation.set(Math.PI/2,a,0);
+  const leaves=[0,1,2,3].map(i=>{
+    const leaf=new T.Group();leaf.rotation.y=i*Math.PI/2+.4;leaf.position.y=.14;figure.add(leaf);
+    add(leaf,'orb',solid(i%2?'#4f9a34':'#7acb4a'),0,.03,.32,.22,.05,.5);
+    return leaf;
+  });
+  const stem=new T.Group();stem.position.y=.14;figure.add(stem);
+  const stalk=[0,1,2].map(i=>add(stem,'column',solid('#3f7a2a'),0,.12+i*.2,0,.09,.22,.09));
+  const head=new T.Group();head.position.y=.72;stem.add(head);
+  const petal=mother?'#7a2a8a':'#b8324a';
+  add(head,'orb',solid(petal),0,.08,0,.5,.34,.44);
+  const jaw=new T.Group();jaw.position.set(0,0,.05);head.add(jaw);
+  add(jaw,'orb',solid(petal),0,-.06,0,.46,.22,.42);
+  add(head,'orb',solid('#3a0a14'),0,0,.12,.34,.12,.24);
+  for(const x of [-.12,-.04,.04,.12]){add(head,'cone',solid('#f4ece0'),x,.04,.2,.04,.08,.04).rotation.x=Math.PI;add(jaw,'cone',solid('#f4ece0'),x+.04,-.02,.2,.04,.08,.04);}
+  const spots=[];
+  for(const [x,y,z] of [[-.16,.2,-.05],[.14,.22,.0],[0,.25,-.15],[.2,.08,-.1]])spots.push(add(head,'orb',solid(mother?'#e7f07a':'#f2e07a',true),x,y,z,.07,.07,.07));
+  const spores=[];
+  if(mother){
+    for(let i=0;i<6;i++)spores.push(add(figure,'orb',solid('#c8f07a',true),0,0,0,.07,.07,.07));
+    for(const a of [.8,2.4,4,5.6]){const vine=add(figure,'column',solid('#3f7a2a'),Math.sin(a)*.45,.35,Math.cos(a)*.45,.07,.7,.07);vine.rotation.set(Math.cos(a)*.5,0,-Math.sin(a)*.5);}
+  }
+  const size=mother?1.75:1.15;
+  figure.scale.setScalar(size);
+  const animate=(t,{swing,walking,phase})=>{
+    const sway=Math.sin(t*1.6+phase);
+    stem.rotation.z=sway*.12;stem.rotation.x=-swing*.6+Math.sin(t*1.1+phase)*.06;
+    head.rotation.x=-swing*.4;
+    jaw.rotation.x=.15+Math.max(0,Math.sin(t*2.4+phase))*.25+swing*.6;
+    leaves.forEach((leaf,i)=>{leaf.rotation.z=Math.sin(t*1.3+phase+i)*.08;});
+    spores.forEach((spore,i)=>{const a=t*.6+i*1.05;spore.position.set(Math.sin(a)*.6,.5+((t*.25+i*.17)%1)*.9,Math.cos(a)*.6);});
+    spots.forEach((spot,i)=>spot.scale.setScalar(.07*(1+.2*Math.sin(t*3+i))));
+  };
+  return {root,figure,legs:[],arms:[],head:(mother?1.15:1.05)*size,animate};
+}
 export function miniature(kind,tint=null) {
   if(creatures[kind])return creatures[kind](kind);
   let [body,accent,dark,skin]=looks[kind]||looks.enemy;
@@ -731,7 +813,9 @@ export function miniature(kind,tint=null) {
   return {root,figure,legs,arms,head:(kind==='mago'?1.36:1.23)*size};
 }
 export function obstacle(root,kind,variant) {
-  const palette={crypt:['#59667b','#354159','#8292ac','#bea0fb'],roots:['#58635d','#333e43','#77a681','#b7ed91'],
+  if(kind==='jungle'){jungleObstacle(root,variant);return;}
+  if(kind==='hell'&&variant===2){hellObstacle(root);return;}
+  const palette={crypt:['#4a5268','#2a3044','#6a7590','#a58ae8'],roots:['#58635d','#333e43','#77a681','#b7ed91'],
     bones:['#7a6e5e','#4a4036','#d6c9a8','#9dffb8'],hell:['#5a2a24','#2a1210','#b4462a','#ffb347']}[kind]||[];
   const [stone,dark,trim]=palette.length?palette:['#59667b','#354159','#8292ac'];
   piece(root,'cube',dark,0,.10,0,.82,.22,.82);
@@ -752,3 +836,37 @@ export function obstacle(root,kind,variant) {
   root.traverse(mesh=>{if(mesh.isMesh&&mesh.material.isMeshStandardMaterial)mesh.castShadow=true;});
 }
 
+
+/** Jungla: árbol con copa, matorral de helechos o roca cubierta de musgo. */
+function jungleObstacle(root,variant){
+  piece(root,'cube','#3a2a1a',0,.06,0,.84,.12,.84);
+  if(variant===0){
+    piece(root,'column','#5a3a22',0,.55,0,.32,1.05,.32);
+    piece(root,'cone','#4a3020',0,.12,0,.6,.25,.6);
+    piece(root,'orb','#2f6a2a',0,1.15,0,.95,.6,.95);
+    piece(root,'orb','#3f8a34',.15,1.38,-.1,.62,.45,.62);
+    piece(root,'orb','#57a83f',-.1,1.5,.1,.36,.3,.36);
+    piece(root,'column','#4f7a2a',.2,.5,.17,.03,.8,.03);
+  }else if(variant===1){
+    for(const [x,z,h] of [[-.2,-.15,.55],[.2,-.1,.7],[0,.2,.6],[-.15,.2,.45],[.22,.2,.5]]){
+      const leaf=piece(root,'cone',h>.55?'#3f8a34':'#57a83f',x,h/2+.1,z,.32,h,.32);leaf.rotation.z=x*1.2;leaf.rotation.x=z*1.2;
+    }
+    piece(root,'orb','#ff5a8a',.1,.62,.05,.12,.12,.12,true);
+    piece(root,'orb','#ffd36b',-.18,.5,.18,.1,.1,.1,true);
+  }else{
+    piece(root,'cube','#5d6658',0,.36,0,.74,.6,.7).rotation.y=.3;
+    piece(root,'cube','#3f8a34',0,.7,0,.78,.08,.74).rotation.y=.3;
+    piece(root,'gem','#4f9a34',.2,.72,.2,.3,.2,.3);
+    piece(root,'column','#3f7a2a',-.3,.35,.3,.04,.6,.04);
+  }
+  root.traverse(mesh=>{if(mesh.isMesh&&mesh.material.isMeshStandardMaterial)mesh.castShadow=true;});
+}
+/** Infierno: aguja de obsidiana con grietas de magma. */
+function hellObstacle(root){
+  piece(root,'cube','#2a1210',0,.08,0,.84,.16,.84);
+  piece(root,'cone','#1e1418',0,.62,0,.62,1.1,.62);
+  piece(root,'cone','#2a1c22',.22,.4,-.18,.3,.6,.3);
+  piece(root,'cube','#ff6a1a',0,.45,.2,.04,.5,.04,true);
+  piece(root,'cube','#ffb347',-.12,.3,.18,.03,.28,.03,true);
+  root.traverse(mesh=>{if(mesh.isMesh&&mesh.material.isMeshStandardMaterial)mesh.castShadow=true;});
+}

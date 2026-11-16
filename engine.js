@@ -170,10 +170,14 @@ const inscriptions = [
 const pick = (values,rng) => values[Math.floor(rng()*values.length)];
 const roll = (low,high,rng) => low+Math.floor(rng()*(high-low+1));
 const randomSeed = rng => (rng()*4294967296)>>>0;
+/** Generador del mapa (mulberry32): semillas cercanas dan salas muy distintas. */
 function floorRandom(seed) {
   return () => {
-    seed = (Math.imul(seed,1664525)+1013904223)>>>0;
-    return seed/4294967296;
+    seed=(seed+0x6D2B79F5)>>>0;
+    let t=seed;
+    t=Math.imul(t^(t>>>15),t|1);
+    t^=t+Math.imul(t^(t>>>7),t|61);
+    return ((t^(t>>>14))>>>0)/4294967296;
   };
 }
 /** Elige con pesos: [[valor,peso],...]. */
@@ -307,27 +311,31 @@ export function runPoints(summary){
   return floor+kills*3+acts*10+(summary.won?25:0);
 }
 export const monsterNames={slime:'Limo',bat:'Murciélago',skull:'Calavera flotante',worm:'Gusano de cripta',slimeking:'Limo colosal',
-  skeleton:'Esqueleto',succubus:'Súcubo',vampire:'Vampiro',imp:'Diablillo'};
+  skeleton:'Esqueleto',succubus:'Súcubo',vampire:'Vampiro',imp:'Diablillo',slug:'Babosa',plant:'Planta escupidora',lavaslime:'Limo de lava'};
 export const ACTS=3,FLOORS_PER_ACT=8;
 export const actOf=floor=>Math.min(ACTS,Math.ceil(Math.max(1,floor)/FLOORS_PER_ACT));
 export const actFloor=floor=>floor-(actOf(floor)-1)*FLOORS_PER_ACT;
-export const actNames=['La Cripta','El Osario','El Infierno'];
+export const actNames=['La Mazmorra','La Jungla','El Infierno'];
+/** Ambientación de cada acto: mazmorra oscura, jungla y infierno. */
+export const actBiomes=['crypt','jungle','hell'];
 /** Fauna de cada acto: cuerpo a cuerpo, a distancia, élite y refuerzo de élite. */
 const fauna=[
-  {melee:['slime','bat'],ranged:['skull'],elite:'worm',extra:'slimeking'},
-  {melee:['skeleton','bat','slime'],ranged:['succubus','skull'],elite:'vampire',extra:'worm'},
-  {melee:['vampire','skeleton'],ranged:['imp','succubus'],elite:'worm',extra:'vampire'}
+  {melee:['skeleton','slime'],ranged:['skull'],elite:'worm',extra:'slimeking'},
+  {melee:['slug','bat'],ranged:['plant'],elite:'slimeking',extra:'slug'},
+  {melee:['lavaslime','vampire'],ranged:['imp','succubus'],elite:'lavaslime',extra:'vampire'}
 ];
 /** Jefes: dos por acto (a mitad y al final), con sus poderes. */
 export const bosses={
-  cerberus:{name:'Cancerbero',act:1,range:1,initiative:18,hp:1.05,powers:'Embestida sobre el héroe más lejano y aullido que resta PM a todo el grupo.'},
-  oracle:{name:'Oráculo de Ceniza',act:1,range:4,initiative:16,hp:1,glyphs:['damage','poison'],element:'fire',powers:'Glifos de brasas y veneno, y mirada ardiente a distancia.'},
-  skeletonking:{name:'Rey Osario',act:2,range:1,initiative:12,hp:1.1,powers:'Invoca esqueletos y se protege con un escudo de huesos mientras viven.'},
-  umbralking:{name:'Rey del Umbral',act:2,range:4,initiative:16,hp:1,glyphs:['slow','poison'],element:'arcane',powers:'Glifos de cadenas y veneno; cadena que arrastra a un héroe hacia él.'},
+  cerberus:{name:'Cancerbero',act:2,range:1,initiative:18,hp:1.05,powers:'Embestida sobre el héroe más lejano y aullido que resta PM a todo el grupo.'},
+  oracle:{name:'Oráculo de Ceniza',act:3,range:4,initiative:16,hp:1,glyphs:['damage','poison'],element:'fire',powers:'Glifos de brasas y veneno, y mirada ardiente a distancia.'},
+  skeletonking:{name:'Rey Osario',act:1,range:1,initiative:12,hp:1.1,powers:'Invoca esqueletos y se protege con un escudo de huesos mientras viven.'},
+  umbralking:{name:'Rey del Umbral',act:1,range:4,initiative:16,hp:1,glyphs:['slow','poison'],element:'arcane',powers:'Glifos de cadenas y veneno; cadena que arrastra a un héroe hacia él.'},
+  sporemother:{name:'Madre Espora',act:2,range:3,initiative:14,hp:1.1,glyphs:['poison','slow'],powers:'Glifos de esporas y lianas; hace brotar plantas escupidoras a su alrededor.'},
   firedemon:{name:'Demonio de Fuego',act:3,range:2,initiative:15,hp:1.1,glyphs:['damage'],element:'fire',powers:'Nova de fuego a su alrededor y suelo en llamas.'},
   vampqueen:{name:'Reina Vampira',act:3,range:3,initiative:17,hp:1.05,glyphs:['poison','damage'],element:'shadow',powers:'Roba vida con cada golpe e invoca murciélagos.'}
 };
-const actBosses=[['cerberus','oracle'],['skeletonking','umbralking'],['firedemon','vampqueen']];
+/** Jefes de cada acto: [opciones a mitad, opciones al final]. */
+const actBosses=[[['skeletonking'],['umbralking']],[['cerberus'],['sporemother']],[['oracle','vampqueen'],['firedemon']]];
 /** Rasgos de cada monstruo: elemento de su ataque, robo de vida, encanto, armadura, movimiento. */
 export const monsterTraits={
   bat:{movement:1,initiative:9},
@@ -337,7 +345,10 @@ export const monsterTraits={
   vampire:{lifesteal:.5,element:'shadow',initiative:10},
   imp:{element:'fire',range:6,initiative:13},
   worm:{ward:2},
-  slimeking:{ward:1}
+  slimeking:{ward:1},
+  slug:{ward:1,slime:true,initiative:5},
+  plant:{range:4,movement:-2,poison:true,initiative:8},
+  lavaslime:{element:'fire',ward:1,initiative:7}
 };
 function monster(species,id,floor,{ranged=false,elite=false,solo=false}={}){
   const trait=monsterTraits[species]||{};
@@ -395,6 +406,16 @@ const forms={
 };
 function contour(s,rng){
   if(s.floor===1)return {shape:'rectángulo',voids:[]};
+  if(s.shape!=='irregular'&&rng()<.35){
+    // Contorno irregular: mordiscos rectangulares al azar en los bordes de arriba y abajo.
+    const voids=new Set();
+    for(let i=roll(2,4,rng);i>0;i--){
+      const width=roll(2,Math.max(2,Math.floor(s.width/4)),rng),depth=roll(1,Math.max(1,Math.floor(s.height/3)),rng);
+      const x0=roll(0,s.width-width,rng),top=rng()<.5;
+      for(let y=0;y<depth;y++)for(let x=x0;x<x0+width;x++)voids.add((top?y:s.height-1-y)*s.width+x);
+    }
+    return {shape:'irregular',voids:[...voids]};
+  }
   const shape=pick(Object.keys(forms).filter(key=>key!==s.shape),rng);
   const mirror=rng()<.5;
   const heightFlip=rng()<.5;
@@ -405,37 +426,81 @@ function contour(s,rng){
   }
   return {shape,voids};
 }
-const layouts=[
-  {name:'Galería de pilares', pillars:['.......','..#.#..','.......','...#...','.......','..#.#..','.......']},
-  {name:'Pasajes quebrados', pillars:['.......','##...#.','.#...#.','.......','...##..','...#...','.......']},
-  {name:'Patio de losas', pillars:['.......','..##...','..#....','.....#.','.....#.','..#....','.......']},
-  {name:'Cruce de sepulcros', pillars:['.......','..#....','..#.#..','.......','.#..#..','....#..','.......']},
-  {name:'Cámaras gemelas', pillars:['.......','.#...#.','.#...#.','.......','..#.#..','..#.#..','.......']},
-  {name:'Nave central', pillars:['.......','.#.#.#.','.......','.......','.......','.#.#.#.','.......']},
-  {name:'Anillo de tumbas', pillars:['.......','..###..','.#...#.','.#...#.','.#...#.','..#.#..','.......']},
-  {name:'Escalera rota', pillars:['.......','.#.....','.##....','...#...','....##.','.....#.','.......']},
-  {name:'Osario diagonal', pillars:['#......','.#.....','.......','...#...','.......','.....#.','......#']},
-  {name:'Capilla en ruinas', pillars:['.......','.##.##.','.......','..#.#..','.......','.##.##.','.......']},
-  {name:'Laberinto menor', pillars:['.......','.####..','.....#.','.###.#.','.#.....','.#.###.','.......']},
-  {name:'Cripta del eco', pillars:['...#...','.......','.#...#.','#.....#','.#...#.','.......','...#...']},
-  {name:'Sala de columnas', pillars:['.......','.#.#.#.','.......','.#.#.#.','.......','.#.#.#.','.......']}
-];
+/** Nombres de sala por ambientación: se combinan al azar. */
+const roomNames={
+  crypt:[['Galería','Osario','Capilla','Pasaje','Cámara','Nave','Sepulcro','Calabozo','Cripta','Mazmorra'],
+    ['de los ecos','del silencio','de los pilares','de las cadenas','del guardián','de huesos','sin nombre','de la vela negra','del carcelero','del eco roto']],
+  jungle:[['Claro','Ciénaga','Espesura','Ruinas','Senda','Templo','Manglar','Charca','Bosque','Altar'],
+    ['de las lianas','de los helechos','del jaguar','de las esporas','de la niebla verde','de raíces','de las ranas','del musgo','de la serpiente','de las flores carnívoras']],
+  hell:[['Forja','Caldera','Pozo','Puente','Altar','Grieta','Trono','Horno','Cráter','Río'],
+    ['de azufre','de las almas','de brasas','del tormento','de la ceniza','de los condenados','de lava','del pacto','de cadenas al rojo','del diablo']]
+};
+/** Estilos de sala: cada uno coloca los obstáculos con reglas distintas y al azar. */
+const roomStyles={
+  // Pilares sueltos, a veces en espejo.
+  pilares(cells,area,rng){
+    const count=roll(3,6,rng);
+    for(let i=0;i<count;i++)cells.push([roll(area.x0,area.x1,rng),roll(area.y0,area.y1,rng)]);
+  },
+  // Tramos de muro rectos de 2 a 4 casillas.
+  muros(cells,area,rng){
+    for(let i=roll(2,4,rng);i>0;i--){
+      const horizontal=rng()<.5,length=roll(2,4,rng);
+      let x=roll(area.x0,area.x1,rng),y=roll(area.y0,area.y1,rng);
+      for(let j=0;j<length;j++){cells.push([x,y]);if(horizontal)x++;else y++;}
+    }
+  },
+  // Un muro que parte la sala con uno o dos huecos de paso.
+  salas(cells,area,rng){
+    const x=roll(area.x0+1,Math.max(area.x0+1,area.x1-1),rng);
+    const gaps=new Set([roll(area.y0,area.y1,rng),roll(area.y0,area.y1,rng)]);
+    for(let y=area.y0;y<=area.y1;y++)if(!gaps.has(y))cells.push([x,y]);
+    for(let i=roll(1,2,rng);i>0;i--)cells.push([roll(area.x0,area.x1,rng),roll(area.y0,area.y1,rng)]);
+  },
+  // Montones de escombros que crecen como manchas.
+  cumulos(cells,area,rng){
+    for(let i=roll(2,3,rng);i>0;i--){
+      let x=roll(area.x0,area.x1,rng),y=roll(area.y0,area.y1,rng);
+      for(let j=roll(2,4,rng);j>0;j--){
+        cells.push([x,y]);
+        if(rng()<.5)x+=rng()<.5?1:-1;else y+=rng()<.5?1:-1;
+      }
+    }
+  },
+  // Esquinas en L, como restos de habitaciones.
+  ruinas(cells,area,rng){
+    for(let i=roll(2,3,rng);i>0;i--){
+      const x=roll(area.x0,area.x1,rng),y=roll(area.y0,area.y1,rng);
+      const dx=rng()<.5?1:-1,dy=rng()<.5?1:-1,arm=roll(1,2,rng);
+      cells.push([x,y]);
+      for(let j=1;j<=arm;j++){cells.push([x+dx*j,y]);cells.push([x,y+dy*j]);}
+    }
+  },
+  // Columnas en rejilla con huecos al azar.
+  columnata(cells,area,rng){
+    const ox=roll(0,1,rng),oy=roll(0,1,rng);
+    for(let y=area.y0+oy;y<=area.y1;y+=2)for(let x=area.x0+ox;x<=area.x1;x+=2)if(rng()<.55)cells.push([x,y]);
+  }
+};
 function makeLayout(s,rng){
-  const available=layouts.filter(layout=>layout.name!==s.layoutName);
-  const layout=pick(available,rng);
-  const flip=rng()<.5;
-  const invert=rng()<.5;
   const w=s.width;
   const h=s.height;
-  const offset=Math.floor((w-7)/2);
-  const top=Math.floor((h-7)/2);
+  const biome=s.biome||'crypt';
+  const style=pick(Object.keys(roomStyles).filter(key=>key!==s.layoutStyle),rng);
+  // Los obstáculos van en el centro: las columnas de salida de cada bando quedan libres.
+  const area={x0:4,x1:w-5,y0:rng()<.5?0:1,y1:h-1-(rng()<.5?0:1)};
+  const cells=[];
+  roomStyles[style](cells,area,rng);
+  // A veces la sala sale simétrica (en espejo arriba/abajo).
+  if(rng()<.4)for(const [x,y] of [...cells])cells.push([x,h-1-y]);
   const walls=[];
-  layout.pillars.forEach((row,y)=>[...row].forEach((tile,x)=>{
-    if(tile!=='#')return;
-    const col=offset+(flip?6-x:x);
-    const line=top+(invert?6-y:y);
-    if(col>=4&&col<=w-5&&onBoard(s,line*w+col))walls.push(line*w+col);
-  }));
+  for(const [x,y] of cells){
+    const pos=y*w+x;
+    if(x>=4&&x<=w-5&&y>=0&&y<h&&onBoard(s,pos)&&!walls.includes(pos))walls.push(pos);
+  }
+  const [nouns,tails]=roomNames[biome]||roomNames.crypt;
+  let name=pick(nouns,rng)+' '+pick(tails,rng);
+  if(name===s.layoutName)name=nouns[(nouns.indexOf(name.split(' ')[0])+1)%nouns.length]+' '+pick(tails,rng);
   const boundary=new Set();
   const ground=Array.from({length:w*h},(_,pos)=>pos).filter(pos=>onBoard(s,pos));
   const candidates=ground.filter(pos=>pos%w>=4&&pos%w<=w-5&&Math.floor(pos/w)>0&&Math.floor(pos/w)<h-1&&!walls.includes(pos));
@@ -459,10 +524,11 @@ function makeLayout(s,rng){
   // Agua: charcas que bloquean el paso pero no la visión. El mapa sigue conectado.
   const water=[];
   const open=candidates.filter(pos=>!boundary.has(pos));
-  const pools=s.floor===1?1:1+Math.floor(rng()*3);
+  // Charcas en la mazmorra, ciénagas grandes en la jungla y ríos de lava en el infierno.
+  const pools=s.floor===1?1:biome==='jungle'?roll(2,4,rng):biome==='hell'?roll(1,3,rng):roll(0,2,rng);
   for(let i=0;i<pools&&open.length;i++){
     let pos=open[roll(0,open.length-1,rng)];
-    const size=2+Math.floor(rng()*4);
+    const size=biome==='jungle'?roll(3,6,rng):roll(2,5,rng);
     for(let j=0;j<size&&pos!==undefined;j++){
       if(!boundary.has(pos)){
         boundary.add(pos);
@@ -479,7 +545,7 @@ function makeLayout(s,rng){
     const pos=spots.splice(roll(0,spots.length-1,rng),1)[0];
     traps.push({pos,kind:s.floor>=2&&rng()<.4?'gas':'spikes'});
   }
-  return {name:layout.name,walls:blocks,water,traps};
+  return {name,style,walls:blocks,water,traps};
 }
 /** Daño esperado por turno de un héroe con su mejor habilidad ofensiva. */
 export function heroOffense(hero){
@@ -548,12 +614,13 @@ function openFloor(s,rng,elite=false,boss=null) {
   [s.width,s.height]=s.floor===1?sizes[0]:pick(available,mapRng);
   Object.assign(s,contour(s,mapRng));
   s.act=actOf(s.floor);
-  s.biome=['crypt','bones','hell'][s.act-1];
+  s.biome=actBiomes[s.act-1];
   s.glyphs=[];
   const w=s.width;
   const mid=Math.floor(s.height/2);
   const layout=makeLayout(s,mapRng);
   s.layoutName=layout.name;
+  s.layoutStyle=layout.style;
   s.walls=layout.walls;
   s.water=layout.water;
   s.traps=layout.traps;
@@ -837,7 +904,7 @@ const voteTime=15000;
 /** Árbol de un acto: 8 pisos, 3-4 caminos por piso, jefe a mitad (piso 4) y al final (piso 8). */
 export function makeRoute(rng,act=1){
   const rows=[];
-  const [midBoss,endBoss]=actBosses[act-1];
+  const [midBoss,endBoss]=actBosses[act-1].map(options=>options.length>1?pick(options,rng):options[0]);
   for(let local=1;local<=FLOORS_PER_ACT;local++){
     const floor=(act-1)*FLOORS_PER_ACT+local;
     if(local===4||local===8){
@@ -1072,8 +1139,8 @@ export function tick(s,rng=Math.random) {
 function monsterAttack(s,unit,target,rng){
   const trait=monsterTraits[unit.look]||{};
   const element=unit.element||trait.element||'physical';
-  const effect=element==='fire'?'blast':element==='shadow'?'venom':element==='arcane'?'arcane':unit.range>1?'arrow':'slash';
-  emit(s,{kind:'spell',effect,actor:unit.id,from:unit.pos,pos:target.pos});
+  const cue=element==='fire'?'blast':element==='shadow'?'venom':element==='arcane'?'arcane':unit.range>1?'arrow':'slash';
+  emit(s,{kind:'spell',effect:cue,actor:unit.id,from:unit.pos,pos:target.pos});
   const before=target.hp;
   hit(s,unit,target,unit.damage+roll(0,2,rng),'damage',false,element);
   const dealt=before-target.hp;
@@ -1085,6 +1152,14 @@ function monsterAttack(s,unit,target,rng){
       emit(s,{kind:'heal',unit:unit.id,from:unit.pos,pos:unit.pos,amount});
       note(s,unit.name+' roba '+amount+' PV.');
     }
+  }
+  if(trait.slime&&alive(target)){
+    effect(target,'slow',1,1);
+    note(s,unit.name+' deja su baba en '+target.name+': −1 PM en su próximo turno.');
+  }
+  if(trait.poison&&alive(target)){
+    effect(target,'poison',1+Math.floor(s.floor/4),2);
+    note(s,unit.name+' envenena a '+target.name+'.');
   }
   if(trait.charm&&alive(target)){
     effect(target,'slow',1,1);
@@ -1167,6 +1242,11 @@ function bossPower(s,boss,heroes,rng){
     emit(s,{kind:'spell',effect:'blast',actor:boss.id,from:boss.pos,pos:boss.pos,area:cells});
     note(s,'Nova de fuego del Demonio.');
     for(const hero of area)hit(s,boss,hero,4+Math.floor(s.floor*.6),'damage',false,'fire');
+    return false;
+  }
+  if(boss.look==='sporemother'&&cycle%2===0){
+    const sprouts=s.units.filter(u=>alive(u)&&u.minion===boss.id);
+    if(sprouts.length<3)summon(s,boss,'plant',2);
     return false;
   }
   if(boss.look==='vampqueen'&&cycle%3===0){

@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=23';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=23';
-import {setupSfx} from './music.js?v=23';
-import {icon} from './icons.js?v=23';
+  glyphInfo,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=24';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=24';
+import {setupSfx} from './music.js?v=24';
+import {icon} from './icons.js?v=24';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -95,7 +95,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=23').then(({createIso})=>{
+import('./isometric.js?v=24').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -845,12 +845,12 @@ function updateTraining(player,ready){
   el('training-title').textContent='Nivel '+(player.level+1)+' · Habilidad';
   const unit=state.units.find(u=>u.id===player.id)||{classId:player.classId,stats:{},level:player.level};
   el('training-compare').hidden=true;
-  el('training-choices').replaceChildren(...trainingChoices(player).map(({index,rank,name})=>{
+  el('training-choices').replaceChildren(...trainingOffer(player).map(({index,rank,name})=>{
     const base=classes[player.classId].skills[index];
     const choice=actionButton('','train',{skill:index});
     choice.className='training-choice';
     choice.append(spellIcon(base[5],base[6]),h('span','training-name',name),
-      h('span','training-rank'+(rank?'':' new'),rank?rank+'/3 → '+(rank+1)+'/3':'Nueva'));
+      h('span','training-rank'+(rank?'':' new'),rank?'Mejorar '+rank+'/3 → '+(rank+1)+'/3':'Aprender · nueva'));
     choice.onpointerenter=choice.onfocus=()=>showTrainingCompare(player,unit,index,rank);
     return choice;
   }));

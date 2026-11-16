@@ -814,7 +814,8 @@ function finish(s,rng) {
     s.training=true;
     for(const p of s.players){
       p.xp=100;
-      p.trained=trainingChoices(p).length===0;
+      p.trainOffer=rollTrainingOffer(p,rng);
+      p.trained=p.trainOffer.length===0;
       p.gold+=Math.round((10+s.floor*4)*(elite?1.5:1));
       const ilvl=itemLevel(s,(elite?1:0)+(bossFight?2:0));
       const luck=(elite?.35:0)+.1*(p.mastery?.botin||0);
@@ -1095,6 +1096,25 @@ function startEvent(s,rng){
   s.deadline=s.turnStarted+voteTime;
   note(s,'Piso '+s.floor+' · Evento: '+event.title+'.');
 }
+/**
+ * Cartas al subir de nivel: 2 habilidades ya aprendidas (sin rango máximo) para mejorar
+ * y 1 habilidad nueva para aprender, al azar. Si falta de un tipo, se completa con el otro.
+ */
+function rollTrainingOffer(player,rng){
+  const shuffle=list=>{const out=[...list];for(let i=out.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[out[i],out[j]]=[out[j],out[i]];}return out;};
+  const all=trainingChoices(player);
+  const upgrades=shuffle(all.filter(c=>c.rank>0)),fresh=shuffle(all.filter(c=>c.rank===0));
+  const pickUp=upgrades.slice(0,2),pickNew=fresh.slice(0,1);
+  const rest=[...upgrades.slice(2),...fresh.slice(1)];
+  const offer=[...pickUp,...pickNew];
+  while(offer.length<3&&rest.length)offer.push(rest.shift());
+  return offer.map(c=>c.index);
+}
+/** Las cartas que tiene un jugador para elegir ahora mismo. */
+export function trainingOffer(player){
+  const all=trainingChoices(player);
+  return (player.trainOffer||[]).map(i=>all.find(c=>c.index===i)).filter(Boolean);
+}
 export function trainingChoices(player){
   return player.skillRanks.flatMap((rank,index)=>rank<3?[{index,rank,name:classes[player.classId].skills[index][0]}]:[]);
 }
@@ -1102,8 +1122,10 @@ export function tick(s,rng=Math.random) {
   if(Date.now()<s.deadline)return false;
   if(s.phase==='reward'){
     for(const p of s.players.filter(p=>s.training&&!p.trained)){
-      const choice=trainingChoices(p).find(choice=>choice.rank>0)||trainingChoices(p)[0];
+      const offer=trainingOffer(p);
+      const choice=offer.find(choice=>choice.rank>0)||offer[0];
       if(choice)p.skillRanks[choice.index]++;
+      p.trained=true;p.trainOffer=[];
     }
     openRoute(s,rng);return true;
   }
@@ -1380,10 +1402,11 @@ function gearAction(s,p,a,rng) {
   const item=p.bag[bagIndex];
   if(a.type==='train'){
     if(!s.training||p.trained)fail('No tienes una mejora pendiente.');
-    const choice=trainingChoices(p).find(option=>option.index===a.skill);
-    if(!choice)fail('La habilidad ya está al máximo o no existe.');
+    const choice=trainingOffer(p).find(option=>option.index===a.skill);
+    if(!choice)fail('Esa habilidad no está entre las cartas ofrecidas.');
     p.skillRanks[choice.index]++;
     p.trained=true;
+    p.trainOffer=[];
   }else if(a.type==='reward'){
     const choices=s.offers[p.id];
     if(s.picks.includes(p.id)||!choices)fail('Ya elegiste botín.');

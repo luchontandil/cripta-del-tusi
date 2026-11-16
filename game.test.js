@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -130,7 +130,13 @@ test('genera botín con afijos y permite equipar, engarzar, extraer y vender una
   assert.throws(()=>act(s,'p0',{type:'sell',item:rune.id},rng),/tienda/);
   assert.equal(s.stock.length,0);
   assert.throws(()=>act(s,'p0',{type:'next'},rng),/habilidades/);
-  const newSpell=trainingChoices(p).find(option=>option.rank===0);
+  const offer=trainingOffer(p);
+  assert.equal(offer.length,3);
+  assert.equal(offer.filter(o=>o.rank>0).length,2,'dos para mejorar');
+  assert.equal(offer.filter(o=>o.rank===0).length,1,'una nueva');
+  const outside=trainingChoices(p).find(o=>!offer.some(c=>c.index===o.index));
+  if(outside)assert.throws(()=>act(s,'p0',{type:'train',skill:outside.index},rng),/cartas/);
+  const newSpell=offer.find(option=>option.rank===0);
   act(s,'p0',{type:'train',skill:newSpell.index},rng);
   assert.throws(()=>act(s,'p0',{type:'train',skill:0},rng),/pendiente/);
   act(s,'p0',{type:'next'},rng);
@@ -522,7 +528,7 @@ test('una partida completa recorre los 3 actos y termina en victoria',()=>{
     }else if(s.phase==='reward'){
       for(const p of s.players){
         if(!s.picks.includes(p.id))act(s,p.id,{type:'reward',item:null},rng);
-        if(s.training&&!p.trained)act(s,p.id,{type:'train',skill:trainingChoices(p)[0].index},rng);
+        if(s.training&&!p.trained)act(s,p.id,{type:'train',skill:trainingOffer(p)[0].index},rng);
       }
       act(s,'p0',{type:'next'},rng);
     }else assert.fail('fase inesperada '+s.phase);

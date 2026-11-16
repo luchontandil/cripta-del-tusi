@@ -147,12 +147,20 @@ function openFloor(s,rng) {
   s.phase='combat';
   s.floor++;
   s.rounds=1;
-  s.width=Math.min(16,10+2*s.players.length);
-  s.height=7+s.players.length;
-  s.biome=s.floor<4?'crypt':'roots';
-  s.glyphs=[];
   s.mapSeed=randomSeed(rng);
   const mapRng=floorRandom(s.mapSeed);
+  const baseWidth=Math.min(16,10+2*s.players.length);
+  const baseHeight=7+s.players.length;
+  const sizes=[
+    [baseWidth,baseHeight],
+    [baseWidth+2,baseHeight],
+    [baseWidth,baseHeight+1],
+    [Math.max(12,baseWidth-2),baseHeight+2]
+  ];
+  const available=sizes.filter(([width,height])=>width!==s.width||height!==s.height);
+  [s.width,s.height]=s.floor===1?sizes[0]:pick(available,mapRng);
+  s.biome=s.floor<4?'crypt':'roots';
+  s.glyphs=[];
   const w=s.width;
   const mid=Math.floor(s.height/2);
   const heroes=s.players.map((p,i)=>{

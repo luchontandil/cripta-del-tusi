@@ -1,6 +1,6 @@
 # Cripta del tusi
 
-Dungeon crawler táctico para navegador. Juega en solitario o en una sala de hasta cuatro personas. Elige Guardián, Arquero, Clérigo o Mago y supera seis pisos. Los tableros combinan cinco diseños, reflejos, obstáculos adicionales y posiciones enemigas variables. Crecen con el grupo y nunca repiten el mismo diseño en dos pisos seguidos.
+Dungeon crawler táctico para navegador. Juega en solitario o en una sala de hasta cuatro personas. Elige Guardián, Arquero, Clérigo o Mago y supera seis pisos. Los tableros combinan cinco diseños, reflejos, obstáculos adicionales y posiciones enemigas variables. Crecen con el grupo. Cada piso cambia de diseño y, a partir del segundo, también de dimensiones respecto al anterior.
 
 ## Jugar en local
 
@@ -39,5 +39,6 @@ Las salas viven en memoria y se pierden al reiniciar el servidor. Al recargar la
 Los totales de los pisos 3 y 6 incluyen al jefe. Ajusta las clases y la función `encounter` en `engine.js` para cambiar el balance.
 
 Ejecuta `npm test` para comprobar el motor y la sincronización de dos clientes.
+
 
 

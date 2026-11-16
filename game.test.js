@@ -129,18 +129,23 @@ test('los pisos alternan diseños y todas las casillas libres están conectadas'
   const names=new Set();
   for(let size=1;size<=4;size++){
     const s=battle(...Array(size).fill('tirador'));
+    const dimensions=new Set();
     for(let floor=1;floor<=6;floor++){
       names.add(s.layoutName);
+      dimensions.add(s.width+'×'+s.height);
       assert.equal(paths({...s,units:[]},{pos:0},s.width*s.height).size,s.width*s.height-s.walls.length-1);
       assert.equal(new Set(s.units.map(u=>u.pos)).size,s.units.length);
       assert.ok(s.units.every(u=>!s.walls.includes(u.pos)));
       if(floor===6)break;
       const previous=s.layoutName;
+      const previousSize=[s.width,s.height];
       s.phase='reward';
       s.picks=s.players.map(p=>p.id);
       act(s,'p0',{type:'next'},()=>((size*17+floor*13)%97)/97);
       assert.notEqual(s.layoutName,previous);
+      assert.notDeepEqual([s.width,s.height],previousSize);
     }
+    assert.ok(dimensions.size>=2);
   }
   assert.ok(names.size>=4);
 });

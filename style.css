@@ -117,3 +117,29 @@ main{max-width:1440px}
 @media(max-width:640px){#rewards{align-items:flex-start;inset:40px 5px 5px}.field-menu{top:5px;right:5px}.field-menu button{padding:3px 5px}}
 
 .draggable-item{cursor:grab;touch-action:none;user-select:none}.dragging{cursor:grabbing}.item-ghost{position:fixed;z-index:50;pointer-events:none;transform:translate(9px,11px);background:#251d20;border:1px solid #b29561;color:#ffe5ad;padding:4px 7px;border-radius:4px;font-size:.75rem}
+
+#rewards .loot-panel{width:min(96%,750px);max-height:100%;border:1px solid #a48a61;background:linear-gradient(150deg,#302736,#1f2029 72%);padding:12px}
+.loot-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:9px 0}
+.loot-card{--rarity:#83796b;border:1px solid var(--rarity);border-top-width:3px;border-radius:6px;background:#191922;min-width:0;padding:8px;display:flex;flex-direction:column;align-items:stretch;gap:4px}
+.loot-card.grade1{--rarity:#a2b96f}.loot-card.grade2{--rarity:#83b2e1}.loot-card.grade3{--rarity:#bf98dc}
+.loot-card h4{font-size:.86rem;line-height:1.15;margin:2px 0;color:#f4e1b8;overflow-wrap:anywhere}
+.loot-card small,.loot-comparison{color:#c4b7aa;font-size:.68rem}.loot-card ul{list-style:none;margin:0;padding:2px 0;font-size:.72rem;min-height:30px}
+.loot-icon{display:grid;place-items:center;align-self:flex-start;width:44px;height:42px;border:1px solid var(--rarity);border-radius:4px;background:radial-gradient(#4e3b51,#231f30)}
+.equipment-icon{width:31px;height:31px;display:block;image-rendering:pixelated;filter:drop-shadow(0 2px 2px #100e16)}
+.loot-icon .equipment-icon{width:39px;height:39px}
+.loot-comparison{border-top:1px solid #ffffff1a;margin-top:2px;padding-top:5px;overflow-wrap:anywhere}
+.loot-deltas{display:flex;gap:3px 6px;flex-wrap:wrap;margin-bottom:3px}.loot-deltas .gain{color:#bddc8b}.loot-deltas .loss{color:#f4a293}
+#rewards .loot-card button{padding:4px 5px;font-size:.69rem;margin:0;line-height:1.25}
+#rewards .loot-card .primary{margin-top:auto;background:linear-gradient(#ead49c,#c3a46b);color:#252319}
+#rewards .loot-card button:only-of-type{margin-top:auto}
+#rewards .loot-skip{font-size:.73rem;background:#2b2a32}
+.item-heading{display:flex;align-items:center;gap:4px}.item-heading .equipment-icon{width:24px;height:24px;flex:none}.item-heading b{margin:0}
+.equipment-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.equipment-grid .inventory-slot>summary,.equipment-grid .inventory-slot>span{aspect-ratio:auto;min-height:49px}.inventory-slot.empty .equipment-icon{opacity:.36;filter:saturate(.4)}
+.equipment-grid .inventory-slot small{font-size:.61rem}.inventory-slot>.item{right:0}
+#board.shaped{background:radial-gradient(ellipse,#171b2a,#11141d);border-color:#36354a}
+.cell.void{visibility:hidden;pointer-events:none}
+.spell-burst{position:absolute;transform:translate(-50%,-50%);width:8%;aspect-ratio:1;border-radius:50%;background:radial-gradient(#fff9d7,#f8af66,transparent 68%);animation:burst 540ms ease-out both}
+.spell-burst.heal,.spell-burst.cleanse,.spell-burst.venom{background:radial-gradient(#f3ffd6,#a4eb8c,transparent 68%)}
+.spell-burst.slow,.spell-burst.arcane,.spell-burst.dash{background:radial-gradient(#efeaff,#9d9dfd,transparent 68%)}
+@media(max-width:690px){.loot-cards{grid-template-columns:1fr}.loot-card{display:grid;grid-template-columns:44px 1fr 1fr;align-items:center}.loot-card h4,.loot-card small,.loot-comparison{grid-column:2/-1}.loot-icon{grid-row:span 3}.loot-card ul{grid-column:2/-1;min-height:0}.loot-card button{grid-column:auto}.loot-card button:last-child{grid-column:3}}
+

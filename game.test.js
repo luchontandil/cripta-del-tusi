@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy} from './engine.js';
+import {create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -151,18 +151,23 @@ test('el Mago puede lanzar a una casilla vacía y dañar a dos enemigos en cruz'
   assert.equal(first.max-first.hp,8);
   assert.equal(second.max-second.hp,8);
   assert.equal(ally.hp,ally.max);
+  assert.deepEqual(s.events.find(event=>event.kind==='spell').area,spellArea(s,center,skill));
 });
 test('los pisos alternan diseños y todas las casillas libres están conectadas',()=>{
   const names=new Set();
+  const shapes=new Set();
   for(let size=1;size<=4;size++){
     const s=battle(...Array(size).fill('tirador'));
     const dimensions=new Set();
     for(let floor=1;floor<=6;floor++){
       names.add(s.layoutName);
+      shapes.add(s.shape);
       dimensions.add(s.width+'×'+s.height);
-      assert.equal(paths({...s,units:[]},{pos:0},s.width*s.height).size,s.width*s.height-s.walls.length-1);
+      assert.equal(s.floor===1,s.voids.length===0);
+      const start=Array.from({length:s.width*s.height},(_,i)=>i).find(i=>onBoard(s,i)&&!s.walls.includes(i));
+      assert.equal(paths({...s,units:[]},{pos:start},s.width*s.height).size,s.width*s.height-s.walls.length-s.voids.length-1);
       assert.equal(new Set(s.units.map(u=>u.pos)).size,s.units.length);
-      assert.ok(s.units.every(u=>!s.walls.includes(u.pos)));
+      assert.ok(s.units.every(u=>onBoard(s,u.pos)&&!s.walls.includes(u.pos)));
       if(floor===6)break;
       const previous=s.layoutName;
       const previousSize=[s.width,s.height];
@@ -175,6 +180,21 @@ test('los pisos alternan diseños y todas las casillas libres están conectadas'
     assert.ok(dimensions.size>=2);
   }
   assert.ok(names.size>=4);
+  assert.ok(shapes.size>=4);
+});
+test('el botín se puede equipar al elegirlo y devuelve la pieza anterior a la mochila',()=>{
+  const s=battle('guardia');
+  const p=s.players[0];
+  const old={id:500,slot:'gloves',kind:'gear',stats:{power:1}};
+  const item={id:501,slot:'gloves',kind:'gear',stats:{power:2}};
+  assert.equal(Object.keys(slots).length,9);
+  p.equipment.gloves=old;
+  s.phase='reward';
+  s.offers.p0=[item];
+  act(s,'p0',{type:'reward',item:item.id,equip:true},rng);
+  assert.equal(p.equipment.gloves,item);
+  assert.deepEqual(p.bag,[old]);
+  assert.deepEqual(s.picks,['p0']);
 });
 test('dos clientes reciben la misma trayectoria completa y el cambio de turno', {timeout:10000}, async t=>{
   server.listen(0,'127.0.0.1');

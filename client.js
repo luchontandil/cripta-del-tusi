@@ -1,6 +1,6 @@
-import {classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames} from './engine.js?v=7';
-import {portrait,spellIcon} from './art.js?v=7';
-import {setupMusic} from './music.js?v=7';
+import {classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard} from './engine.js?v=8';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=8';
+import {setupSfx} from './music.js?v=8';
 
 const el=id=>document.getElementById(id);
 let state,session,selected=null,busy=false,polling=false,generation=0,revision=0,rendered='';
@@ -10,7 +10,7 @@ el('server').value=localStorage.getItem('amber-server')||(onPages?'https://cript
 const error=message=>{el('error').textContent=message;};
 const iconName={expose:'Vulnerable',slow:'−PM',poison:'Veneno'};
 const specs={guardia:'Primera línea · debilita al enemigo',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
-const musicMode=setupMusic(el('music'),el('field-music'));
+const sfx=setupSfx(el('field-sfx'));
 let bagShown=true,shopShown=false,drag=null,dropTarget=null,suppressInventoryClick=0;
 let iso=null;
 let useIso=localStorage.getItem('cripta-view')!=='2d';
@@ -25,6 +25,7 @@ function syncViewport(){
   toggle.setAttribute('aria-pressed',String(shown));
   toggle.textContent=shown?'Vista isométrica':'Vista cenital';
   el('field-view').hidden=!iso;
+  el('zoom-in').hidden=el('zoom-out').hidden=!shown;
   el('field-view').setAttribute('aria-pressed',String(shown));
   el('field-view').textContent=shown?'3D':'2D';
 }
@@ -38,6 +39,8 @@ el('view-toggle').onclick=()=>{
   }
 };
 el('field-view').onclick=()=>el('view-toggle').click();
+el('zoom-in').onclick=()=>iso?.zoom(.1);
+el('zoom-out').onclick=()=>iso?.zoom(-.1);
 el('field-bag').onclick=()=>{
   bagShown=!bagShown;
   el('inventory').hidden=!bagShown;
@@ -52,7 +55,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=7').then(({createIso})=>{
+import('./isometric.js?v=8').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -153,7 +156,11 @@ function itemRow(item,title,actions=[]){
   const name=document.createElement('b');
   name.textContent=title+(item?.name||'Vacío');
   name.className=item?.kind==='rune'?'rune':'grade'+(item?.grade||0);
-  row.append(name);
+  const heading=document.createElement('div');
+  heading.className='item-heading';
+  if(item)heading.append(equipmentIcon(item.kind==='rune'?'rune':item.slot));
+  heading.append(name);
+  row.append(heading);
   if(item){
     const desc=document.createElement('small');
     desc.textContent=[item.rarity,describe(item.stats),item.socket?'⚒ '+item.socket.name+' · '+describe(item.socket.stats):''].filter(Boolean).join(' · ');
@@ -162,7 +169,54 @@ function itemRow(item,title,actions=[]){
   row.append(...actions);
   return row;
 }
-const slotIcons={weapon:'⚔',armor:'⛨',boots:'➟',charm:'◇'};
+function comparison(item,player){
+  const old=player.equipment[item.slot];
+  const box=document.createElement('div');
+  box.className='loot-comparison';
+  const title=document.createElement('strong');
+  title.textContent=old?'Frente a '+old.name:'Ranura libre';
+  box.append(title);
+  const delta=document.createElement('div');
+  delta.className='loot-deltas';
+  for(const [key,label] of Object.entries(statNames)){
+    const change=(item.stats[key]||0)-(old?.stats[key]||0)-(old?.socket?.stats[key]||0);
+    if(!change)continue;
+    const stat=document.createElement('span');
+    stat.className=change>0?'gain':'loss';
+    stat.textContent=(change>0?'+':'−')+Math.abs(change)+' '+label;
+    delta.append(stat);
+  }
+  if(!delta.children.length)delta.textContent='Mismos atributos';
+  box.append(delta);
+  return box;
+}
+function lootCard(item,player){
+  const card=document.createElement('article');
+  card.className='loot-card grade'+(item.kind==='rune'?3:item.grade);
+  const visual=document.createElement('div');
+  visual.className='loot-icon';
+  visual.append(equipmentIcon(item.kind==='rune'?'rune':item.slot));
+  const title=document.createElement('h4');
+  title.textContent=item.name;
+  const type=document.createElement('small');
+  type.textContent=item.kind==='rune'?'Runa · Engarzable':slots[item.slot]+' · '+item.rarity;
+  const stats=document.createElement('ul');
+  for(const [key,value] of Object.entries(item.stats)){
+    const li=document.createElement('li');
+    li.textContent='+'+value+' '+statNames[key];
+    stats.append(li);
+  }
+  card.append(visual,title,type,stats);
+  if(item.kind==='gear')card.append(comparison(item,player));
+  const take=actionButton('A la mochila','reward',{item:item.id});
+  if(item.kind==='gear'){
+    const equip=actionButton('Equipar ahora','reward',{item:item.id,equip:true});
+    equip.className='primary';
+    card.append(equip);
+  }
+  card.append(take);
+  return card;
+}
 const dropTargets=new WeakMap();
 function draggable(tile,payload){
   const face=tile.querySelector('summary');
@@ -221,9 +275,7 @@ function inventorySlot(item,label,actions=[],fallback=''){
   const tile=document.createElement(item?'details':'div');
   tile.className='inventory-slot '+(item?'filled grade'+(item.grade||0):'empty');
   const face=document.createElement(item?'summary':'span');
-  const icon=document.createElement('b');
-  icon.textContent=item?.kind==='rune'?'✧':slotIcons[item?.slot]||fallback;
-  face.append(icon);
+  if(item||fallback)face.append(equipmentIcon(item?.kind==='rune'?'rune':item?.slot||fallback));
   if(label){
     const name=document.createElement('small');
     name.textContent=label;
@@ -251,7 +303,7 @@ function renderInventory(player){
     const item=player.equipment[slot];
     const actions=item&&trading?[actionButton('Quitar','unequip',{slot})]:[];
     if(trading&&item?.socket)actions.push(actionButton('Extraer runa','unsocket',{slot}));
-    const tile=inventorySlot(item,label,actions,slotIcons[slot]);
+    const tile=inventorySlot(item,label,actions,slot);
     if(trading){
       if(item)draggable(tile,{from:'gear',slot});
       dropZone(tile,p=>p.from==='bag'&&(p.slot===slot||(p.kind==='rune'&&!!item)),
@@ -289,12 +341,17 @@ function renderInventory(player){
     buy.disabled=player.gold<item.price;
     shop.append(itemRow(item,'',[buy]));
   }
-  const loot=panel('Botín');
+  const loot=panel('Botín · Elige una recompensa');
+  loot.classList.add('loot-panel');
   const choices=state.offers[player.id]||[];
   if(state.picks.includes(player.id))loot.append('Botín elegido. '+state.picks.length+'/'+state.players.length+' listos.');
   else{
-    for(const item of choices)loot.append(itemRow(item,'',[actionButton('Elegir','reward',{item:item.id})]));
-    loot.append(actionButton('Pasar','reward',{item:null}));
+    const cards=document.createElement('div');
+    cards.className='loot-cards';
+    for(const item of choices)cards.append(lootCard(item,player));
+    const skip=actionButton('No quiero ninguno','reward',{item:null});
+    skip.className='loot-skip';
+    loot.append(cards,skip);
   }
   if(shopShown)shop.prepend(btn('Cerrar',()=>{
     shopShown=false;
@@ -330,6 +387,20 @@ function resetAnimation(){
   el('animations').replaceChildren();
 }
 function impact(event){
+  if(event.kind==='spell'){
+    sfx(event.effect);
+    if(iso?.active)iso.impact(event);
+    else{
+      for(const pos of event.area||[event.pos]){
+        const flash=document.createElement('span');
+        flash.className='spell-burst '+event.effect;
+        Object.assign(flash.style,boardPoint(pos));
+        el('animations').append(flash);
+        setTimeout(()=>flash.remove(),600);
+      }
+    }
+    return;
+  }
   if(iso?.active){
     iso.impact(event);
     if(event.kind==='blast')return;
@@ -406,7 +477,6 @@ function setState(next,initial=false){
   }
   if(next.phase!=='reward')shopShown=false;
   state=next;
-  musicMode(next.phase==='combat');
   render();
   animate();
 }
@@ -450,11 +520,12 @@ function drawBoard(turn,walking,skill){
   syncViewport();
   if(field.hidden)return;
   board.style.setProperty('--cols',state.width);
-  board.className=state.biome||'crypt';
+  board.className=(state.biome||'crypt')+(state.voids?.length?' shaped':'');
   const fragment=document.createDocumentFragment();
   const shades=state.biome==='roots'?['#55513a','#4d573b','#60573d','#3f4938']:['#49524c','#3d4845','#515650','#3b4540'];
   for(let pos=0;pos<state.width*state.height;pos++){
     const unit=state.units.find(u=>u.hp>0&&u.pos===pos);
+    const voidCell=!onBoard(state,pos);
     const wall=state.walls.includes(pos);
     const glyph=state.glyphs.find(g=>g.cells.includes(pos));
     const castRange=skill&&inRange(state,turn,pos,skill);
@@ -468,7 +539,8 @@ function drawBoard(turn,walking,skill){
     });
     const shadesIndex=((Math.imul(pos+1,2654435761)^state.mapSeed)>>>6)%shades.length;
     cell.style.setProperty('--tile',shades[shadesIndex]);
-    cell.className=['cell',wall&&'wall',path&&'walk',blocked&&'no-sight',castRange&&'cast-range',aim&&'aim',glyph&&'glyph-'+glyph.kind,glyph?.warn&&'warn'].filter(Boolean).join(' ');
+    cell.className=['cell',voidCell&&'void',wall&&'wall',path&&'walk',blocked&&'no-sight',castRange&&'cast-range',aim&&'aim',glyph&&'glyph-'+glyph.kind,glyph?.warn&&'warn'].filter(Boolean).join(' ');
+    if(voidCell){cell.disabled=true;cell.setAttribute('aria-hidden','true');}
     cell.setAttribute('aria-label',(unit?.name||(wall?'Muro':'Casilla'))+' '+(pos%state.width+1)+', '+(Math.floor(pos/state.width)+1));
     if(path){
       cell.onpointerenter=cell.onfocus=()=>{
@@ -666,7 +738,6 @@ el('leave').onclick=()=>{
   resetAnimation();
   syncViewport();
   hideUnit();
-  musicMode(false);
   sessionStorage.removeItem('amber-session');
   error('');render();
 };

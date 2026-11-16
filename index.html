@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#171917">
   <title>Cripta del tusi</title>
-  <link rel="stylesheet" href="./style.css?v=7">
+  <link rel="stylesheet" href="./style.css?v=8">
 </head>
 <body><main>
-  <header><div class="crest" aria-hidden="true">◆</div><h1>Cripta del tusi</h1><button id="music" type="button" aria-pressed="false">Música</button></header>
+  <header><div class="crest" aria-hidden="true">◆</div><h1>Cripta del tusi</h1></header>
   <section id="entry" class="panel gateway">
     <h2>Entrar a la cripta</h2>
     <label>Nombre <input id="name" maxlength="22" placeholder="Aventurero"></label>
@@ -35,8 +35,10 @@
           <div id="iso-world" hidden></div><div id="board"></div><div id="animations" aria-hidden="true"></div>
           <div class="field-menu" aria-label="Controles del tablero">
             <button id="field-bag" type="button" title="Mostrar u ocultar equipo y mochila" aria-pressed="true">Equipo</button>
-            <button id="field-music" type="button" title="Activar o silenciar música" aria-pressed="false">♫</button>
+            <button id="field-sfx" type="button" aria-label="Efectos de sonido" aria-pressed="true">SFX</button>
             <button id="field-view" type="button" title="Cambiar vista" aria-pressed="true">3D</button>
+            <button id="zoom-out" type="button" aria-label="Alejar cámara">−</button>
+            <button id="zoom-in" type="button" aria-label="Acercar cámara">+</button>
             <button id="field-shop" type="button" hidden>Mercader</button>
           </div>
           <section id="rewards" aria-label="Botín y mercader" hidden></section>
@@ -52,5 +54,5 @@
       <aside id="inventory" hidden></aside>
     </div>
   </section>
-</main><script type="module" src="./client.js?v=7"></script></body>
+</main><script type="module" src="./client.js?v=8"></script></body>
 </html>

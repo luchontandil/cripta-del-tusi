@@ -27,16 +27,25 @@ export const classes = {
     ['Paso de sombra',2,3,0,0,'dash','↢',1]
   ]}
 };
-export const slots = {weapon:'Arma', armor:'Armadura', boots:'Botas', charm:'Talismán'};
+export const slots = {weapon:'Arma',helmet:'Casco',armor:'Armadura',gloves:'Guantes',belt:'Cinturón',boots:'Botas',ring:'Anillo',amulet:'Amuleto',charm:'Talismán'};
 export const statNames = {power:'Potencia', vitality:'Vitalidad', healing:'Curación', reach:'Alcance', ward:'Protección', critical:'Crítico', movement:'PM'};
 const rarities = ['Común','Poco común','Raro','Épico'];
 const bases = {
   weapon:['Arco de tejo','Sable de cobre','Cetro de ónice','Lanza de vigía'],
+  helmet:['Yelmo del centinela','Capucha del eco','Corona de hollín'],
   armor:['Coraza de escamas','Manto de ceniza','Jubón reforzado'],
+  gloves:['Guantes de bruma','Guanteletes del vigía','Mitones de púas'],
+  belt:['Cinturón del peregrino','Faja de cuero rojo','Cinto de eslabones'],
   boots:['Botas del umbral','Grebas de bronce','Botas de arena'],
-  charm:['Anillo de obsidiana','Amuleto de luna','Ojo de la cripta']
+  ring:['Anillo de obsidiana','Sello de cobre','Sortija de sal'],
+  amulet:['Amuleto de luna','Colgante de ámbar','Lágrima del alba'],
+  charm:['Ojo de la cripta','Diente de vigía','Llave de los ecos']
 };
-const pools = {weapon:['power','reach','critical'],armor:['vitality','ward','healing'],boots:['movement','vitality','ward'],charm:['healing','critical','power','reach']};
+const pools = {
+  weapon:['power','reach','critical'],helmet:['vitality','ward','critical'],armor:['vitality','ward','healing'],
+  gloves:['power','critical','healing'],belt:['vitality','ward','power'],boots:['movement','vitality','ward'],
+  ring:['critical','reach','power'],amulet:['vitality','healing','reach'],charm:['healing','critical','power','reach']
+};
 const inscriptions = [
   ['Brasa','power',2], ['Brote','healing',3], ['Brújula','reach',1],
   ['Muralla','ward',1], ['Centella','critical',8], ['Pulso','vitality',5]
@@ -81,7 +90,7 @@ function sumStats(equipment) {
   return totals;
 }
 export function create() {
-  return {phase:'lobby', floor:0, rounds:0, width:12,height:8,players:[],units:[],walls:[],glyphs:[],
+  return {phase:'lobby', floor:0, rounds:0, width:12,height:8,players:[],units:[],walls:[],voids:[],glyphs:[],
     log:[],events:[],seq:0,itemId:0,turn:0,deadline:0,turnStarted:0,picks:[],offers:{},stock:[]};
 }
 const alive = unit => unit.hp>0;
@@ -108,7 +117,26 @@ export function encounter(floor,size) {
   });
 }
 export const distance = (s,a,b) => Math.abs(a%s.width-b%s.width)+Math.abs(Math.floor(a/s.width)-Math.floor(b/s.width));
-const adjacent = (s,pos) => [pos-s.width,pos+s.width,pos-1,pos+1].filter(n=>n>=0&&n<s.width*s.height&&distance(s,pos,n)===1);
+export const onBoard=(s,pos)=>Number.isInteger(pos)&&pos>=0&&pos<s.width*s.height&&!s.voids?.includes(pos);
+const adjacent = (s,pos) => [pos-s.width,pos+s.width,pos-1,pos+1].filter(n=>onBoard(s,n)&&distance(s,pos,n)===1);
+const forms={
+  L:(x,y)=>x<.52||y>=.43,
+  T:(x,y)=>y<.43||(x>=.28&&x<.73),
+  C:(x,y)=>x<.49||y<.31||y>=.69,
+  cruz:(x,y)=>(x>=.23&&x<.77)||(y>=.27&&y<.75)
+};
+function contour(s,rng){
+  if(s.floor===1)return {shape:'rectángulo',voids:[]};
+  const shape=pick(Object.keys(forms).filter(key=>key!==s.shape),rng);
+  const mirror=rng()<.5;
+  const heightFlip=rng()<.5;
+  const voids=[];
+  for(let y=0;y<s.height;y++)for(let x=0;x<s.width;x++){
+    const u=(x+.5)/s.width,v=(y+.5)/s.height;
+    if(!forms[shape](mirror?1-u:u,heightFlip?1-v:v))voids.push(y*s.width+x);
+  }
+  return {shape,voids};
+}
 const layouts=[
   {name:'Galería de pilares', pillars:['.......','..#.#..','.......','...#...','.......','..#.#..','.......']},
   {name:'Pasajes quebrados', pillars:['.......','##...#.','.#...#.','.......','...##..','...#...','.......']},
@@ -130,16 +158,21 @@ function makeLayout(s,rng){
     if(tile!=='#')return;
     const col=offset+(flip?6-x:x);
     const line=top+(invert?6-y:y);
-    if(col>=4&&col<=w-5)walls.push(line*w+col);
+    if(col>=4&&col<=w-5&&onBoard(s,line*w+col))walls.push(line*w+col);
   }));
-  const boundary=new Set(walls);
-  const candidates=Array.from({length:w*h},(_,pos)=>pos).filter(pos=>pos%w>=4&&pos%w<=w-5&&Math.floor(pos/w)>0&&Math.floor(pos/w)<h-1&&!boundary.has(pos));
+  const boundary=new Set();
+  const ground=Array.from({length:w*h},(_,pos)=>pos).filter(pos=>onBoard(s,pos));
+  const candidates=ground.filter(pos=>pos%w>=4&&pos%w<=w-5&&Math.floor(pos/w)>0&&Math.floor(pos/w)<h-1&&!walls.includes(pos));
   function connected(){
-    const visited=new Set([0]);
+    const visited=new Set([ground.find(pos=>!boundary.has(pos))]);
     for(const pos of visited)for(const next of adjacent(s,pos)){
       if(!boundary.has(next))visited.add(next);
     }
-    return visited.size+boundary.size===w*h;
+    return visited.size+boundary.size===ground.length;
+  }
+  for(const pos of walls){
+    boundary.add(pos);
+    if(!connected())boundary.delete(pos);
   }
   for(let i=0;i<2+Math.floor(s.floor/2)&&candidates.length;i++){
     const pos=candidates.splice(roll(0,candidates.length-1,rng),1)[0];
@@ -164,10 +197,17 @@ function openFloor(s,rng) {
   ];
   const available=sizes.filter(([width,height])=>width!==s.width||height!==s.height);
   [s.width,s.height]=s.floor===1?sizes[0]:pick(available,mapRng);
+  Object.assign(s,contour(s,mapRng));
   s.biome=s.floor<4?'crypt':'roots';
   s.glyphs=[];
   const w=s.width;
   const mid=Math.floor(s.height/2);
+  const layout=makeLayout(s,mapRng);
+  s.layoutName=layout.name;
+  s.walls=layout.walls;
+  const free=Array.from({length:w*s.height},(_,pos)=>pos).filter(pos=>onBoard(s,pos)&&!s.walls.includes(pos));
+  const heroPositions=s.floor===1?[0,-1,1,-2].map(y=>w*(mid+y)+1):
+    [...free].sort((a,b)=>((a%w)*4+Math.abs(Math.floor(a/w)-mid))-((b%w)*4+Math.abs(Math.floor(b/w)-mid))).slice(0,s.players.length);
   const heroes=s.players.map((p,i)=>{
     const previous=s.units.find(u=>u.id===p.id);
     const level=s.floor;
@@ -178,19 +218,18 @@ function openFloor(s,rng) {
     const max=classes[p.classId].hp+stats.vitality+(level-1)*4;
     return {id:p.id,name:p.name,classId:p.classId,level,initiative:classes[p.classId].initiative,stats,max,
       hp:previous?Math.min(max,Math.max(previous.hp,0)+Math.ceil(max*.45)):max,
-      pos:w*(mid+[0,-1,1,-2][i])+1,effects:{}};
+      pos:heroPositions[i],effects:{}};
   });
-  const layout=makeLayout(s,mapRng);
-  s.layoutName=layout.name;
-  s.walls=layout.walls;
-  const spawns=Array.from({length:(s.height-2)*2},(_,i)=>w*(1+Math.floor(i/2))+w-2-i%2);
-  const foes=encounter(s.floor,s.players.length).map(u=>{
+  const lineup=encounter(s.floor,s.players.length);
+  const spawns=s.floor===1?Array.from({length:(s.height-2)*2},(_,i)=>w*(1+Math.floor(i/2))+w-2-i%2):
+    free.filter(pos=>!heroPositions.includes(pos)).sort((a,b)=>b%w-a%w).slice(0,Math.max(12,lineup.length*2));
+  const foes=lineup.map(u=>{
     const pos=spawns.splice(roll(0,spawns.length-1,mapRng),1)[0];
     return {...u,max:u.hp,pos};
   });
   s.units=[...heroes,...foes].sort((a,b)=>b.initiative-a.initiative);
   s.turn=0;
-  note(s,'Piso '+s.floor+' · '+s.layoutName+(s.floor%3===0?' · Cámara del jefe':''));
+  note(s,'Piso '+s.floor+' · '+s.layoutName+(s.voids.length?' · '+s.shape.toUpperCase():'')+(s.floor%3===0?' · Cámara del jefe':''));
   beginTurn(s);
 }
 export function lineOfSight(s,from,to,ignoreId) {
@@ -198,7 +237,7 @@ export function lineOfSight(s,from,to,ignoreId) {
   const tx=to%s.width,ty=Math.floor(to/s.width);
   const dx=Math.abs(tx-x),dy=Math.abs(ty-y);
   const sx=Math.sign(tx-x),sy=Math.sign(ty-y);
-  const blocked=new Set([...s.walls,...s.units.filter(u=>alive(u)&&u.id!==ignoreId&&u.pos!==from&&u.pos!==to).map(u=>u.pos)]);
+  const blocked=new Set([...s.walls,...(s.voids||[]),...s.units.filter(u=>alive(u)&&u.id!==ignoreId&&u.pos!==from&&u.pos!==to).map(u=>u.pos)]);
   let ix=0,iy=0;
   while(ix<dx||iy<dy) {
     const cross=(1+2*ix)*dy-(1+2*iy)*dx;
@@ -212,6 +251,7 @@ export function lineOfSight(s,from,to,ignoreId) {
   return true;
 }
 export function paths(s,unit,limit) {
+  if(!onBoard(s,unit.pos))return new Map();
   const blocked=new Set([...s.walls,...s.units.filter(alive).map(u=>u.pos)]);
   const routes=new Map([[unit.pos,[]]]);
   for(const [pos,path] of routes) {
@@ -320,7 +360,12 @@ function castGlyph(s,boss,heroes,rng) {
   }
   if(s.glyphs.some(g=>g.owner===boss.id))return;
   const target=heroes.reduce((a,b)=>distance(s,boss.pos,a.pos)<=distance(s,boss.pos,b.pos)?a:b);
-  const options=[target.pos,...adjacent(s,target.pos)].filter(pos=>!s.walls.includes(pos));
+  const options=[target.pos];
+  for(let i=0;i<options.length&&options.length<5;i++){
+    for(const pos of adjacent(s,options[i])){
+      if(!s.walls.includes(pos)&&!options.includes(pos))options.push(pos);
+    }
+  }
   const kinds=['damage','poison','slow'];
   const first=(boss.glyphCycle||0)%kinds.length;
   boss.glyphCycle=(boss.glyphCycle||0)+1;
@@ -372,15 +417,22 @@ export function tick(s,rng=Math.random) {
       }
     }
     const target=attackOptions(s,unit,heroes,unit.pos)[0];
-    if(target)hit(s,unit,target,unit.damage+roll(0,2,rng));
+    if(target){
+      emit(s,{kind:'spell',effect:unit.range>1?'arrow':'slash',actor:unit.id,from:unit.pos,pos:target.pos});
+      hit(s,unit,target,unit.damage+roll(0,2,rng));
+    }
   }else note(s,unit.name+' se quedó sin tiempo.');
   advance(s,rng);
   return true;
 }
 const support=kind=>kind==='heal'||kind==='cleanse';
+function spellCue(s,unit,pos,kind,area){
+  const effect=kind==='damage'?(unit.classId==='tirador'?'arrow':unit.classId==='mago'||unit.classId==='mistico'?'arcane':'slash'):kind;
+  emit(s,{kind:'spell',effect,actor:unit.id,from:unit.pos,pos,area});
+}
 export function hasRange(s,unit,pos,skill) {
   const [,cost,range,,,,,min=0]=skill;
-  if(!Number.isInteger(pos)||pos<0||pos>=s.width*s.height||s.walls.includes(pos)||cost>s.ap)return false;
+  if(!onBoard(s,pos)||s.walls.includes(pos)||cost>s.ap)return false;
   const d=distance(s,unit.pos,pos);
   return d>=min&&d<=range+(range>1?(unit.stats?.reach||0):0);
 }
@@ -405,7 +457,10 @@ function gearAction(s,p,a,rng) {
     if(s.picks.includes(p.id)||!choices)fail('Ya elegiste botín.');
     const loot=choices.find(choice=>choice.id===a.item);
     if(!loot&&a.item!==null)fail('Botín inválido.');
-    if(loot)p.bag.push(loot);
+    if(loot&&a.equip===true&&loot.kind==='gear'){
+      if(p.equipment[loot.slot])p.bag.push(p.equipment[loot.slot]);
+      p.equipment[loot.slot]=loot;
+    }else if(loot)p.bag.push(loot);
     s.picks.push(p.id);
   }else if(a.type==='buy'){
     const i=s.stock.findIndex(listing=>listing.id===a.item);
@@ -473,6 +528,7 @@ export function act(s,id,a,rng=Math.random) {
   if(kind==='dash'){
     if(!castableCell(s,unit,a.pos,skill))fail('No hay una ruta libre a esa casilla.');
     s.ap-=cost;
+    spellCue(s,unit,a.pos,kind);
     move(s,unit,paths(s,unit,skill[2]+unit.stats.reach).get(a.pos),false);
     if(!alive(unit))advance(s,rng);
     return;
@@ -481,7 +537,7 @@ export function act(s,id,a,rng=Math.random) {
     if(!castableCell(s,unit,a.pos,skill))fail('Casilla fuera de alcance o sin línea de visión.');
     s.ap-=cost;
     const area=spellArea(s,a.pos,skill);
-    emit(s,{kind:'blast',pos:a.pos,area});
+    spellCue(s,unit,a.pos,kind,area);
     for(const foe of s.units.filter(u=>u.enemy&&alive(u)&&area.includes(u.pos))){
       hit(s,unit,foe,roll(min,max,rng)+unit.stats.power);
     }
@@ -490,6 +546,7 @@ export function act(s,id,a,rng=Math.random) {
   }
   if(!targetable(s,unit,target,skill))fail('Objetivo inválido, fuera de alcance o sin línea de visión.');
   s.ap-=cost;
+  spellCue(s,unit,target.pos,kind);
   if(support(kind)){
     const amount=Math.min(target.max-target.hp,roll(min,max,rng)+unit.stats.healing);
     target.hp+=amount;

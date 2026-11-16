@@ -94,3 +94,73 @@ export function spellIcon(kind,symbol) {
   return icon;
 }
 
+
+const gearColors={
+  weapon:['#b3c7e4','#eef4ff','#687292'],
+  helmet:['#9babbc','#e4e9f1','#626776'],
+  armor:['#8398a2','#c1e3e1','#4c6873'],
+  gloves:['#b86260','#f6ad85','#754440'],
+  belt:['#a26d51','#f2bd72','#6c493f'],
+  boots:['#97736a','#d4b49a','#60454b'],
+  ring:['#dba45d','#ffe8a2','#9b6445'],
+  amulet:['#b887dc','#fbd6ff','#74509d'],
+  charm:['#7ba6a6','#c3f0dc','#456a72'],
+  rune:['#8267bb','#e1bbff','#4e3d78']
+};
+export function equipmentIcon(type){
+  const art=document.createElement('canvas');
+  art.width=40;art.height=40;
+  art.className='equipment-icon';
+  art.setAttribute('aria-hidden','true');
+  const c=art.getContext('2d');
+  const [base,light,shade]=gearColors[type]||gearColors.charm;
+  const outline='#201923';
+  const poly=(paint,points,stroke=outline)=>{
+    c.beginPath();points.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath();
+    c.fillStyle=paint;c.fill();if(stroke){c.lineWidth=1.7;c.strokeStyle=stroke;c.stroke();}
+  };
+  const path=(paint,width,points)=>{
+    c.lineJoin='round';c.lineCap='round';c.strokeStyle=paint;c.lineWidth=width;c.beginPath();
+    points.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.stroke();
+  };
+  const gem=(x,y,r,a=light,b=shade)=>{poly(a,[[x,y-r],[x+r,y],[x,y+r],[x-r,y]]);poly(b,[[x,y],[x+r,y],[x,y+r]],null);};
+  if(type==='weapon'){
+    poly(base,[[11,25],[27,8],[34,6],[33,13],[16,29]]);
+    path(light,2,[[14,24],[29,9]]);path(shade,5,[[9,32],[16,25]]);path('#e7b56f',4,[[10,22],[20,32]]);
+    gem(8,33,3);
+  }else if(type==='helmet'){
+    poly(base,[[6,24],[8,14],[14,8],[25,8],[32,15],[34,24],[31,31],[23,31],[22,26],[17,26],[16,31],[9,31]]);
+    path(light,3,[[10,19],[15,12],[25,12],[30,18]]);path(shade,3,[[11,24],[17,24],[22,22],[30,24]]);
+  }else if(type==='armor'){
+    poly(base,[[9,10],[16,7],[20,12],[24,7],[31,10],[35,19],[28,22],[27,33],[13,33],[12,22],[5,19]]);
+    path(light,3,[[11,12],[19,19],[29,12]]);path(shade,2,[[13,25],[20,28],[27,25]]);gem(20,20,4);
+  }else if(type==='gloves'){
+    poly(base,[[13,33],[12,25],[7,20],[7,16],[10,14],[15,20],[15,9],[19,8],[21,14],[23,7],[27,9],[28,15],[30,11],[34,14],[32,23],[28,33]]);
+    path(light,2,[[16,23],[21,19],[29,18]]);path(shade,4,[[15,30],[26,30]]);
+  }else if(type==='belt'){
+    poly(base,[[5,16],[34,15],[36,25],[6,27]]);
+    path(shade,3,[[8,24],[33,22]]);poly(light,[[15,13],[25,13],[28,18],[26,26],[15,27],[12,22],[12,17]]);
+    poly(shade,[[16,17],[23,17],[24,23],[16,24]]);path(light,2,[[19,21],[28,20]]);
+  }else if(type==='boots'){
+    poly(base,[[12,9],[24,9],[25,24],[33,28],[33,33],[10,33],[10,27]]);
+    path(shade,3,[[12,30],[31,30]]);path(light,2,[[13,12],[21,12],[21,25],[27,27]]);
+    path(shade,2,[[15,17],[22,17],[15,21],[22,21]]);
+  }else if(type==='ring'){
+    c.strokeStyle=outline;c.lineWidth=8;c.beginPath();c.ellipse(20,23,10,9,0,0,Math.PI*2);c.stroke();
+    c.strokeStyle=base;c.lineWidth=5;c.stroke();gem(20,12,6,light,shade);
+    path(light,1.5,[[12,25],[15,29],[19,30]]);
+  }else if(type==='amulet'){
+    path(outline,5,[[7,9],[9,21],[20,30],[31,21],[33,9]]);
+    path(base,2.7,[[7,9],[9,21],[20,30],[31,21],[33,9]]);
+    gem(20,24,9,light,shade);gem(20,24,4,base,shade);
+  }else if(type==='rune'){
+    poly(base,[[12,7],[26,8],[32,17],[30,32],[18,34],[8,27],[8,15]]);
+    path(light,2.5,[[15,28],[23,13],[24,26],[16,21],[26,18]]);
+  }else{
+    poly(shade,[[20,5],[32,12],[33,27],[20,35],[7,27],[8,12]]);
+    poly(base,[[20,9],[30,19],[20,31],[10,19]]);
+    gem(20,19,7,light,shade);path(light,1.5,[[20,11],[28,19],[20,27]]);
+  }
+  return art;
+}
+

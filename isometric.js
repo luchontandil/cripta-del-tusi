@@ -80,6 +80,7 @@ export function createIso(mount,onCell){
   let stageKey='',state,active=false,hover=null,frame=0,viewWidth=0,viewHeight=0;
   let routeSignature='';
   let previousFrame=0;
+  let magnification=1.13;
   const routeGroup=new T.Group();
   stage.add(routeGroup);
 
@@ -105,7 +106,7 @@ export function createIso(mount,onCell){
       sizeY=Math.max(sizeY,Math.abs(world.y));
     }
     const aspect=viewWidth/viewHeight;
-    const extent=Math.max(sizeY,sizeX/aspect)*1.07;
+    const extent=Math.max(sizeY,sizeX/aspect)*1.07/magnification;
     camera.left=-extent*aspect;
     camera.right=extent*aspect;
     camera.top=extent;
@@ -142,13 +143,28 @@ export function createIso(mount,onCell){
     const mode=state.biome||'crypt';
     const palette=tilesets[mode]||tilesets.crypt;
     const walls=new Set(state.walls);
-    piece(stage,'cube',ink,0,-.45,0,state.width+.18,.65,state.height+.18);
-    piece(stage,'cube',mode==='roots'?'#293837':'#333b53',0,-.20,0,state.width+.13,.23,state.height+.13);
+    const holes=new Set(state.voids||[]);
+    const w=state.width,h=state.height;
+    const ground=(x,z)=>x>=0&&x<w&&z>=0&&z<h&&!holes.has(z*w+x);
+    const exposed=[];
     for(let pos=0;pos<state.width*state.height;pos++){
+      if(holes.has(pos)){overlays.push(null);continue;}
       const coord=logical(state,pos);
       const v=random(state.mapSeed,pos);
       const color=palette[Math.floor(v*palette.length)];
-      piece(stage,'cube',color,coord.x,-.065,coord.z,.965,.13,.965);
+      piece(stage,'cube',color,coord.x,-.057,coord.z,.963,.114,.963);
+      const x=pos%w,z=Math.floor(pos/w);
+      if(!ground(x-1,z)||!ground(x+1,z)||!ground(x,z-1)||!ground(x,z+1)){
+        piece(stage,'cube',ink,coord.x,-.24,coord.z,1,.36,1);
+        if(!ground(x,z-1)){
+          piece(stage,'cube',palette[(pos+2)%palette.length],coord.x,.21,coord.z-.51,.97,.40,.23);
+          exposed.push([coord.x,coord.z-.55]);
+        }
+        if(!ground(x-1,z)&&pos%4!==2){
+          piece(stage,'cube',palette[pos%palette.length],coord.x-.52,.17,coord.z,.22,.34,.96);
+          exposed.push([coord.x-.55,coord.z]);
+        }
+      }
       const overlay=piece(stage,'cube','#448ead',coord.x,.007,coord.z,.92,.016,.92,true);
       overlay.visible=false;
       overlays.push(overlay);
@@ -163,18 +179,7 @@ export function createIso(mount,onCell){
         chip.rotation.y=v*12;
       }
     }
-    const w=state.width,h=state.height;
-    // Cutaway walls frame the far sides; the two sides closest to camera stay low.
-    for(let i=0;i<w;i++){
-      const x=i-(w-1)/2;
-      if(i%5!==3)piece(stage,'cube',palette[(i+2)%palette.length],x,.28,-h/2-.15,.98,.53,.29);
-      if(i%4===0)piece(stage,'cube','#687189',x,.61,-h/2-.15,.35,.16,.36);
-    }
-    for(let i=0;i<h;i++){
-      const z=i-(h-1)/2;
-      if(i%4!==2)piece(stage,'cube',palette[i%palette.length],-w/2-.15,.25,z,.29,.47,.98);
-    }
-    const placement=[[-w/2-.15,-h/2+.8],[w/2-.95,-h/2-.18],[-w/2-.17,h/2-.9]];
+    const placement=[.09,.49,.87].map(f=>exposed[Math.floor(exposed.length*f)]);
     placement.forEach(([x,z],index)=>{
       piece(stage,'column','#475264',x,.52,z,.34,1.13,.34);
       piece(stage,'column','#b18a65',x,1.13,z,.31,.17,.31);
@@ -283,7 +288,8 @@ export function createIso(mount,onCell){
     if(!ray.ray.intersectPlane(plane,world))return null;
     const x=Math.round(world.x+(state.width-1)/2),z=Math.round(world.z+(state.height-1)/2);
     if(x<0||x>=state.width||z<0||z>=state.height)return null;
-    return z*state.width+x;
+    const pos=z*state.width+x;
+    return state.voids?.includes(pos)?null:pos;
   }
   function changeHover(pos,event){
     if(hover===pos)return;
@@ -298,6 +304,12 @@ export function createIso(mount,onCell){
     const pos=aimAt(e);
     if(pos!==null)onCell('click',pos,e);
   });
+  renderer.domElement.addEventListener('wheel',e=>{
+    if(!active||e.ctrlKey||e.deltaY===0)return;
+    e.preventDefault();
+    const pixels=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?viewHeight:1);
+    zoom(clamp(-pixels*.0012,-.16,.16));
+  },{passive:false});
   renderer.domElement.addEventListener('webglcontextlost',e=>{
     e.preventDefault();
     mount.dispatchEvent(new Event('graphicslost'));
@@ -326,26 +338,47 @@ export function createIso(mount,onCell){
   }
   function impact(event){
     if(!active)return;
-    const palette={heal:'#b5ef90',blast:'#ffad64',poison:'#c2df81',glyph:'#ff8e66'};
-    const positions=event.area||[event.pos];
-    if(event.from!==undefined&&event.from!==event.pos){
-      const source=state.units.find(u=>u.pos===event.from&&u.hp>0);
-      const model=source&&models.get(source.id);
-      if(model){
-        model.strike=performance.now();
-        const start=logical(state,event.from);
-        const end=logical(state,event.pos);
-        model.root.rotation.y=Math.atan2(end.x-start.x,end.z-start.z);
-        if(start.distanceTo(end)>1.1){
-          const projectile=piece(transient,'gem',palette[event.kind]||'#f4d5a3',start.x,.72,start.z,.16,.24,.16,true);
-          effects.push({mesh:projectile,start:performance.now(),duration:170,source:start,target:end});
-        }
+    const palette={heal:'#9bf2a5',cleanse:'#fff2ba',blast:'#ff884b',slow:'#9be8ff',venom:'#b9e574',expose:'#d9a3ff',
+      arcane:'#bfb4ff',arrow:'#f6d18b',push:'#faf1a9',slash:'#ffdaa8',dash:'#bc91ee',poison:'#b9e574',glyph:'#ff8e66'};
+    const color=palette[event.effect||event.kind]||'#f4c18e';
+    const time=performance.now();
+    const target=logical(state,event.pos);
+    if(event.kind!=='spell'){
+      if(event.kind==='glyph'||event.kind==='poison'){
+        const pulse=piece(transient,'disc',color,target.x,.045,target.z,.45,.025,.45,true);
+        effects.push({mesh:pulse,start:time,duration:330,pop:true});
       }
+      return;
     }
-    for(const pos of positions){
+    const from=logical(state,event.from);
+    const travel=from.distanceTo(target);
+    const model=models.get(event.actor);
+    if(model){
+      model.strike=time;
+      if(travel>.01)model.root.rotation.y=Math.atan2(target.x-from.x,target.z-from.z);
+    }
+    const ranged=travel>1.1&&!['heal','cleanse','dash','slash'].includes(event.effect);
+    const flight=ranged?Math.min(300,120+travel*18):65;
+    if(ranged){
+      const shot=piece(transient,event.effect==='arrow'?'cone':'gem',color,from.x,.68,from.z,.17,.25,.17,true);
+      effects.push({mesh:shot,start:time,duration:flight,source:from,target,shape:event.effect});
+    }
+    const area=event.area||[event.pos];
+    for(const [i,pos] of area.entries()){
       const p=logical(state,pos);
-      const glow=piece(transient,'disc',palette[event.kind]||'#f69a74',p.x,.044,p.z,.55,.025,.55,true);
-      effects.push({mesh:glow,start:performance.now(),duration:360,pop:true});
+      const start=time+flight+i*34;
+      const ring=piece(transient,'ring',color,p.x,.064,p.z,.44,.44,.44,true);
+      ring.rotation.x=-Math.PI/2;
+      ring.visible=false;
+      effects.push({mesh:ring,start,duration:405,ring:true});
+      const count=reduced?3:event.effect==='blast'?9:6;
+      for(let j=0;j<count;j++){
+        const angle=j/count*Math.PI*2;
+        const spark=piece(transient,'gem',j%3===0?'#fff5d4':color,p.x,.15,p.z,.087,.125,.087,true);
+        spark.visible=false;
+        effects.push({mesh:spark,start:start+(j%3)*18,duration:295+(j%3)*65,
+          burst:true,origin:p,angle,wide:event.effect==='blast'?.58:.31,high:['heal','cleanse'].includes(event.effect)?.85:.57});
+      }
     }
   }
   function draw(now){
@@ -388,13 +421,27 @@ export function createIso(mount,onCell){
     for(let i=effects.length-1;i>=0;i--){
       const fx=effects[i];
       const t=(now-fx.start)/fx.duration;
+      if(t<0)continue;
       if(t>=1){transient.remove(fx.mesh);effects.splice(i,1);continue;}
-      if(fx.pop){
+      fx.mesh.visible=true;
+      if(fx.burst){
+        const spread=fx.wide*Math.sin(t*Math.PI*.62);
+        fx.mesh.position.set(fx.origin.x+Math.cos(fx.angle)*spread,.1+Math.sin(t*Math.PI)*fx.high,fx.origin.z+Math.sin(fx.angle)*spread);
+        fx.mesh.scale.setScalar(.12*(1-t*.88));
+        fx.mesh.rotation.y=t*5;
+      }else if(fx.ring){
+        fx.mesh.scale.setScalar(.25+Math.sin(t*Math.PI*.76)*.86);
+        fx.mesh.position.y=.04+t*.08;
+      }else if(fx.pop){
         fx.mesh.scale.x=fx.mesh.scale.z=.36+t*.55;
         fx.mesh.position.y=.04+t*.045;
       }else{
         fx.mesh.position.lerpVectors(fx.source,fx.target,t);
         fx.mesh.position.y=.56+Math.sin(t*Math.PI)*.52;
+        if(fx.shape==='arrow'){
+          fx.mesh.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),fx.target.clone().sub(fx.source).normalize());
+          fx.mesh.scale.y=.48;
+        }else fx.mesh.rotation.y=t*7;
       }
     }
     renderer.setRenderTarget(pixels);
@@ -403,6 +450,10 @@ export function createIso(mount,onCell){
     renderer.render(screen,screenCamera);
     frame=requestAnimationFrame(draw);
   }
-  return {show,sync,anchor,highlight,move,impact,get active(){return active;}};
+  function zoom(delta){
+    magnification=clamp(magnification+delta,.85,1.45);
+    fit();
+  }
+  return {show,sync,anchor,highlight,move,impact,zoom,get active(){return active;}};
 }
 

@@ -1,6 +1,6 @@
 # Cripta del tusi
 
-Dungeon crawler táctico para navegador. Juega en solitario o en una sala de hasta cuatro personas. Elige Guardián, Arquero, Clérigo, Mago o Acechante y supera seis pisos. Los tableros combinan cinco diseños, reflejos, obstáculos adicionales y posiciones enemigas variables. Crecen con el grupo. Cada piso cambia de diseño y, a partir del segundo, también de dimensiones respecto al anterior.
+Dungeon crawler táctico para navegador. Juega en solitario o en una sala de hasta cuatro personas. Elige Guardián, Arquero, Clérigo, Mago o Acechante y supera seis pisos. Los tableros combinan cinco diseños, reflejos, obstáculos adicionales y posiciones enemigas variables. Crecen con el grupo. A partir del segundo piso, la planta puede tener forma de L, T, C o cruz y cambia de dimensiones respecto al anterior.
 
 El tablero isométrico usa Three.js r180, incluido con su licencia MIT. Pulsa una casilla para moverte o para lanzar el hechizo seleccionado. Desde la barra superior puedes alternar con la vista cenital. Si el navegador no dispone de WebGL, el juego usa la vista cenital automáticamente.
 
@@ -14,11 +14,11 @@ npm start
 
 Entra en http://localhost:3000. Para probar el cooperativo, abre una segunda ventana en modo privado. En la primera, crea una sala desde **Jugar con amigos**. En la segunda, introduce el código y pulsa **Unirse**. Para jugar desde otro dispositivo de la misma red, usa la IP local del equipo anfitrión y el puerto 3000 en ambos navegadores.
 
-Los turnos tienen 60 segundos. Las casillas azules se pueden alcanzar. Pasa el puntero para ver la ruta y haz clic para moverte. Selecciona un hechizo para ver su alcance en morado y sus objetivos válidos con borde dorado. La Bola de fuego del Mago permite elegir una casilla y previsualizar su área en naranja. Usa F1 para terminar el turno y las teclas 1 a 4 para seleccionar hechizos. Pasa el puntero sobre una unidad para ver su ficha. La música arranca al interactuar y se puede silenciar desde el tablero. Las casillas rojas indican que hay alcance pero falta línea de visión. Todos los jugadores reciben la misma secuencia de pasos. Los hechizos largos comprueban línea de visión y la vulnerabilidad aumenta el daño de cualquier atacante.
+Los turnos tienen 60 segundos. Las casillas azules se pueden alcanzar. Pasa el puntero para ver la ruta y haz clic para moverte. Selecciona un hechizo para ver su alcance en morado y sus objetivos válidos con borde dorado. La Bola de fuego del Mago permite elegir una casilla y previsualizar su área en naranja. Usa F1 para terminar el turno y las teclas 1 a 4 para seleccionar hechizos. Pasa el puntero sobre una unidad para ver su ficha. El botón SFX controla los sonidos de botones y hechizos. Las casillas rojas indican que hay alcance pero falta línea de visión. Todos los jugadores reciben la misma secuencia de pasos. Los hechizos largos comprueban línea de visión y la vulnerabilidad aumenta el daño de cualquier atacante.
 
 Los jefes de los pisos 3 y 6 anuncian glifos de brasas, veneno y cadenas. Al activarse pueden dañar, envenenar o restar PM a los héroes que entren o comiencen el turno encima.
 
-Entre pisos se elige el botín sobre el tablero. Arrastra objetos de la mochila a una ranura compatible y devuélvelos a la mochila para desequiparlos. El botón Mercader abre la tienda. Cada nuevo piso otorga 4 PV máximos y cada dos niveles suben la potencia y la curación. El equipo combina bases, rarezas y atributos aleatorios. Las runas se guardan en la mochila y pueden venderse, engarzarse en una pieza o extraerse para reutilizarlas.
+Entre pisos se elige el botín sobre el tablero. Las tarjetas comparan cada pieza con la equipada y permiten equiparla directamente o guardarla. Hay nueve ranuras de equipo, con iconos propios para cada ranura y las runas. Arrastra objetos de la mochila a una ranura compatible y devuélvelos a la mochila para desequiparlos. El botón Mercader abre la tienda. Cada nuevo piso otorga 4 PV máximos y cada dos niveles suben la potencia y la curación. El equipo combina bases, rarezas y atributos aleatorios. Las runas se guardan en la mochila y pueden venderse, engarzarse en una pieza o extraerse para reutilizarlas.
 
 ## Publicar en GitHub Pages
 
@@ -41,6 +41,7 @@ Las salas viven en memoria y se pierden al reiniciar el servidor. Al recargar la
 Los totales de los pisos 3 y 6 incluyen al jefe. Ajusta las clases y la función `encounter` en `engine.js` para cambiar el balance.
 
 Ejecuta `npm test` para comprobar el motor y la sincronización de dos clientes.
+
 
 
 

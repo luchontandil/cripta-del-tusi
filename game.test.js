@@ -124,9 +124,8 @@ test('genera botín con afijos y permite equipar, engarzar, extraer y vender una
   act(s,'p0',{type:'socket',item:rune.id,slot:gear.slot},rng);
   assert.equal(p.equipment[gear.slot].socket,rune);
   act(s,'p0',{type:'unsocket',slot:gear.slot},rng);
-  const gold=p.gold;
-  act(s,'p0',{type:'sell',item:rune.id},rng);
-  assert.equal(p.gold,gold+5);
+  assert.throws(()=>act(s,'p0',{type:'sell',item:rune.id},rng),/tienda/);
+  assert.equal(s.stock.length,0);
   assert.throws(()=>act(s,'p0',{type:'next'},rng),/habilidades/);
   const newSpell=trainingChoices(p).find(option=>option.rank===0);
   act(s,'p0',{type:'train',skill:newSpell.index},rng);
@@ -387,4 +386,52 @@ test('el agua bloquea el paso pero no la visión y los pinchos dañan al pisarlo
   const hp=hero.hp;
   act(s,'p0',{type:'move',pos:hero.pos-1},rng);
   assert.equal(hero.hp,hp-(3+s.floor));
+});
+
+test('la tienda es una sala del mapa: se compra y vende allí y se sigue cuando todos están listos',()=>{
+  for(let seed=1;seed<20;seed++){
+    let x=seed;const random=()=>((x=(Math.imul(x,1664525)+1013904223)>>>0)/4294967296);
+    const route=makeRoute(random);
+    assert.ok(route.rows[1].some(n=>n.kind==='shop'));
+    assert.ok(route.rows[4].some(n=>n.kind==='shop'));
+  }
+  const s=create();
+  join(s,'p0','Uno','guardia');join(s,'p1','Dos','mago');
+  act(s,'p0',{type:'start'},rng);
+  s.route.rows[0]=[{id:'1-0',floor:1,kind:'shop',x:.27,next:s.route.rows[1].map(n=>n.id)},{id:'1-1',floor:1,kind:'combat',x:.73,next:s.route.rows[1].map(n=>n.id)}];
+  s.vote.options=['1-0','1-1'];
+  act(s,'p0',{type:'vote',option:0},rng);
+  act(s,'p1',{type:'vote',option:0},rng);
+  assert.equal(s.phase,'shop');
+  assert.equal(s.stock.length,6);
+  const p=s.players[0];
+  p.gold=500;
+  const item=s.stock[0];
+  act(s,'p0',{type:'buy',item:item.id},rng);
+  assert.ok(p.bag.includes(item));
+  const before=p.gold;
+  act(s,'p0',{type:'sell',item:item.id},rng);
+  assert.equal(p.gold,before+Math.floor(item.price/2));
+  act(s,'p0',{type:'ready'},rng);
+  assert.equal(s.phase,'shop');
+  act(s,'p1',{type:'ready'},rng);
+  assert.equal(s.phase,'map');
+  assert.equal(s.stock.length,0);
+});
+test('los jugadores pueden darse objetos y tusi fuera del combate',()=>{
+  const s=create();
+  join(s,'p0','Uno','guardia');join(s,'p1','Dos','mago');
+  act(s,'p0',{type:'start'},rng);
+  const [a,b]=s.players;
+  a.gold=30;
+  const gem={id:777,kind:'rune',name:'Runa',stats:{fire:2},price:10};
+  a.bag.push(gem);
+  act(s,'p0',{type:'give',to:'p1',gold:12},rng);
+  assert.equal(a.gold,18);assert.equal(b.gold,12);
+  act(s,'p0',{type:'give',to:'p1',item:777},rng);
+  assert.ok(b.bag.includes(gem));assert.ok(!a.bag.includes(gem));
+  assert.throws(()=>act(s,'p0',{type:'give',to:'p1',gold:100},rng),/suficiente/);
+  assert.throws(()=>act(s,'p0',{type:'give',to:'p0',gold:1},rng),/otro jugador/);
+  enterCombat(s);
+  assert.throws(()=>act(s,s.units[s.turn].id,{type:'give',to:'p1',gold:1},rng),/fuera del combate/);
 });

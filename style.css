@@ -607,6 +607,30 @@ summary{cursor:pointer}
 .event-option.voted{border-color:var(--gold);background:linear-gradient(180deg,#4a3a63,#2c2340);box-shadow:0 0 0 1px var(--gold-glow),0 0 18px #f2cd8a33}
 .event-card .vote-status{justify-content:center}
 .mods-chip{color:#d5b8ff}
+.route-node.kind-shop{color:#ffb3e4;border-color:#8a4f78}
+.legend-item.kind-shop .icon,.tip-node.kind-shop{color:#ffb3e4}
+.shop-wallet{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;padding:5px 12px;border-radius:99px;background:#ff8fd614;border:1px solid #ff8fd655;color:#ffd1ef;font-size:.9rem}
+.shop-wallet b{font-size:1.05rem}
+.shop-cards{grid-template-columns:repeat(3,minmax(0,1fr));margin:0}
+.shop-cards .buy-button{margin-top:auto;font-size:.76rem;padding:.5em}
+.shop-cards .buy-button:disabled{background:#2a2339;color:var(--faint);border-color:var(--line)}
+.shop-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:auto}
+.ready-party{display:flex;flex-wrap:wrap;gap:6px}
+.ready-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 4px;border-radius:99px;background:#ffffff08;border:1px solid var(--line);font-size:.8rem;color:var(--muted)}
+.ready-chip canvas{width:18px;image-rendering:pixelated}
+.ready-chip.on{border-color:var(--good);color:var(--good);background:#a8de8c14}
+.ready-button{min-width:200px}
+.ready-button.done{border-color:var(--good);color:var(--good)}
+.give-button{border-color:#ff8fd655}
+.give-button .icon{color:#ffb3e4}
+.give-tusi{margin-top:8px;font-size:.78rem}
+.give-tusi summary{display:inline-flex;align-items:center;gap:5px;color:#ffb3e4;font-weight:700;list-style:none}
+.give-tusi summary::-webkit-details-marker{display:none}
+.give-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.give-row input{width:90px;padding:.35em .5em}
+.give-row button{font-size:.74rem;padding:.35em .6em}
+.give-row canvas{width:16px;image-rendering:pixelated}
+@media(max-width:900px){.shop-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* ───────────── Fin de partida ───────────── */
 .gameover{width:min(94vw,420px);border:1px solid #7c3a46;border-radius:16px;padding:26px 24px 22px;text-align:center;color:var(--paper);

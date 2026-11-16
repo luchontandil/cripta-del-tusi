@@ -1,8 +1,8 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement,nodeKinds,modText,trapInfo} from './engine.js?v=16';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=16';
-import {setupSfx} from './music.js?v=16';
-import {icon} from './icons.js?v=16';
+  glyphInfo,skillFor,damagePreview,trainingChoices,modifiableRange,elements,skillElement,nodeKinds,modText,trapInfo} from './engine.js?v=17';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=17';
+import {setupSfx} from './music.js?v=17';
+import {icon} from './icons.js?v=17';
 
 const el=id=>document.getElementById(id);
 let state,session,selected=null,busy=false,polling=false,generation=0,revision=0,rendered='';
@@ -47,7 +47,7 @@ let useIso=localStorage.getItem('cripta-view')!=='2d';
 const battlefield=el('battlefield');
 const worldMount=el('iso-world');
 function syncViewport(){
-  const shown=!!(iso&&useIso&&state?.units.length&&!el('game').hidden&&!['map','event'].includes(state?.phase));
+  const shown=!!(iso&&useIso&&state?.units.length&&!el('game').hidden&&!['map','event','shop'].includes(state?.phase));
   iso?.show(shown);
   battlefield.classList.toggle('isometric',shown);
   const toggle=el('view-toggle');
@@ -86,7 +86,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=16').then(({createIso})=>{
+import('./isometric.js?v=17').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -509,11 +509,14 @@ function inventorySlot(item,label,actions=[],fallback=''){
 function renderInventory(player){
   const holder=el('inventory');
   const rewards=el('rewards');
-  const trading=lootReady();
+  const shopping=state.phase==='shop';
+  // Fuera de combate se puede gestionar el equipo; vender solo en la tienda.
+  const trading=lootReady()||['shop','map','event'].includes(state.phase);
+  const others=state.players.filter(p=>p.id!==player.id);
   holder.hidden=state.phase==='lobby'||!bagShown;
-  el('field-shop').hidden=!trading;
-  const choosing=trading&&!state.picks.includes(player.id);
-  rewards.hidden=!choosing&&!(trading&&shopShown);
+  el('field-shop').hidden=true;
+  const choosing=lootReady()&&!state.picks.includes(player.id);
+  rewards.hidden=!choosing;
   if(state.phase==='lobby'){holder.replaceChildren();rewards.replaceChildren();return;}
   const gear=panel('Nivel '+player.level,'level');
   const xp=document.createElement('progress');
@@ -547,7 +550,13 @@ function renderInventory(player){
       else for(const [slot,label] of Object.entries(slots)){
         if(player.equipment[slot])actions.push(actionButton('Engarzar en '+label.toLowerCase(),'socket',{item:item.id,slot}));
       }
-      actions.push(actionButton('Vender · '+(Math.floor(item.price/2)+(item.socket?Math.floor(item.socket.price/2):0))+' tusi','sell',{item:item.id}));
+      if(shopping)actions.push(actionButton('Vender · '+(Math.floor(item.price/2)+(item.socket?Math.floor(item.socket.price/2):0))+' tusi','sell',{item:item.id}));
+      for(const other of others){
+        const gift=actionButton('','give',{to:other.id,item:item.id});
+        gift.className='give-button';
+        gift.append(icon('users'),'Dar a '+other.name);
+        actions.push(gift);
+      }
     }
     const tile=inventorySlot(item,'',actions);
     if(trading)draggable(tile,{from:'bag',item:item.id,slot:item.slot,kind:item.kind});
@@ -561,15 +570,9 @@ function renderInventory(player){
   gold.className='bag-gold';
   gold.replaceChildren(icon('gold'),h('b',null,String(player.gold)),' tusi');
   bag.append(gold);
+  if(trading&&others.length&&player.gold>0)bag.append(giveTusi(player,others));
   holder.replaceChildren(gear,bag);
   if(rewards.hidden){rewards.replaceChildren();return;}
-  const shop=panel('Mercader','shop');
-  if(!state.stock.length)shop.append('Todo vendido');
-  for(const item of state.stock){
-    const buy=actionButton('Comprar · '+item.price+' tusi','buy',{item:item.id});
-    buy.disabled=player.gold<item.price;
-    shop.append(itemRow(item,'',[buy]));
-  }
   const loot=panel('Botín · Elige una recompensa','xp');
   loot.classList.add('loot-panel');
   const choices=state.offers[player.id]||[];
@@ -582,11 +585,60 @@ function renderInventory(player){
     skip.className='loot-skip';
     loot.append(cards,skip);
   }
-  if(shopShown)shop.prepend(btn('Cerrar',()=>{
-    shopShown=false;
-    renderInventory(player);
+  rewards.replaceChildren(loot);
+}
+/** Formulario compacto para dar tusi a otro jugador. */
+let giveDraft=null;
+function giveTusi(player,others){
+  const box=h('details','give-tusi');
+  box.open=giveDraft!==null;
+  box.addEventListener('toggle',()=>{giveDraft=box.open?(giveDraft??''):null;});
+  const summary=h('summary',null,icon('users'),'Dar tusi');
+  const amount=document.createElement('input');
+  amount.type='number';amount.min='1';amount.max=String(player.gold);amount.placeholder='Cantidad';
+  amount.value=giveDraft||'';
+  amount.oninput=()=>{giveDraft=amount.value;};
+  const buttons=others.map(other=>{
+    const b=btn('',()=>{
+      const value=Math.floor(Number(amount.value));
+      if(!value||value<1)return error('Escribe una cantidad.');
+      giveDraft=null;
+      send({type:'give',to:other.id,gold:value});
+    });
+    b.append(portrait(other.classId),'A '+other.name);
+    return b;
+  });
+  box.append(summary,h('div','give-row',amount,...buttons));
+  return box;
+}
+/** Tienda: sala del mapa con el género del mercader, venta y "Listo". */
+function renderShop(box){
+  const player=state.players.find(p=>p.id===session.id);
+  const cards=state.stock.map(item=>{
+    const card=lootCard(item,player);
+    card.querySelectorAll('button').forEach(b=>b.remove());
+    const buy=actionButton('','buy',{item:item.id});
+    buy.className='primary buy-button';
+    buy.append(icon('gold'),'Comprar · '+item.price+' tusi');
+    buy.disabled=player.gold<item.price;
+    card.append(buy);
+    return card;
+  });
+  const ready=state.ready||[];
+  const me=ready.includes(player.id);
+  const readyButton=btn('',()=>send({type:'ready'}));
+  readyButton.className=me?'ready-button done':'primary ready-button';
+  readyButton.append(icon(me?'check':'play'),me?'Listo · esperando al grupo':'Listo para seguir');
+  const party=h('div','ready-party',...state.players.map(p=>{
+    const chip=h('span','ready-chip'+(ready.includes(p.id)?' on':''),portrait(p.classId),p.name);
+    return chip;
   }));
-  rewards.replaceChildren(...(choosing?[loot]:[]),...(shopShown?[shop]:[]));
+  box.replaceChildren(
+    h('div','journey-head',h('h3',null,icon('shop'),'Tienda del mercader'),
+      h('p',null,'Compra aquí; vende desde tu mochila. Podéis pasaros objetos y tusi.')),
+    h('div','shop-wallet',icon('gold'),h('b',null,String(player.gold)),' tusi disponibles'),
+    cards.length?h('div','loot-cards shop-cards',...cards):h('p','event-text','El mercader no tiene nada más que vender.'),
+    h('div','shop-footer',party,readyButton));
 }
 const trainingDialog=el('training');
 trainingDialog.addEventListener('cancel',event=>event.preventDefault());
@@ -665,7 +717,7 @@ function updateGameOver(){
   sfx('blast');
   gameoverDialog.showModal();
 }
-const nodeIcons={combat:'sword',elite:'elite',event:'question',boss:'crown'};
+const nodeIcons={combat:'sword',elite:'elite',event:'question',boss:'crown',shop:'shop'};
 /** Retratos pequeños de quienes votaron una opción. */
 function voters(option){
   const votes=state.vote?.votes||{};
@@ -755,10 +807,10 @@ function renderEvent(box){
 }
 function renderJourney(){
   const box=el('journey');
-  const show=['map','event'].includes(state?.phase);
+  const show=['map','event','shop'].includes(state?.phase);
   box.hidden=!show;
   if(!show)return;
-  if(state.phase==='map')renderMap(box);else renderEvent(box);
+  if(state.phase==='map')renderMap(box);else if(state.phase==='shop')renderShop(box);else renderEvent(box);
 }
 function pawnName(name){
   const tag=document.createElement('span');
@@ -1008,10 +1060,10 @@ function render(){
   const mine=state.phase==='combat'&&turn?.id===session.id;
   const host=state.players[0]?.id===session.id;
   const rewardReady=lootReady();
-  const title={map:'Piso '+(state.floor+1)+' · Elige el camino',event:'Evento · '+(state.event?.title||''),lobby:'Sala de expedición',combat:'Piso '+state.floor+' · '+state.layoutName+' · '+turn?.name+(mine?' (tú)':''),reward:rewardReady?'Botín y mercader':'Victoria',won:'Expedición completada',lost:'El grupo ha caído'}[state.phase];
+  const title={shop:'Piso '+state.floor+' · Tienda',map:'Piso '+(state.floor+1)+' · Elige el camino',event:'Evento · '+(state.event?.title||''),lobby:'Sala de expedición',combat:'Piso '+state.floor+' · '+state.layoutName+' · '+turn?.name+(mine?' (tú)':''),reward:rewardReady?'Botín y mercader':'Victoria',won:'Expedición completada',lost:'El grupo ha caído'}[state.phase];
   el('phase').textContent=title;
   updateGameOver();
-  const journey=['map','event'].includes(state.phase);
+  const journey=['map','event','shop'].includes(state.phase);
   el('turn-bar').hidden=state.phase!=='combat'&&!rewardReady&&!journey;
   el('turn-bar').classList.toggle('timer-only',state.phase!=='combat');
   if(!el('turn-bar').hidden)paintClock();
@@ -1214,7 +1266,7 @@ async function refresh(){
 try{session=JSON.parse(sessionStorage.getItem('amber-session'));}catch{session=null;}
 refresh();
 setInterval(()=>{
-  if(state&&!session.code&&['combat','reward','map','event'].includes(state.phase)&&Date.now()>=state.deadline){
+  if(state&&!session.code&&['combat','reward','map','event','shop'].includes(state.phase)&&Date.now()>=state.deadline){
     const next=structuredClone(state);
     if(tick(next))setState(next);
   }

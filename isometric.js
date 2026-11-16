@@ -1,5 +1,5 @@
 import * as T from './three.module.js';
-import {miniature,obstacle,piece,solid} from './models3d.js?v=16';
+import {miniature,obstacle,piece,solid} from './models3d.js?v=17';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);

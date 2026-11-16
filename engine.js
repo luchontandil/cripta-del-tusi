@@ -131,7 +131,7 @@ function sumStats(equipment) {
 export function create() {
   return {phase:'lobby', floor:0, rounds:0, width:12,height:8,players:[],units:[],walls:[],voids:[],glyphs:[],
     water:[],traps:[],log:[],events:[],seq:0,itemId:0,turn:0,deadline:0,turnStarted:0,picks:[],offers:{},stock:[],training:false,
-    route:null,node:null,vote:null,event:null,pending:{},mods:{}};
+    route:null,node:null,vote:null,event:null,pending:{},mods:{},ready:[]};
 }
 const alive = unit => unit.hp>0;
 const fail = message => {throw new Error(message);};
@@ -476,7 +476,7 @@ function finish(s,rng) {
       p.gold+=Math.round((10+s.floor*4)*(elite?1.5:1));
       s.offers[p.id]=Array.from({length:3},(_,i)=>rollItem(s,rng,elite?{bonus:.35,gear:i===0}:{}));
     }
-    s.stock=Array.from({length:4},()=>rollItem(s,rng));
+    s.stock=[];
     note(s,elite?'Victoria de élite · Botín mejorado y más tusi.':'Victoria · Elige botín y prepara tu equipo.');
   }else for(const p of s.players)p.xp=100;
   return true;
@@ -550,6 +550,7 @@ export const nodeKinds={
   combat:{name:'Combate',description:'Enemigos normales y botín estándar.'},
   elite:{name:'Élite',description:'Enemigos más duros y un limo colosal extra. Botín mejor y 50 % más de tusi.'},
   event:{name:'Evento',description:'Un encuentro sin combate. El grupo vota entre varias opciones.'},
+  shop:{name:'Tienda',description:'Un mercader: compra y vende con tusi. Sin combate. Se sigue cuando todos están listos.'},
   boss:{name:'Jefe',description:'Cámara del jefe con glifos.'}
 };
 const voteTime=15000;
@@ -566,7 +567,9 @@ export function makeRoute(rng){
       return r<.42?'combat':r<.7?'elite':'event';
     });
     if(floor>1&&new Set(kinds).size===1)kinds[kinds.length-1]=kinds[0]==='event'?'combat':'event';
-    if(!kinds.some(kind=>kind!=='event'))kinds[0]='combat';
+    // La tienda solo existe en el mapa: siempre una en los pisos 2 y 5, y a veces en el 4.
+    if(floor===2||floor===5||(floor===4&&count===3&&rng()<.35))kinds[Math.floor(rng()*count)]='shop';
+    if(!kinds.some(kind=>kind==='combat'||kind==='elite'))kinds[kinds.indexOf('shop')===0?count-1:0]='combat';
     rows.push(xs.map((x,i)=>({id:floor+'-'+i,floor,kind:kinds[i],x,next:[]})));
   }
   for(let r=0;r<rows.length-1;r++){
@@ -592,6 +595,8 @@ function routeOptions(s){
 /** Pasa al siguiente piso del camino: vota si hay varias rutas, entra directamente si solo hay una. */
 function openRoute(s,rng){
   s.training=false;
+  s.stock=[];
+  s.ready=[];
   const options=routeOptions(s);
   if(options.length===1){enterNode(s,findNode(s,options[0]),rng);return;}
   s.phase='map';
@@ -605,6 +610,7 @@ function enterNode(s,node,rng){
   s.node={id:node.id,kind:node.kind};
   s.route.path.push(node.id);
   if(node.kind==='event'){startEvent(s,rng);return;}
+  if(node.kind==='shop'){startShop(s,rng);return;}
   openFloor(s,rng,node.kind==='elite');
 }
 function castVote(s,player,option,rng){
@@ -682,6 +688,38 @@ const events={
       }}},
     {label:'Saquear',detail:'Cada uno recibe 12 de tusi.',apply:s=>{for(const p of s.players)p.gold+=12;}}]}
 };
+const shopTime=90000;
+function startShop(s,rng){
+  s.floor++;
+  for(const p of s.players)p.level=s.floor;
+  s.phase='shop';
+  s.vote=null;
+  s.event=null;
+  s.ready=[];
+  s.stock=Array.from({length:6},(_,i)=>rollItem(s,rng,{bonus:.12,gear:i<4}));
+  s.turnStarted=Date.now();
+  s.deadline=s.turnStarted+shopTime;
+  note(s,'Piso '+s.floor+' · Tienda del mercader.');
+}
+/** Dar un objeto de la mochila o tusi a otro jugador (fuera de combate). */
+function give(s,p,a){
+  const to=s.players.find(other=>other.id===a.to);
+  if(!to||to.id===p.id)fail('Elige a otro jugador.');
+  if(a.gold!==undefined){
+    const amount=Number(a.gold);
+    if(!Number.isInteger(amount)||amount<=0)fail('Cantidad inválida.');
+    if(amount>p.gold)fail('No tienes suficiente tusi.');
+    p.gold-=amount;
+    to.gold+=amount;
+    note(s,p.name+' da '+amount+' tusi a '+to.name+'.');
+    return;
+  }
+  const index=p.bag.findIndex(item=>item.id===a.item);
+  if(index<0)fail('Objeto no encontrado en tu mochila.');
+  const [item]=p.bag.splice(index,1);
+  to.bag.push(item);
+  note(s,p.name+' da '+item.name+' a '+to.name+'.');
+}
 function startEvent(s,rng){
   const hasHeroes=heroesOf(s).length>0;
   const pool=Object.keys(events).filter(id=>!s.route.seen.includes(id)&&(hasHeroes||!events[id].needsHeroes));
@@ -710,6 +748,7 @@ export function tick(s,rng=Math.random) {
     openRoute(s,rng);return true;
   }
   if(s.phase==='map'||s.phase==='event'){resolveVote(s,rng);return true;}
+  if(s.phase==='shop'){openRoute(s,rng);return true;}
   if(s.phase!=='combat')return false;
   const unit=s.units[s.turn];
   if(!alive(unit)){advance(s,rng);return true;}
@@ -778,6 +817,7 @@ function gearAction(s,p,a,rng) {
     }else if(loot)p.bag.push(loot);
     s.picks.push(p.id);
   }else if(a.type==='buy'){
+    if(s.phase!=='shop')fail('Solo puedes comprar en la tienda.');
     const i=s.stock.findIndex(listing=>listing.id===a.item);
     if(i<0)fail('Ya no está a la venta.');
     if(p.gold<s.stock[i].price)fail('No tienes suficiente tusi.');
@@ -811,6 +851,7 @@ function gearAction(s,p,a,rng) {
       if(gear.socket)p.bag.push(gear.socket);
       gear.socket=item;
     }else if(a.type==='sell'){
+      if(s.phase!=='shop')fail('Solo puedes vender en la tienda.');
       p.bag.splice(bagIndex,1);
       p.gold+=Math.floor(item.price/2)+(item.socket?Math.floor(item.socket.price/2):0);
     }else fail('Acción de inventario inválida.');
@@ -825,9 +866,27 @@ export function act(s,id,a,rng=Math.random) {
     openRoute(s,rng);
     return;
   }
+  const calm=['reward','shop','map','event'].includes(s.phase);
+  if(a.type==='give'){
+    if(!calm)fail('Solo podéis intercambiar fuera del combate.');
+    give(s,player,a);
+    return;
+  }
+  if(calm&&['equip','unequip','socket','unsocket'].includes(a.type)){gearAction(s,player,a,rng);return;}
   if(s.phase==='map'||s.phase==='event'){
     if(a.type!=='vote')fail('Ahora toca votar.');
     castVote(s,player,a.option,rng);
+    return;
+  }
+  if(s.phase==='shop'){
+    if(a.type==='ready'){
+      if(!s.ready.includes(player.id))s.ready.push(player.id);
+      else s.ready=s.ready.filter(id=>id!==player.id);
+      if(s.players.every(p=>s.ready.includes(p.id)))openRoute(s,rng);
+      return;
+    }
+    if(!['buy','sell'].includes(a.type))fail('Acción no disponible en la tienda.');
+    gearAction(s,player,a,rng);
     return;
   }
   if(a.type==='restart'&&['won','lost'].includes(s.phase)&&host){

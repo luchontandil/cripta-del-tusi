@@ -81,6 +81,19 @@ export function spellIcon(kind,symbol) {
     for(const [a,b] of [[[14,5],[14,23]],[[6,9],[22,19]],[[6,19],[22,9]]])stroke('#aff6ff',2,a,b);
     stroke('#eaffff',2,[11,9],[14,6],[17,9]);
     stroke('#eaffff',2,[11,19],[14,22],[17,19]);
+  }else if(kind==='venom'){
+    c.fillStyle='#c9ef7a';c.beginPath();c.moveTo(14,4);c.bezierCurveTo(20,12,22,15,22,18);c.arc(14,18,8,0,Math.PI);c.bezierCurveTo(6,15,8,12,14,4);c.fill();
+    c.fillStyle='#46601f';c.beginPath();c.arc(11,18,2,0,Math.PI*2);c.arc(16.5,20.5,1.4,0,Math.PI*2);c.fill();
+  }else if(kind==='dash'){
+    c.fillStyle='#e6ccff';c.beginPath();c.arc(14,14,9,Math.PI*.35,Math.PI*1.65);c.arc(17,14,7,Math.PI*1.55,Math.PI*.45,true);c.fill();
+    stroke('#fff4ff',2,[17,9],[24,14],[17,19]);
+  }else if(symbol==='✦'){
+    c.fillStyle='#e7dcff';c.beginPath();
+    for(let i=0;i<8;i++){const r=i%2?3.5:11,a=i*Math.PI/4-Math.PI/2;c.lineTo(14+Math.cos(a)*r,14+Math.sin(a)*r);}
+    c.closePath();c.fill();c.fillStyle='#ffffff';c.beginPath();c.arc(14,14,2.5,0,Math.PI*2);c.fill();
+  }else if(symbol==='✹'){
+    c.fillStyle='#ffb057';c.beginPath();c.moveTo(14,3);c.bezierCurveTo(22,10,23,16,21,20);c.arc(14,19,7.5,0,Math.PI);c.bezierCurveTo(5,15,8,12,11,9);c.lineTo(13,13);c.closePath();c.fill();
+    c.fillStyle='#fff0b8';c.beginPath();c.arc(14,20,3.5,0,Math.PI*2);c.fill();
   }else if(symbol==='➶'||kind==='push'){
     stroke('#f4d68c',2,[5,21],[22,6],[21,13]);
     stroke('#fff4c3',2,[16,7],[22,6]);

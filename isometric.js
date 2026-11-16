@@ -9,6 +9,33 @@ const tilesets={
 };
 const overlayColors={walk:'#448ead',cast:'#725298',aim:'#f1bf71',route:'#b3efff',area:'#ed8855',blocked:'#b34255',damage:'#ea6a50',poison:'#9abe56',slow:'#719add'};
 const ink='#121423';
+const flatTile=new T.PlaneGeometry(1,1).rotateX(-Math.PI/2);
+const clock={value:0};
+const overlayCache=new Map();
+/** Material de resaltado: relleno translúcido, borde luminoso y pulso suave. */
+function overlayMaterial(color,strength=1){
+  const key=color+strength;
+  if(overlayCache.has(key))return overlayCache.get(key);
+  const material=new T.ShaderMaterial({
+    uniforms:{tint:{value:new T.Color(color)},time:clock,strength:{value:strength}},
+    vertexShader:`varying vec2 vUv; varying vec3 vWorld;
+      void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.);vWorld=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,
+    fragmentShader:`uniform vec3 tint; uniform float time; uniform float strength; varying vec2 vUv; varying vec3 vWorld;
+      void main(){
+        vec2 q=min(vUv,1.-vUv);
+        float d=min(q.x,q.y);
+        float edge=smoothstep(.16,.0,d);
+        float corner=smoothstep(.30,.0,max(q.x,q.y))*.0;
+        float pulse=.82+.18*sin(time*3.2+(vWorld.x+vWorld.z)*.55);
+        float alpha=(.30+edge*.70)*pulse*strength;
+        vec3 color=mix(tint,vec3(1.),edge*.35);
+        gl_FragColor=vec4(color*(1.+edge*.6),alpha);
+      }`,
+    transparent:true,depthWrite:false,toneMapped:false
+  });
+  overlayCache.set(key,material);
+  return material;
+}
 const logical=(state,pos)=>new T.Vector3(pos%state.width-(state.width-1)/2,0,Math.floor(pos/state.width)-(state.height-1)/2);
 const random=(seed,i)=>((Math.imul(i+7,2654435761)^seed)>>>0)/4294967296;
 const look=u=>u.look||u.classId;
@@ -20,31 +47,32 @@ export function createIso(mount,onCell){
   renderer.setPixelRatio(1);
   renderer.outputColorSpace=T.SRGBColorSpace;
   renderer.toneMapping=T.ACESFilmicToneMapping;
-  renderer.toneMappingExposure=1.25;
+  renderer.toneMappingExposure=1.48;
   renderer.shadowMap.enabled=true;
-  renderer.shadowMap.type=T.PCFShadowMap;
+  renderer.shadowMap.type=T.PCFSoftShadowMap;
   renderer.domElement.setAttribute('aria-hidden','true');
   const labels=document.createElement('div');
   labels.className='iso-labels';
   mount.append(renderer.domElement,labels);
 
   const scene=new T.Scene();
-  scene.fog=new T.Fog('#111420',26,55);
+  scene.fog=new T.Fog('#100d1a',24,52);
   const stage=new T.Group();
   const figures=new T.Group();
   const transient=new T.Group();
   scene.add(stage,figures,transient);
-  scene.add(new T.HemisphereLight('#d4e1ff','#322139',2.15));
-  const key=new T.DirectionalLight('#ffd1a1',2.4);
+  scene.add(new T.HemisphereLight('#d9dcff','#2a1a33',2.3));
+  const key=new T.DirectionalLight('#ffd6a8',2.7);
   key.position.set(-5,10,6);
   key.castShadow=true;
-  key.shadow.mapSize.set(1024,1024);
+  key.shadow.mapSize.set(2048,2048);
+  key.shadow.radius=2;
   key.shadow.camera.left=key.shadow.camera.bottom=-12;
   key.shadow.camera.right=key.shadow.camera.top=12;
   key.shadow.camera.far=42;
   key.shadow.normalBias=.025;
   scene.add(key);
-  const fill=new T.DirectionalLight('#a3aaff',1.2);
+  const fill=new T.DirectionalLight('#9fa6ff',1.35);
   fill.position.set(5,6,-7);
   scene.add(fill);
   const camera=new T.OrthographicCamera(-1,1,1,-1,.1,100);
@@ -53,16 +81,35 @@ export function createIso(mount,onCell){
   const screenCamera=new T.OrthographicCamera(-1,1,1,-1,0,2);
   screenCamera.position.z=1;
   const pixelMaterial=new T.ShaderMaterial({
-    uniforms:{image:{value:pixels.texture},resolution:{value:new T.Vector2(1,1)}},
+    uniforms:{image:{value:pixels.texture},resolution:{value:new T.Vector2(1,1)},time:clock},
     vertexShader:`varying vec2 tex; void main(){tex=uv;gl_Position=vec4(position.xy,0.,1.);}`,
-    fragmentShader:`uniform sampler2D image; uniform vec2 resolution; varying vec2 tex;
+    fragmentShader:`uniform sampler2D image; uniform vec2 resolution; uniform float time; varying vec2 tex;
       void main(){
         vec2 p=floor(tex*resolution);
-        gl_FragColor=texture2D(image,(p+.5)/resolution);
+        vec4 base=texture2D(image,(p+.5)/resolution);
+        // Brillo suave: muestras vecinas de las zonas más luminosas.
+        vec3 glow=vec3(0.);
+        for(int i=0;i<8;i++){
+          float a=float(i)*.785398;
+          vec2 o=vec2(cos(a),sin(a))*3.5/resolution;
+          vec3 c=texture2D(image,(p+.5)/resolution+o).rgb;
+          glow+=max(c-.62,0.);
+        }
+        gl_FragColor=vec4(base.rgb+glow*.16,base.a);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
+        // Gradación: sombras frías, luces cálidas, algo más de contraste.
+        vec3 c=gl_FragColor.rgb;
+        float l=dot(c,vec3(.299,.587,.114));
+        c=mix(c,c*vec3(.92,.95,1.12),1.-smoothstep(.0,.45,l));
+        c=mix(c,c*vec3(1.07,1.0,.9),smoothstep(.5,1.,l));
+        c=mix(vec3(l),c,1.12);
+        c=(c-.5)*1.06+.5;
+        // Viñeta.
+        vec2 v=tex-.5;
+        c*=1.-dot(v,v)*.42;
         float threshold=mod(p.x+p.y*2.,4.)/4.-.375;
-        gl_FragColor.rgb=clamp(floor(gl_FragColor.rgb*31.+.5+threshold)/31.,0.,1.);
+        gl_FragColor.rgb=clamp(floor(clamp(c,0.,1.)*31.+.5+threshold)/31.,0.,1.);
       }`,
     transparent:true,depthTest:false
   });
@@ -73,6 +120,11 @@ export function createIso(mount,onCell){
   const world=new T.Vector3();
   const overlays=[];
   const torches=[];
+  const torchLights=[];
+  const hoverMarker=new T.Mesh(flatTile,overlayMaterial('#ffffff',.55));
+  hoverMarker.visible=false;
+  hoverMarker.renderOrder=3;
+  let dust=null;
   const models=new Map();
   const effects=[];
   const steps=new Map();
@@ -92,7 +144,8 @@ export function createIso(mount,onCell){
       viewWidth=lastRect.width;
       viewHeight=lastRect.height;
       renderer.setSize(viewWidth,viewHeight,false);
-      pixels.setSize(Math.max(1,Math.round(viewWidth*.68)),Math.max(1,Math.round(viewHeight*.68)));
+      const density=Math.min(1,.72*Math.max(1,Math.min(2,window.devicePixelRatio||1)));
+      pixels.setSize(Math.max(1,Math.round(viewWidth*density)),Math.max(1,Math.round(viewHeight*density)));
       pixelMaterial.uniforms.resolution.value.set(pixels.width,pixels.height);
     }
     camera.position.set(17,17.5,18);
@@ -132,6 +185,7 @@ export function createIso(mount,onCell){
     steps.clear();
   }
   function rebuild(){
+    if(dust){dust.geometry.dispose();dust.material.dispose();dust=null;}
     for(const id of models.keys())removeModel(id);
     clearTransient();
     stage.clear();
@@ -140,6 +194,7 @@ export function createIso(mount,onCell){
     routeSignature='';
     overlays.length=0;
     torches.length=0;
+    torchLights.length=0;
     const mode=state.biome||'crypt';
     const palette=tilesets[mode]||tilesets.crypt;
     const walls=new Set(state.walls);
@@ -165,8 +220,11 @@ export function createIso(mount,onCell){
           exposed.push([coord.x-.55,coord.z]);
         }
       }
-      const overlay=piece(stage,'cube','#448ead',coord.x,.007,coord.z,.92,.016,.92,true);
+      const overlay=new T.Mesh(flatTile,overlayMaterial(overlayColors.walk));
+      overlay.position.set(coord.x,.012,coord.z);
+      overlay.renderOrder=2;
       overlay.visible=false;
+      stage.add(overlay);
       overlays.push(overlay);
       if(walls.has(pos)){
         const block=new T.Group();
@@ -186,12 +244,47 @@ export function createIso(mount,onCell){
       const color=mode==='roots'?'#c1f195':'#ffb46b';
       const flame=piece(stage,'gem',color,x,1.34,z,.22,.37,.22,true);
       torches.push(flame);
-      const light=new T.PointLight(color,12,5,2);
+      const light=new T.PointLight(color,14,6,2);
       light.position.set(x,1.47,z);
       stage.add(light);
+      torchLights.push(light);
+      const halo=piece(stage,'orb',color,x,1.36,z,.5,.5,.5,true);
+      halo.material=new T.MeshBasicMaterial({color,transparent:true,opacity:.16,depthWrite:false,blending:T.AdditiveBlending});
       const crystal=piece(stage,'gem',mode==='roots'?'#7da38f':'#8479b5',x+(index===0?.65:-.41),.19,z+.35,.22,.38,.20);
       crystal.rotation.z=.32;
     });
+    stage.add(hoverMarker);
+    const count=reduced?0:Math.round(w*h*1.4);
+    if(count){
+      const positions=new Float32Array(count*3);
+      const seeds=new Float32Array(count);
+      for(let i=0;i<count;i++){
+        positions[i*3]=(random(state.mapSeed,i*3+1)-.5)*(w+2);
+        positions[i*3+1]=random(state.mapSeed,i*3+2)*2.6;
+        positions[i*3+2]=(random(state.mapSeed,i*3+3)-.5)*(h+2);
+        seeds[i]=random(state.mapSeed,i*7)*6.283;
+      }
+      const geometry=new T.BufferGeometry();
+      geometry.setAttribute('position',new T.BufferAttribute(positions,3));
+      geometry.setAttribute('seed',new T.BufferAttribute(seeds,1));
+      const material=new T.ShaderMaterial({
+        uniforms:{time:clock,tint:{value:new T.Color(mode==='roots'?'#d4ff9c':'#ffc98a')}},
+        vertexShader:`attribute float seed; uniform float time; varying float vFade;
+          void main(){
+            vec3 p=position;
+            float t=time*.18+seed;
+            p.y=mod(p.y+time*.12,2.6);
+            p.x+=sin(t*1.3)*.25; p.z+=cos(t)*.25;
+            vFade=sin(p.y/2.6*3.1416)*(.55+.45*sin(time*2.+seed*3.));
+            gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);
+            gl_PointSize=2.;
+          }`,
+        fragmentShader:`uniform vec3 tint; varying float vFade; void main(){gl_FragColor=vec4(tint,vFade*.75);}`,
+        transparent:true,depthWrite:false,blending:T.AdditiveBlending
+      });
+      dust=new T.Points(geometry,material);
+      stage.add(dust);
+    }
     fit();
   }
   function makeLabel(u){
@@ -259,8 +352,9 @@ export function createIso(mount,onCell){
       const type=c.contains('area-preview')?'area':c.contains('route')?'route':c.contains('no-sight')?'blocked':glyph||(
         c.contains('aim')?'aim':c.contains('cast-range')?'cast':c.contains('walk')?'walk':null);
       o.visible=!!type;
-      if(type)o.material=solid(overlayColors[type],true);
-      o.scale.set(c.contains('route')?.88:glyph?.86:.82,.016,c.contains('route')?.88:glyph?.86:.82);
+      if(type)o.material=overlayMaterial(overlayColors[type],type==='route'||type==='area'?1.25:glyph?1.1:1);
+      const size=c.contains('route')?.94:glyph?.92:.9;
+      o.scale.set(size,1,size);
       if(c.contains('route'))route.push([Number(cell.dataset.step),i]);
     }
     route.sort((a,b)=>a[0]-b[0]);
@@ -293,6 +387,11 @@ export function createIso(mount,onCell){
   }
   function changeHover(pos,event){
     if(hover===pos)return;
+    if(pos!==null&&state){
+      const p=logical(state,pos);
+      hoverMarker.position.set(p.x,.02,p.z);
+      hoverMarker.visible=true;
+    }else hoverMarker.visible=false;
     if(hover!==null)onCell('leave',hover,event);
     hover=pos;
     if(pos!==null)onCell('enter',pos,event);
@@ -385,6 +484,10 @@ export function createIso(mount,onCell){
     if(!active)return;
     const delta=previousFrame?Math.min(45,Math.max(0,now-previousFrame)):0;
     previousFrame=now;
+    clock.value=reduced?0:now/1000;
+    for(const [index,light] of torchLights.entries()){
+      light.intensity=reduced?14:12.5+Math.sin(now*.011+index*2.1)*1.6+Math.sin(now*.027+index)*1.1;
+    }
     for(const [index,flame] of torches.entries()){
       const t=reduced?0:now*.007+index;
       flame.scale.y=.34+Math.sin(t)*.065;
@@ -413,6 +516,11 @@ export function createIso(mount,onCell){
       model.arms[1].rotation.x=-gait*.36-swing*.97-breath*.10;
       model.legs[0].rotation.x=-gait*.43;
       model.legs[1].rotation.x=gait*.43;
+      if(model.ring.visible&&!reduced){
+        model.ring.rotation.y=now*.0012;
+        const s=1+Math.sin(now*.005)*.05;
+        model.ring.scale.set(1.22*s,1.39,1.36*s);
+      }
       model.shadow.position.x=model.root.position.x;
       model.shadow.position.z=model.root.position.z;
       const pos=projected(model.root.position.x,model.head+.15+model.figure.position.y,model.root.position.z);

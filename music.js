@@ -1,4 +1,5 @@
 // Short, synthesized effects. This module never starts a soundtrack.
+import {icon} from './icons.js?v=11';
 export function setupSfx(button){
   let context,master;
   let muted=false;
@@ -48,7 +49,8 @@ export function setupSfx(button){
   };
   function reflect(){
     button.setAttribute('aria-pressed',String(!muted));
-    button.textContent=muted?'SFX off':'SFX';
+    button.replaceChildren(icon(muted?'mute':'sound'));
+    button.title=muted?'Sonido desactivado':'Sonido activado';
   }
   reflect();
   button.addEventListener('click',()=>{

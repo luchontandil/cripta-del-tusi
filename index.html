@@ -3,53 +3,78 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#171917">
+  <meta name="theme-color" content="#120f1b">
   <title>Cripta del tusi</title>
-  <link rel="stylesheet" href="./style.css?v=10">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="./style.css?v=11">
 </head>
 <body><main>
-  <header><div class="crest" aria-hidden="true">◆</div><h1>Cripta del tusi</h1></header>
-  <section id="entry" class="panel gateway">
-    <h2>Entrar a la cripta</h2>
-    <label>Nombre <input id="name" maxlength="22" placeholder="Aventurero"></label>
-    <label>Clase <select id="class"><option value="guardia">Guardián</option><option value="tirador">Arquero</option><option value="mistico">Clérigo</option><option value="mago">Mago</option><option value="sombra">Acechante</option></select></label>
-    <div id="class-preview"></div>
-    <button id="solo" class="primary">Jugar en solitario</button>
-    <details><summary>Jugar con amigos</summary>
-      <button id="create">Crear sala</button>
-      <label>Código de sala <input id="code" maxlength="6" placeholder="A1B2C3"></label>
-      <button id="join">Unirse</button>
-      <label>Dirección del servidor <input id="server" type="url" placeholder="https://tu-servidor.example"></label>
-    </details>
+  <header class="brand">
+    <svg class="crest" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 29 16 16 30 3 16Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 8 23 16 16 24 9 16Z" fill="currentColor"/></svg>
+    <h1>Cripta del tusi</h1>
+  </header>
+  <section id="entry" class="gateway">
+    <p class="tagline">Dungeon crawler táctico por turnos · seis pisos · hasta cuatro jugadores</p>
+    <div class="gateway-grid">
+      <div class="panel gateway-main">
+        <h2>Entrar a la cripta</h2>
+        <label class="field">Nombre <input id="name" maxlength="22" placeholder="Aventurero" autocomplete="nickname"></label>
+        <fieldset class="class-picker">
+          <legend>Clase</legend>
+          <div id="class-cards" class="class-cards" role="radiogroup" aria-label="Clase"></div>
+          <select id="class" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="guardia">Guardián</option><option value="tirador">Arquero</option><option value="mistico">Clérigo</option><option value="mago">Mago</option><option value="sombra">Acechante</option></select>
+        </fieldset>
+        <div id="class-preview" class="class-preview" aria-live="polite"></div>
+        <button id="solo" class="primary big">Jugar en solitario</button>
+      </div>
+      <details class="panel gateway-online" open>
+        <summary><h2>Jugar con amigos</h2></summary>
+        <p class="hint">Crea una sala y comparte el código, o únete a la de un amigo.</p>
+        <button id="create" class="wide">Crear sala</button>
+        <div class="join-row">
+          <label class="field">Código de sala <input id="code" maxlength="6" placeholder="A1B2C3" autocapitalize="characters" spellcheck="false"></label>
+          <button id="join">Unirse</button>
+        </div>
+        <label class="field small">Dirección del servidor <input id="server" type="url" placeholder="https://tu-servidor.example"></label>
+      </details>
+    </div>
   </section>
   <p id="error" role="status"></p>
-  <div id="unit-tooltip" class="panel unit-tooltip" role="tooltip" hidden></div>
+  <div id="unit-tooltip" class="tip" role="tooltip" hidden></div>
   <section id="game" hidden>
-    <div class="status"><div id="room"></div><button id="copy-code" hidden>Copiar código</button><button id="view-toggle" aria-pressed="false" hidden>Vista isométrica</button><button id="leave">Salir</button></div>
-    <section class="fight-header panel"><h2 id="phase"></h2></section>
+    <div class="topbar panel">
+      <div class="status"><span id="room" class="chip"></span><button id="copy-code" class="ghost" hidden>Copiar código</button></div>
+      <h2 id="phase"></h2>
+      <div class="top-actions"><button id="view-toggle" class="ghost" aria-pressed="false" hidden>Vista isométrica</button><button id="leave" class="ghost">Salir</button></div>
+    </div>
     <div class="layout">
-      <aside class="panel combat-log"><h2>Registro</h2><ol id="log"></ol></aside>
+      <aside class="side-left">
+        <section class="panel turn-order"><h3>Orden de turno</h3><ol id="turns" class="initiative" aria-label="Orden de iniciativa"></ol></section>
+        <section class="panel combat-log"><h3>Registro</h3><ol id="log"></ol></section>
+      </aside>
       <section class="arena">
-        <ol id="turns" class="initiative" aria-label="Orden de iniciativa"></ol>
         <div id="battlefield">
           <div id="iso-world" hidden></div><div id="board"></div><div id="animations" aria-hidden="true"></div>
           <div class="field-menu" aria-label="Controles del tablero">
-            <button id="field-bag" type="button" title="Mostrar u ocultar equipo y mochila" aria-pressed="true">Equipo</button>
-            <button id="field-sfx" type="button" aria-label="Efectos de sonido" aria-pressed="true">SFX</button>
-            <button id="field-view" type="button" title="Cambiar vista" aria-pressed="true">3D</button>
-            <button id="zoom-out" type="button" aria-label="Alejar cámara">−</button>
-            <button id="zoom-in" type="button" aria-label="Acercar cámara">+</button>
+            <button id="field-bag" type="button" title="Mostrar u ocultar equipo y mochila" aria-label="Equipo y mochila" aria-pressed="true">Equipo</button>
+            <button id="field-sfx" type="button" title="Efectos de sonido" aria-label="Efectos de sonido" aria-pressed="true">SFX</button>
+            <button id="field-view" type="button" title="Cambiar entre vista 3D y cenital" aria-label="Cambiar vista" aria-pressed="true">3D</button>
+            <button id="zoom-out" type="button" title="Alejar cámara" aria-label="Alejar cámara">−</button>
+            <button id="zoom-in" type="button" title="Acercar cámara" aria-label="Acercar cámara">+</button>
             <button id="field-shop" type="button" hidden>Mercader</button>
           </div>
+          <div id="glyph-legend" hidden class="legend"><span class="g-damage">Brasas · daño</span><span class="g-poison">Veneno · daño por turno</span><span class="g-slow">Cadenas · <b class="stat-mp">−2 PM</b></span></div>
           <section id="rewards" aria-label="Botín y mercader" hidden></section>
         </div>
-        <div id="glyph-legend" hidden class="legend"><span>◆ Brasas · daño</span><span>◆ Veneno · daño por turno</span><span>◆ Cadenas · <b class="stat-mp">−2 PM</b></span></div>
-        <div id="controls" class="actionbar"></div>
-        <div id="turn-bar" class="panel" hidden>
-          <span class="points ap"><strong id="pa"></strong> PA</span>
-          <div id="clock" role="progressbar" aria-label="Tiempo de turno" aria-valuemin="0"><span id="seconds"></span></div>
-          <span class="points mp"><strong id="pm"></strong> PM</span>
-          <button id="end-turn" class="primary" aria-keyshortcuts="F1">Terminar turno <kbd>F1</kbd></button>
+        <div class="hud">
+          <div id="controls" class="actionbar"></div>
+          <div id="turn-bar" hidden>
+            <span class="points ap" title="Puntos de acción"><strong id="pa"></strong> PA</span>
+            <div id="clock" role="progressbar" aria-label="Tiempo de turno" aria-valuemin="0"><span id="seconds"></span></div>
+            <span class="points mp" title="Puntos de movimiento"><strong id="pm"></strong> PM</span>
+            <button id="end-turn" class="primary" aria-keyshortcuts="F1">Terminar turno <kbd>F1</kbd></button>
+          </div>
         </div>
       </section>
       <aside id="inventory" hidden></aside>
@@ -57,5 +82,5 @@
   </section>
 </main>
 <dialog id="training" aria-labelledby="training-title"><h2 id="training-title"></h2><p>Aprende una habilidad o mejora una que ya conoces.</p><div id="training-choices"></div></dialog>
-<script type="module" src="./client.js?v=10"></script></body>
+<script type="module" src="./client.js?v=11"></script></body>
 </html>

@@ -1160,21 +1160,21 @@ function ps1Hero(kind,tint){
   lp(body,P.box,k.cloth,[0,.6,.12],[.08,0,0],[.2,.3,.03]);                         // tabardo delantero
   lp(body,P.box,k.cloth,[0,.6,-.12],[-.08,0,0],[.22,.3,.03]);                      // tabardo trasero
   lp(body,P.box,k.brass,[0,.74,.135],[0,0,0],[.2,.025,.02]);
-  lp(body,P.prism6,k.skin,[0,1.05,0],[0,0,0],[.12,.08,.12]);                       // cuello
+  lp(body,P.prism6,k.steelDark,[0,1.05,0],[0,0,0],[.12,.08,.12]);                  // cuello (cota)
   lp(body,P.taper6,k.steelDark,[0,1.04,0],[0,Math.PI/6,0],[.28,.06,.24]);          // gorjal
-  lp(body,P.head,k.skin,[0,1.2,0],[0,Math.PI/8,0],[.24,.28,.25]);                  // cabeza
+  lp(body,P.head,k.steel,[0,1.2,0],[0,Math.PI/8,0],[.27,.28,.27]);                 // yelmo cerrado
+  lp(body,P.box,'#141218',[0,1.215,.128],[0,0,0],[.19,.03,.02]);                   // ranura de visión
+  lp(body,P.box,k.steelDark,[0,1.13,.125],[0,0,0],[.14,.07,.02]);                  // respiradero
+  for(const x of [-.04,0,.04])lp(body,P.box,'#141218',[x,1.13,.137],[0,0,0],[.012,.04,.01]);
   lp(body,P.dome,k.steel,[0,1.27,0],[0,Math.PI/8,0],[.31,.24,.31]);                // casco
   lp(body,P.prism6,k.brass,[0,1.275,0],[0,Math.PI/6,0],[.31,.03,.31]);             // aro del casco
-  lp(body,P.box,k.steel,[0,1.22,.13],[0,0,0],[.035,.13,.03]);                      // nasal
+  lp(body,P.box,k.steel,[0,1.19,.135],[0,0,0],[.03,.1,.02]);                       // refuerzo central
   lp(body,P.box,k.steel,[0,1.15,-.1],[.15,0,0],[.27,.2,.07]);                      // cubrenuca
-  for(const s of [-1,1])lp(body,P.box,k.hair,[s*.115,1.24,-.02],[0,0,0],[.03,.06,.16]); // pelo bajo el casco
-  for(const s of [-1,1])lp(body,P.box,k.steel,[s*.12,1.16,.04],[0,s*.25,0],[.03,.13,.14]); // carrilleras
+
+
   lp(body,P.box,k.cloth,[0,1.42,-.02],[0,0,0],[.04,.12,.28]);                      // cimera
   lp(body,P.box,k.clothDark,[0,1.44,-.17],[.5,0,0],[.04,.08,.1]);
   const torso=fuse(body,'body');figure.add(torso);
-  // Cara pixelada (una draw call más, compartida entre héroes con la misma piel).
-  const face=new T.Mesh(new T.PlaneGeometry(.17,.17),new T.MeshStandardMaterial({map:faceTexture(k.skin,k.hair,{scar:true}),roughness:.9}));
-  face.position.set(0,1.185,.122);torso.add(face);
   // ── Piernas ──
   const legs=[-1,1].map(s=>{
     const leg=new T.Group();leg.position.set(s*.09,.6,0);figure.add(leg);
@@ -1215,12 +1215,14 @@ function ps1Hero(kind,tint){
   arms[0].getObjectByName('held').add(shield);
   // ── Espada (mano derecha) ──
   const wp=[];
-  lp(wp,P.box,'#d6e0e4',[0,.3,0],[0,0,0],[.06,.5,.018]);
-  lp(wp,P.cone6,'#d6e0e4',[0,.58,0],[0,0,0],[.06,.08,.02]);
-  lp(wp,P.box,k.brass,[0,.04,0],[0,0,0],[.2,.035,.05]);
-  lp(wp,P.prism6,k.leather,[0,-.03,0],[0,0,0],[.035,.1,.035]);
-  lp(wp,P.oct,k.brass,[0,-.1,0],[0,0,0],[.06,.06,.06]);
-  const sword=fuse(wp,'sword');
+  lp(wp,P.prism6,'#6a4a30',[0,.17,0],[0,0,0],[.04,.4,.04]);                       // mango
+  lp(wp,P.prism6,k.leather,[0,.0,0],[0,0,0],[.05,.12,.05]);                       // empuñadura
+  lp(wp,P.oct,k.brass,[0,-.08,0],[0,0,0],[.06,.06,.06]);                          // pomo
+  lp(wp,P.prism6,k.steelDark,[0,.43,0],[0,0,0],[.09,.16,.09]);                    // cabeza de la maza
+  for(let i=0;i<6;i++){const a=i*Math.PI/3;lp(wp,P.box,k.steel,[Math.sin(a)*.065,.43,Math.cos(a)*.065],[0,a,0],[.025,.17,.07]);} // pestañas
+  lp(wp,P.cone6,k.steel,[0,.55,0],[0,0,0],[.06,.07,.06]);                          // punta
+  lp(wp,P.prism6,k.brass,[0,.33,0],[0,0,0],[.07,.025,.07]);                       // collar
+  const sword=fuse(wp,'mace');
   const swordHolder=arms[1].getObjectByName('held');
   swordHolder.add(sword);swordHolder.rotation.x=1.25;
   const animate=(t,{gait,swing,walking,phase})=>{
@@ -1234,5 +1236,6 @@ function ps1Hero(kind,tint){
     arms[0].rotation.z=-.1;arms[1].rotation.z=.1;
     legs[0].rotation.x=-gait*.55;legs[1].rotation.x=gait*.55;
   };
-  return {root,figure,legs,arms,head:1.46,animate,pose:{T:()=>{arms[0].rotation.set(0,0,-Math.PI/2);arms[1].rotation.set(0,0,Math.PI/2);legs.forEach(l=>l.rotation.set(0,0,0));}}};
+  figure.scale.set(.92,.86,.92);
+  return {root,figure,legs,arms,head:1.46*.86,animate,pose:{T:()=>{arms[0].rotation.set(0,0,-Math.PI/2);arms[1].rotation.set(0,0,Math.PI/2);legs.forEach(l=>l.rotation.set(0,0,0));}}};
 }

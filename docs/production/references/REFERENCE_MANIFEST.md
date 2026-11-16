@@ -2,6 +2,8 @@
 
 **Estado (17-11-2026, Claude):** Fase 1 completada contra el checkout vigente del juego (commit `db43077`). Referencias raster todavía no generadas. **No aprobar para modelado final.**
 
+**Reglas fijadas por Lucho (17-11-2026):** PS1 estilizado ~4–5 cabezas; **caras ocultas** en todos los héroes; héroes de ~1,16 u de alto.
+
 **Bloqueos actuales para la Fase 2:**
 1. ~~Conflicto de dirección~~ **Resuelto por Lucho (17-11-2026): «PS1 estilizado, ~4–5 cabezas»**: cuerpo más adulto pero algo cabezón y legible desde arriba, low-poly facetado con texturas pixeladas. Sustituye a las 2,5–3 cabezas chibi de `STYLE_GUIDE.md`, `HERO_ARCHETYPES.md`, `PRODUCTION_BIBLE.md` y `CLAUDE_HANDOFF.md` (pendiente actualizar esos documentos).
 2. ~~Generador de imágenes~~ Resuelto: Claude produce las láminas renderizando el propio modelo 3D (mismo modelo en todas las vistas). Lucho dio el visto bueno al método el 17-11-2026 con el Guardián como primera prueba.
@@ -34,7 +36,7 @@ La lista completa, vistas, observaciones y huecos de auditoría está en [ASSET_
 | Asset | Categoría | Archivo | Vistas previstas | Estado | Observaciones |
 |---|---|---|---|---|---|
 | Style guide / lineup / materiales | Dirección visual | `00_style_guide.png`, `01_class_lineup.png`, `02_palette_materials.png` | Paneles de muestras y escala común | Pendiente | Proporciones chibi y materiales PBR simplificados de la biblia local |
-| Guardián | Personaje | `hero_guardian.png`, `hero_guardian_ingame.png`, `hero_guardian.md` | T-pose frontal, lateral, trasera, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | Render del modelo PS1 `ps1Hero('guardia')`; 930 tris, 8 draw calls. Pendiente de revisión de Lucho |
+| Guardián | Personaje | `hero_guardian.png`, `hero_guardian_ingame.png`, `hero_guardian.md` | T-pose frontal, lateral, trasera, 3/4, cenital, isométrico, escala | **Propuesta v2** (17-11-2026) | Render del modelo PS1 `ps1Hero('guardia')`; 1 060 tris, 7 draw calls, 1 material. Correcciones aplicadas: sin cara, maza, más bajo. Pendiente de revisión |
 | Arquero, Clérigo, Mago, Ninja | Personajes | `hero_archer.png`, `hero_cleric.png`, `hero_mage.png`, `hero_ninja.png` | Igual que el Guardián | Pendiente | Se harán con el mismo método cuando se apruebe la dirección del Guardián |
 | Monstruos y jefes | Bestiario | Ver inventario | Ortho F/L/T, top-down, escala, articulaciones y ataque | Pendiente | Cobertura enumerada en inventario; diseño final requiere hojas aprobadas |
 | Mazmorra, Jungla, Infierno | Entorno | `act_crypt.png`, `act_jungle.png`, `act_hell.png` | Room top-down/isométrico + kit modular/footprints | Pendiente | No fijar metros ni tile sin medida de código |

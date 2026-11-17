@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=31';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=31';
-import {setupSfx} from './music.js?v=31';
-import {icon} from './icons.js?v=31';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=32';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=32';
+import {setupSfx} from './music.js?v=32';
+import {icon} from './icons.js?v=32';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -95,7 +95,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=31').then(({createIso})=>{
+import('./isometric.js?v=32').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1290,7 +1290,7 @@ function drawBoard(turn,walking,skill){
   board.className=(state.biome||'crypt')+(state.voids?.length?' shaped':'');
   const fragment=document.createDocumentFragment();
   const shades={jungle:['#3d5a2c','#4a6a32','#36502a','#56763a'],crypt:['#353a4c','#2f3444','#3a3e52','#2b3040'],roots:['#55513a','#4d573b','#60573d','#3f4938'],bones:['#5a5246','#4e473c','#625a4c','#474036'],
-    hell:['#4a2a22','#3e2420','#542e24','#36201c']}[state.biome]||['#49524c','#3d4845','#515650','#3b4540'];
+    hell:['#2e2826','#2a2624','#3a3330','#262220']}[state.biome]||['#49524c','#3d4845','#515650','#3b4540'];
   for(let pos=0;pos<state.width*state.height;pos++){
     const unit=state.units.find(u=>u.hp>0&&u.pos===pos);
     const voidCell=!onBoard(state,pos);

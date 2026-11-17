@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,obstacle,piece,solid} from './models3d.js?v=31';
-import {playerColors} from './engine.js?v=31';
+import {miniature,obstacle,piece,solid} from './models3d.js?v=32';
+import {playerColors} from './engine.js?v=32';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -9,10 +9,10 @@ const tilesets={
   jungle:['#2c4322','#344d27','#283d1f','#3c572c','#304824'],
   roots:['#3c524e','#465c50','#384a4a','#4e5f55','#415450'],
   bones:['#4e4840','#5a5246','#474036','#625a4c','#514a3e'],
-  hell:['#3e2420','#4a2a22','#36201c','#542e24','#41261f']
+  hell:['#2a2624','#322c29','#262220','#3a3330','#2e2826']
 };
-const biomeLight={crypt:'#ffa45a',jungle:'#e8ff8a',roots:'#c1f195',bones:'#9dffb8',hell:'#ff6a2a'};
-const biomeFog={crypt:'#07060d',jungle:'#0c1a0e',roots:'#0d1412',bones:'#12110e',hell:'#1a0806'};
+const biomeLight={crypt:'#ffa45a',jungle:'#e8ff8a',roots:'#c1f195',bones:'#9dffb8',hell:'#ff8a3a'};
+const biomeFog={crypt:'#07060d',jungle:'#0c1a0e',roots:'#0d1412',bones:'#12110e',hell:'#0e0b0a'};
 const overlayColors={walk:'#448ead',cast:'#725298',aim:'#f1bf71',route:'#b3efff',area:'#ed8855',blocked:'#b34255',damage:'#ea6a50',poison:'#9abe56',slow:'#719add'};
 const ink='#121423';
 const flatTile=new T.PlaneGeometry(1,1).rotateX(-Math.PI/2);
@@ -358,7 +358,7 @@ export function createIso(mount,onCell){
     scene.fog.color.set(biomeFog[mode]||'#100d1a');
     // Luz de cada acto: mazmorra fría y oscura, jungla verde y húmeda, infierno rojo.
     const mood={crypt:['#9aa2d8','#140c1c',1.6,'#ffc890',2.1,'#7a82e0',1.0],jungle:['#c8e8b0','#142010',1.9,'#ffe8a0',2.4,'#6ab890',1.0],
-      hell:['#c88878','#2a0804',1.6,'#ff9a5a',2.1,'#ff4a2a',1.0]}[mode]||['#d9dcff','#2a1a33',2.3,'#ffd6a8',2.7,'#9fa6ff',1.35];
+      hell:['#c8b8b0','#1a1210',1.5,'#ffc890',1.9,'#8a7ab8',.8]}[mode]||['#d9dcff','#2a1a33',2.3,'#ffd6a8',2.7,'#9fa6ff',1.35];
     sky.color.set(mood[0]);sky.groundColor.set(mood[1]);sky.intensity=mood[2];
     key.color.set(mood[3]);key.intensity=mood[4];fill.color.set(mood[5]);fill.intensity=mood[6];
     const palette=tilesets[mode]||tilesets.crypt;

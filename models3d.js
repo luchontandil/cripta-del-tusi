@@ -818,7 +818,7 @@ export function obstacle(root,kind,variant) {
   if(kind==='jungle'){jungleObstacle(root,variant);return;}
   if(kind==='hell'&&variant===2){hellObstacle(root);return;}
   const palette={crypt:['#4a5268','#2a3044','#6a7590','#a58ae8'],roots:['#58635d','#333e43','#77a681','#b7ed91'],
-    bones:['#7a6e5e','#4a4036','#d6c9a8','#9dffb8'],hell:['#5a2a24','#2a1210','#b4462a','#ffb347']}[kind]||[];
+    bones:['#7a6e5e','#4a4036','#d6c9a8','#9dffb8'],hell:['#3a3230','#1e1a19','#5a4a44','#ff8a3a']}[kind]||[];
   const [stone,dark,trim]=palette.length?palette:['#59667b','#354159','#8292ac'];
   piece(root,'cube',dark,0,.10,0,.82,.22,.82);
   if(variant===0){

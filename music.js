@@ -1,12 +1,15 @@
-// Short, synthesized effects. This module never starts a soundtrack.
-import {icon} from './icons.js?v=42';
+// Sonido del juego: efectos, ambiente por acto y música de fondo.
+import {icon} from './icons.js?v=43';
 export function setupSfx(button){
   let context,master;
   let muted=false;
-  // Volúmenes guardados en el navegador (0–1): efectos y ambiente.
+  // Volúmenes guardados en el navegador (0–1). Por defecto: efectos 15 %, ambiente 25 %, música 5 %.
+  // (Claves nuevas: todos los jugadores empiezan con estos valores aunque antes hubieran movido las barras.)
   const stored=(key,fallback)=>{try{const v=parseFloat(localStorage.getItem(key));return Number.isFinite(v)?Math.min(1,Math.max(0,v)):fallback;}catch{return fallback;}};
-  let volumeSfx=stored('cripta-sfx-volume',.7),volumeAmbience=stored('cripta-amb-volume',.6);
-  let ambienceBus=null;
+  const keys={sfx:'cripta-vol-sfx',amb:'cripta-vol-amb',music:'cripta-vol-music'};
+  let volumeSfx=stored(keys.sfx,.15),volumeAmbience=stored(keys.amb,.25),volumeMusic=stored(keys.music,.05);
+  let ambienceBus=null,musicBus=null;
+  const MUSIC_GAIN=6;   // escala de la barra de música: al 5 % queda de fondo, ~15 dB bajo los efectos
   try{muted=localStorage.getItem('cripta-sfx-muted')==='yes';}catch{}
   function ready(){
     if(muted)return false;
@@ -21,10 +24,32 @@ export function setupSfx(button){
         ambienceBus=context.createGain();
         ambienceBus.gain.value=.75*volumeAmbience;
         ambienceBus.connect(context.destination);
+        musicBus=context.createGain();
+        musicBus.gain.value=MUSIC_GAIN*volumeMusic;
+        musicBus.connect(context.destination);
       }
+      startMusic();
       if(context.state!=='running')context.resume().catch(()=>{});
       return true;
     }catch{return false;}
+  }
+  // Música de fondo en bucle («Dungeon Pulse»), arranca con el primer gesto.
+  let music=null;
+  function startMusic(){
+    if(music||muted||!context)return;
+    music={pending:true};
+    buffer('music_dungeon').then(data=>{
+      if(!data||muted||!music?.pending){music=null;return;}
+      const source=context.createBufferSource(),gain=context.createGain();
+      source.buffer=data;source.loop=true;
+      gain.gain.value=0;gain.gain.setTargetAtTime(1,context.currentTime,2);
+      source.connect(gain).connect(musicBus);source.start();
+      music={source,gain};
+    });
+  }
+  function stopMusic(){
+    if(music?.source){const old=music;old.gain.gain.setTargetAtTime(0,context.currentTime,.4);setTimeout(()=>{try{old.source.stop();}catch{}},2000);}
+    music=null;
   }
   // Algunos navegadores (Firefox) dejan el audio suspendido: se reintenta con cada gesto.
   const unlock=()=>{if(context&&context.state!=='running')context.resume().catch(()=>{});};
@@ -45,7 +70,7 @@ export function setupSfx(button){
   // ── Banco de sonidos (OpenGameArt CC0 + Little Robot Sound Factory CC-BY 3.0; ver sfx/CREDITS.md) ──
   // Cada clave tiene varias variantes; se elige una al azar con un ligero cambio de tono.
   const base=new URL('./sfx/',import.meta.url);
-  const SFX_VERSION='5';   // súbelo al cambiar archivos del banco
+  const SFX_VERSION='6';   // súbelo al cambiar archivos del banco
   const diag={decoded:0,failed:0,lastError:''};
   let bank=null,bankLoading=null;
   const buffers=new Map();
@@ -143,8 +168,8 @@ export function setupSfx(button){
       b.title=muted?'Sonido desactivado':'Sonido';
     }
     muteBox.checked=!muted;
-    sfxRange.value=Math.round(volumeSfx*100);ambRange.value=Math.round(volumeAmbience*100);
-    sfxOut.textContent=sfxRange.value+' %';ambOut.textContent=ambRange.value+' %';
+    sfxRange.value=Math.round(volumeSfx*100);ambRange.value=Math.round(volumeAmbience*100);musicRange.value=Math.round(volumeMusic*100);
+    sfxOut.textContent=sfxRange.value+' %';ambOut.textContent=ambRange.value+' %';musicOut.textContent=musicRange.value+' %';
   }
   // Menú de sonido: activar/desactivar y barras de volumen.
   const menu=document.createElement('div');
@@ -153,16 +178,18 @@ export function setupSfx(button){
     <label class="sound-row"><input type="checkbox" data-k="on"> Sonido activado</label>
     <label class="sound-row">Efectos <input type="range" min="0" max="100" step="5" data-k="sfx"><output></output></label>
     <label class="sound-row">Ambiente <input type="range" min="0" max="100" step="5" data-k="amb"><output></output></label>
+    <label class="sound-row">Música <input type="range" min="0" max="100" step="5" data-k="music"><output></output></label>
     <button type="button" class="ghost sound-test" data-k="test">Probar sonido</button>
     <p class="sound-diag" data-k="diag" hidden></p>`;
   document.body.append(menu);
   const muteBox=menu.querySelector('[data-k="on"]'),sfxRange=menu.querySelector('[data-k="sfx"]'),ambRange=menu.querySelector('[data-k="amb"]');
-  const [sfxOut,ambOut]=menu.querySelectorAll('output');
+  const musicRange=menu.querySelector('[data-k="music"]');
+  const [sfxOut,ambOut,musicOut]=menu.querySelectorAll('output');
   function place(){const r=anchor.getBoundingClientRect();menu.style.top=(r.bottom+6)+'px';menu.style.left=Math.max(8,Math.min(innerWidth-236,r.right-228))+'px';}
   function setMuted(next){
     muted=next;
     try{localStorage.setItem('cripta-sfx-muted',muted?'yes':'no');}catch{}
-    if(muted){const key=ambienceKey;ambient('');ambienceKey=key;}
+    if(muted){const key=ambienceKey;ambient('');ambienceKey=key;stopMusic();}
     else{play('click');const key=ambienceKey;ambienceKey='';ambient(key);}
     reflect();
   }
@@ -187,11 +214,13 @@ export function setupSfx(button){
       diagBox.textContent=lines.join(' ');
     },1400);
   });
-  sfxRange.addEventListener('input',()=>{volumeSfx=sfxRange.value/100;try{localStorage.setItem('cripta-sfx-volume',volumeSfx);}catch{}
+  sfxRange.addEventListener('input',()=>{volumeSfx=sfxRange.value/100;try{localStorage.setItem(keys.sfx,volumeSfx);}catch{}
     if(master)master.gain.value=.5*volumeSfx;reflect();});
   sfxRange.addEventListener('change',()=>play('hit'));
-  ambRange.addEventListener('input',()=>{volumeAmbience=ambRange.value/100;try{localStorage.setItem('cripta-amb-volume',volumeAmbience);}catch{}
+  ambRange.addEventListener('input',()=>{volumeAmbience=ambRange.value/100;try{localStorage.setItem(keys.amb,volumeAmbience);}catch{}
     if(ambienceBus)ambienceBus.gain.value=.75*volumeAmbience;reflect();});
+  musicRange.addEventListener('input',()=>{volumeMusic=musicRange.value/100;try{localStorage.setItem(keys.music,volumeMusic);}catch{}
+    if(musicBus)musicBus.gain.value=MUSIC_GAIN*volumeMusic;if(ready())startMusic();reflect();});
   reflect();
   function attach(b){
     if(!b)return;

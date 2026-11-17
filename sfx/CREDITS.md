@@ -239,3 +239,7 @@ No son de dominio público: solo para uso dentro de este juego, no se pueden reu
 - `el_shadow_1.ogg` ← 01 DSGNErie, Dark, Synth, Low.wav (Soundsnap)
 - `el_shadow_2.ogg` ← 03 DSGNErie, Dark, Synth.wav (Soundsnap)
 - `el_shadow_3.ogg` ← 01 DSGNErie, Danger, Tense, Dark.wav (Soundsnap)
+
+## Música
+
+- `music_dungeon.ogg` ← «Dungeon Pulse», aportada por el propietario del proyecto (convertida a OGG, normalizada y preparada para repetirse en bucle).

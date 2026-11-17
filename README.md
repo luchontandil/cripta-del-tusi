@@ -90,3 +90,10 @@ Efectos de sonido de OpenGameArt.org, procesados (recorte, mono, normalizado, OG
 packs CC0 de rubberduck, artisticdude, Kenney, qubodup, Ogrebane y JaggedStone, y la
 *Fantasy Sound Effects Library* de **Little Robot Sound Factory** (www.littlerobotsoundfactory.com),
 licencia CC-BY 3.0. Lista por archivo en [`sfx/CREDITS.md`](sfx/CREDITS.md).
+
+## Editor de sonidos (administradores)
+
+Los nicks de la variable de entorno `ADMIN_NICKS` (separados por comas) ven el botón
+**Editor de SFX** en su cuenta. Desde ahí se ajusta el volumen y el tono de cada categoría,
+se puede usar el sonido de otra categoría y desactivar variantes (clic derecho).
+«Guardar para todos» guarda la mezcla en la base de datos y la reciben todos los jugadores.

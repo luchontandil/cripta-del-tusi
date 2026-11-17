@@ -46,14 +46,16 @@ export const server = createServer(async (req,res) => {
     let body = {};
     if (req.method === 'POST') {
       let input = '';
+      const limit = path === '/api/account/sfx-mix' ? 32768 : 4096;
       for await (const chunk of req) {
         input += chunk;
-        if (input.length > 4096) return send(413,{error:'Solicitud demasiado grande.'});
+        if (input.length > limit) return send(413,{error:'Solicitud demasiado grande.'});
       }
       body = JSON.parse(input || '{}');
     }
     const accountToken = req.headers['x-account'] || null;
     if (code === 'account') return send(200, await accountRoute(operation, req.method, body, accountToken));
+    if (code === 'sfx' && operation === 'mix' && req.method === 'GET') return send(200,{mix:await accounts.soundMix()});
     if (req.method === 'POST' && ((code === 'rooms' && !operation) || operation === 'join')) {
       const creating = code === 'rooms';
       if (creating && rooms.size >= 250) return send(503,{error:'Servidor lleno.'});
@@ -122,6 +124,7 @@ async function accountRoute(operation,method,body,tokenValue){
   }
   if(operation==='dismiss')return {user:await accounts.dismissInvite(user,body.from)};
   if(operation==='award')return accounts.awardSolo(user,body);
+  if(operation==='sfx-mix')return {mix:await accounts.saveSoundMix(user,body.mix)};
   throw new Error('Ruta desconocida.');
 }
 setInterval(() => {

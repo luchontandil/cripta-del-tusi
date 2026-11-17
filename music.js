@@ -1,5 +1,5 @@
 // Short, synthesized effects. This module never starts a soundtrack.
-import {icon} from './icons.js?v=33';
+import {icon} from './icons.js?v=34';
 export function setupSfx(button){
   let context,master;
   let muted=false;
@@ -55,21 +55,36 @@ export function setupSfx(button){
   // Mapa de efectos del motor a claves del banco.
   const aliases={slash:'swing',expose:'arcane',pull:'push',swap:'dash',poison:'venom',fire:'blast'};
   /** Reproduce una muestra del banco. Devuelve false si no existe (para caer en el sintetizador). */
-  function sample(key,{volume=1,rate=1,delay=0,pan=0}={}){
+  // Mezcla del editor de SFX (la define un administrador en el servidor).
+  let mix={};
+  /** Archivo de una categoría según la mezcla: origen, variantes activas. null = silencio. */
+  function pickFile(name){
+    const m=mix[name]||{};
+    const src=m.from&&bank[m.from]?m.from:name;
+    if(src.startsWith('amb_'))return src;
+    const on=Array.from({length:bank[src]},(_,i)=>i+1).filter(n=>!(m.off||[]).includes(n));
+    if(!on.length)return null;
+    return src+'_'+on[Math.floor(Math.random()*on.length)];
+  }
+  let lastPreview=null;
+  function sample(key,{volume=1,rate=1,delay=0,pan=0,file:forced=null,exact=false,track=false}={}){
     if(!bank)return false;
     const name=bank[key]?key:bank[aliases[key]]?aliases[key]:null;
-    if(!name)return false;
-    const count=bank[name];
-    const file=name.startsWith('amb_')?name:name+'_'+(1+Math.floor(Math.random()*count));
+    if(!name&&!forced)return false;
+    const m=forced?{}:mix[name]||{};
+    const file=forced||pickFile(name);
+    if(!file)return true;
+    volume*=m.volume??1;rate*=m.pitch??1;
     buffer(file).then(data=>{
       if(!data||muted)return;
       const source=context.createBufferSource(),gain=context.createGain();
       source.buffer=data;
-      source.playbackRate.value=rate*(.93+Math.random()*.14);
+      source.playbackRate.value=rate*(exact?1:.93+Math.random()*.14);
       gain.gain.value=volume;
       let node=source.connect(gain);
       if(pan&&context.createStereoPanner){const p=context.createStereoPanner();p.pan.value=Math.max(-1,Math.min(1,pan));node=node.connect(p);}
       node.connect(master);
+      if(track){try{lastPreview?.stop();}catch{}lastPreview=source;}
       source.start(context.currentTime+delay);
     });
     return true;
@@ -81,11 +96,12 @@ export function setupSfx(button){
     ambienceKey=key;
     if(ambience){const old=ambience;old.gain.gain.setTargetAtTime(0,context.currentTime,.6);setTimeout(()=>old.source.stop(),3000);ambience=null;}
     if(!key||!ready()||!bank?.[key])return;
-    buffer(key).then(data=>{
+    const file=pickFile(key),level=.6*(mix[key]?.volume??1);
+    buffer(file).then(data=>{
       if(!data||ambienceKey!==key||muted)return;
       const source=context.createBufferSource(),gain=context.createGain();
-      source.buffer=data;source.loop=true;
-      gain.gain.value=0;gain.gain.setTargetAtTime(.6,context.currentTime,1.2);
+      source.buffer=data;source.loop=true;source.playbackRate.value=mix[key]?.pitch??1;
+      gain.gain.value=0;gain.gain.setTargetAtTime(level,context.currentTime,1.2);
       source.connect(gain).connect(ambienceBus);source.start();
       ambience={source,gain};
     });
@@ -149,5 +165,18 @@ export function setupSfx(button){
     if(control&&control!==button&&!control.closest('#board')&&!control.disabled)play('click');
   },true);
   play.ambient=key=>{loadBank().then(()=>ambient(key));};
+  // Utilidades para el editor de SFX.
+  play.bank=()=>loadBank().then(()=>bank);
+  play.mix=()=>mix;
+  play.setMix=next=>{
+    mix=next&&typeof next==='object'?next:{};
+    if(ambienceKey&&ambience){const key=ambienceKey;ambienceKey='';ambient(key);}
+  };
+  /** Reproduce una categoría (con la mezcla) o una variante concreta (file) con volumen y tono dados. */
+  play.preview=(key,options={})=>{if(!ready())return;loadBank().then(()=>{
+    if(key.startsWith('amb_')){const f=options.file||pickFile(key);if(f)sample(key,{...options,file:f,exact:true,track:true});return;}
+    sample(key,{...options,track:true});
+  });};
+  play.stopPreview=()=>{try{lastPreview?.stop();}catch{}lastPreview=null;};
   return play;
 }

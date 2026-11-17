@@ -19,9 +19,14 @@ async function hashPassword(password,salt=randomBytes(16).toString('hex')){
   const hash=(await scrypt(String(password),salt,32)).toString('hex');
   return {salt,hash};
 }
+/** Administradores: nicks en la variable de entorno ADMIN_NICKS (separados por comas). */
+export function isAdmin(nick){
+  const list=String(process.env.ADMIN_NICKS||'').split(',').map(n=>n.trim().toLowerCase()).filter(Boolean);
+  return !!nick&&list.includes(String(nick).trim().toLowerCase());
+}
 /** Datos públicos de la cuenta (sin contraseña). */
 export function publicUser(user){
-  return {nick:user.nick,points:user.points,spent:user.spent,mastery:user.mastery,friends:user.friends,
+  return {admin:isAdmin(user.nick),nick:user.nick,points:user.points,spent:user.spent,mastery:user.mastery,friends:user.friends,
     invites:(user.invites||[]).filter(i=>Date.now()-i.at<600000),runs:user.runs||0,best:user.best||0};
 }
 async function newSession(nick){
@@ -134,3 +139,35 @@ export async function dismissInvite(user,from){
   return publicUser(user);
 }
 export {cleanMastery};
+
+// ───────────── Mezcla de sonidos (editor de SFX, solo administradores) ─────────────
+const mixKey='sfx:mix';
+let bankCache=null;
+async function soundBank(){
+  if(!bankCache){
+    const {readFile}=await import('node:fs/promises');
+    bankCache=JSON.parse(await readFile(new URL('./sfx/bank.json',import.meta.url),'utf8'));
+  }
+  return bankCache;
+}
+export async function soundMix(){return (await getJSON(mixKey))||{};}
+/** Valida y guarda la mezcla: volumen, tono, variantes desactivadas y origen de cada categoría. */
+export async function saveSoundMix(user,mix){
+  if(!isAdmin(user.nick))throw Object.assign(new Error('Solo un administrador puede editar los sonidos.'),{status:403});
+  const bank=await soundBank();
+  const clean={};
+  for(const [key,entry] of Object.entries(mix||{})){
+    if(!Object.hasOwn(bank,key)||!entry||typeof entry!=='object')continue;
+    const out={};
+    const from=typeof entry.from==='string'&&Object.hasOwn(bank,entry.from)&&entry.from!==key&&!entry.from.startsWith('amb_')===!key.startsWith('amb_')?entry.from:null;
+    if(from)out.from=from;
+    const count=bank[from||key];
+    const vol=Number(entry.volume);if(Number.isFinite(vol)&&vol!==1)out.volume=Math.round(Math.min(2,Math.max(0,vol))*100)/100;
+    const pitch=Number(entry.pitch);if(Number.isFinite(pitch)&&pitch!==1)out.pitch=Math.round(Math.min(2,Math.max(.5,pitch))*100)/100;
+    const off=Array.isArray(entry.off)?[...new Set(entry.off.map(Number).filter(n=>Number.isInteger(n)&&n>=1&&n<=count))].sort((a,b)=>a-b):[];
+    if(off.length)out.off=off;
+    if(Object.keys(out).length)clean[key]=out;
+  }
+  await setJSON(mixKey,clean);
+  return clean;
+}

@@ -41,12 +41,21 @@ export const server = createServer(async (req,res) => {
       res.end(content);
       return;
     }
+    // Sonidos subidos por el administrador.
+    const custom = /^\/api\/sfx\/file\/([0-9a-f]{16})$/.exec(path);
+    if (req.method === 'GET' && custom) {
+      const file = await accounts.soundFile(custom[1]);
+      if (!file) return send(404,{error:'Sonido no encontrado.'});
+      res.writeHead(200, {'Content-Type':file.type,'Cache-Control':'public, max-age=31536000, immutable'});
+      res.end(Buffer.from(file.data,'base64'));
+      return;
+    }
     const [,service,code,operation] = path.split('/');
     if (service !== 'api') return send(404,{error:'Ruta desconocida.'});
     let body = {};
     if (req.method === 'POST') {
       let input = '';
-      const limit = path === '/api/account/sfx-mix' ? 32768 : 4096;
+      const limit = path === '/api/account/sfx-upload' ? 640*1024 : path === '/api/account/sfx-mix' ? 32768 : 4096;
       for await (const chunk of req) {
         input += chunk;
         if (input.length > limit) return send(413,{error:'Solicitud demasiado grande.'});
@@ -125,6 +134,8 @@ async function accountRoute(operation,method,body,tokenValue){
   if(operation==='dismiss')return {user:await accounts.dismissInvite(user,body.from)};
   if(operation==='award')return accounts.awardSolo(user,body);
   if(operation==='sfx-mix')return {mix:await accounts.saveSoundMix(user,body.mix)};
+  if(operation==='sfx-upload')return {mix:await accounts.uploadSound(user,body)};
+  if(operation==='sfx-delete')return {mix:await accounts.deleteSound(user,body)};
   throw new Error('Ruta desconocida.');
 }
 setInterval(() => {

@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,glyphText,monsterSkills,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=35';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=35';
-import {setupSfx} from './music.js?v=35';
-import {icon} from './icons.js?v=35';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=36';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=36';
+import {setupSfx} from './music.js?v=36';
+import {icon} from './icons.js?v=36';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -95,7 +95,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=35').then(({createIso})=>{
+import('./isometric.js?v=36').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -139,7 +139,7 @@ async function refreshAccount(){
 accountCall('status').then(data=>{account.persistent=data.persistent;renderAccount();}).catch(()=>{});
 // Mezcla de sonidos definida por el administrador (volumen, tono y variantes de cada categoría).
 let savedMix={};
-fetch(serverBase()+'/api/sfx/mix',{signal:AbortSignal.timeout(12000)}).then(r=>r.json()).then(d=>{savedMix=d.mix||{};sfx.setMix(savedMix);}).catch(()=>{});
+fetch(serverBase()+'/api/sfx/mix',{signal:AbortSignal.timeout(12000)}).then(r=>r.json()).then(d=>{savedMix=d.mix||{};sfx.setMix(savedMix,serverBase());}).catch(()=>{});
 setInterval(refreshAccount,10000);
 function field(label,input){return h('label','field',label,input);}
 function renderAccount(){
@@ -1646,27 +1646,48 @@ function renderSfxEditor(bank){
     const e=sfxDraft[key]||{};
     const ambience=key.startsWith('amb_');
     const src=e.from&&bank[e.from]?e.from:key;
-    const variants=ambience?[]:Array.from({length:bank[src]},(_,i)=>i+1).map(n=>{
+    const customs=e.files||[];
+    const variants=ambience||customs.length?[]:Array.from({length:bank[src]},(_,i)=>i+1).map(n=>{
       const on=!(e.off||[]).includes(n);
-      const play=btn('▶ '+n,()=>sfx.preview(key,{file:src+'_'+n,volume:e.volume??1,rate:e.pitch??1,exact:true}));
-      play.className='sfx-variant'+(on?'':' off');play.title=on?'Variante activa · clic derecho para desactivarla':'Desactivada · clic derecho para activarla';
-      play.oncontextmenu=ev=>{ev.preventDefault();const en=entry(key);const off=new Set(en.off||[]);off.has(n)?off.delete(n):off.add(n);en.off=[...off].sort((a,b)=>a-b);tidy(key);apply();renderSfxEditor(bank);};
-      return play;
+      const play=btn('▶',()=>sfx.preview(key,{file:src+'_'+n,volume:e.volume??1,rate:e.pitch??1,exact:true}));
+      play.className='sfx-play';play.title='Escuchar la variante '+n;
+      const box=document.createElement('input');box.type='checkbox';box.checked=on;box.title=on?'Activa: desmarca para no usarla':'Desactivada';
+      box.onchange=()=>{const en=entry(key);const off=new Set(en.off||[]);box.checked?off.delete(n):off.add(n);en.off=[...off].sort((a,b)=>a-b);tidy(key);apply();renderSfxEditor(bank);};
+      return h('span','sfx-variant'+(on?'':' off'),play,h('label',null,box,' '+n));
     });
+    const uploaded=customs.map(f=>{
+      const play=btn('▶',()=>sfx.preview(key,{file:sfx.customUrl(f.id),volume:e.volume??1,rate:e.pitch??1,exact:true}));play.className='sfx-play';
+      const del=btn('✕',async()=>{if(!confirm('¿Borrar «'+f.name+'»? No se puede deshacer.'))return;
+        try{const d=await accountCall('sfx-delete',{key,id:f.id});savedMix=d.mix;Object.assign(sfxDraft,{[key]:{...(sfxDraft[key]||{}),files:d.mix[key]?.files}});tidy(key);apply();renderSfxEditor(bank);}catch(err){alert(err.message);}});
+      del.className='sfx-play danger';del.title='Borrar este sonido';
+      return h('span','sfx-variant custom',play,h('span',null,f.name),del);
+    });
+    const file=document.createElement('input');file.type='file';file.accept='audio/ogg,audio/mpeg,audio/wav,audio/webm,.ogg,.mp3,.wav,.webm';file.hidden=true;
+    file.onchange=async()=>{
+      const f=file.files[0];if(!f)return;
+      const type=f.type||({ogg:'audio/ogg',mp3:'audio/mpeg',wav:'audio/wav',webm:'audio/webm'})[f.name.split('.').pop().toLowerCase()]||'';
+      if(f.size>450*1024){alert('El archivo pesa '+Math.round(f.size/1024)+' KB; el máximo es 450 KB. Recórtalo o pásalo a OGG/MP3.');return;}
+      const data=await new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]);r.onerror=ko;r.readAsDataURL(f);});
+      try{const d=await accountCall('sfx-upload',{key,name:f.name.replace(/\.[^.]+$/,''),type,data});savedMix=d.mix;
+        sfxDraft[key]={...(sfxDraft[key]||{}),files:d.mix[key]?.files};apply();renderSfxEditor(bank);}
+      catch(err){alert(err.message);}
+    };
+    const upload=btn('',()=>file.click());upload.className='ghost';upload.append(icon('plus'),'Subir sonido');
     const from=document.createElement('select');
     from.append(new Option('Sus propios sonidos',''),...keys.filter(k=>k!==key&&k.startsWith('amb_')===ambience).map(k=>new Option(sfxLabels[k]||k,k)));
     from.value=e.from||'';
     from.onchange=()=>{const en=entry(key);en.from=from.value||undefined;delete en.off;tidy(key);apply();renderSfxEditor(bank);};
     const test=btn('',()=>sfx.preview(key));test.className='primary sfx-test';test.append(icon('play'),'Probar');
-    const reset=btn('Restablecer',()=>{delete sfxDraft[key];apply();renderSfxEditor(bank);});reset.className='ghost';reset.disabled=!sfxDraft[key];
+    const reset=btn('Restablecer',()=>{const files=sfxDraft[key]?.files;if(files)sfxDraft[key]={files};else delete sfxDraft[key];apply();renderSfxEditor(bank);});reset.className='ghost';reset.disabled=!sfxDraft[key]||Object.keys(sfxDraft[key]).join()==='files';
     return h('div','sfx-row'+(sfxDraft[key]?' changed':''),
       h('div','sfx-name',h('strong',null,sfxLabels[key]||key),h('code',null,key)),
       h('div','sfx-controls',
         slider('Volumen',0,200,Math.round((e.volume??1)*100),v=>v+' %',v=>{entry(key).volume=v/100;tidy(key);apply();}),
         slider('Tono',50,200,Math.round((e.pitch??1)*100),v=>v+' %',v=>{entry(key).pitch=v/100;tidy(key);apply();}),
         h('label','sfx-from',h('span',null,'Usar'),from)),
-      h('div','sfx-variants',...variants),
-      h('div','sfx-actions',test,reset));
+      h('div','sfx-variants',...variants,...uploaded,
+        customs.length?h('small','hint','Usa tus sonidos subidos en lugar de los originales.'):null),
+      h('div','sfx-actions',test,upload,file,reset));
   };
   const search=document.createElement('input');search.type='search';search.placeholder='Buscar sonido…';search.value=sfxFilter;
   search.oninput=()=>{sfxFilter=search.value;const pos=search.selectionStart;renderSfxEditor(bank);const again=sfxDialog.querySelector('input[type=search]');again.focus();again.setSelectionRange(pos,pos);};
@@ -1680,12 +1701,12 @@ function renderSfxEditor(bank){
     finally{save.disabled=false;}
   });
   save.className='primary';save.append(icon('check'),'Guardar para todos');
-  const resetAll=btn('Restablecer todo',()=>{sfxDraft={};apply();renderSfxEditor(bank);});resetAll.className='ghost';
+  const resetAll=btn('Restablecer ajustes',()=>{sfxDraft=Object.fromEntries(Object.entries(sfxDraft).filter(([,e])=>e.files?.length).map(([k,e])=>[k,{files:e.files}]));apply();renderSfxEditor(bank);});resetAll.title='Vuelve a los valores originales (los sonidos subidos se mantienen)';resetAll.className='ghost';
   const close=btn('Cerrar',()=>sfxDialog.close());close.className='ghost';
   const changed=Object.keys(sfxDraft).length;
   sfxDialog.replaceChildren(
     h('header','sfx-head',Object.assign(h('h2',null,icon('sound'),'Editor de SFX'),{id:'sfx-editor-title'}),
-      h('p','hint','Ajusta volumen y tono de cada categoría, usa los sonidos de otra, o desactiva variantes con clic derecho. Los cambios suenan al momento; «Guardar» los aplica a todos los jugadores.'),
+      h('p','hint','Ajusta volumen y tono, usa los sonidos de otra categoría, desmarca variantes que no encajen o sube tus propios archivos (OGG, MP3 o WAV, máx. 450 KB). Los cambios suenan al momento; «Guardar» los aplica a todos los jugadores.'),
       h('div','sfx-toolbar',search,h('span','chip',changed+' modificados'),resetAll,save,close),status),
     h('div','sfx-list',...shown.map(row)));
 }

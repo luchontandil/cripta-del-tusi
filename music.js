@@ -1,5 +1,5 @@
 // Short, synthesized effects. This module never starts a soundtrack.
-import {icon} from './icons.js?v=35';
+import {icon} from './icons.js?v=36';
 export function setupSfx(button){
   let context,master;
   let muted=false;
@@ -49,17 +49,20 @@ export function setupSfx(button){
     return bankLoading;
   }
   function buffer(name){
-    if(!buffers.has(name))buffers.set(name,fetch(new URL(name+'.ogg',base)).then(r=>r.arrayBuffer()).then(data=>context.decodeAudioData(data)).catch(()=>null));
+    if(!buffers.has(name))buffers.set(name,fetch(name.includes('/')?name:new URL(name+'.ogg',base)).then(r=>r.arrayBuffer()).then(data=>context.decodeAudioData(data)).catch(()=>null));
     return buffers.get(name);
   }
   // Mapa de efectos del motor a claves del banco.
   const aliases={slash:'swing',expose:'arcane',pull:'push',swap:'dash',poison:'venom',fire:'blast'};
   /** Reproduce una muestra del banco. Devuelve false si no existe (para caer en el sintetizador). */
   // Mezcla del editor de SFX (la define un administrador en el servidor).
-  let mix={};
+  let mix={},customBase='';
+  const customUrl=id=>customBase+'/api/sfx/file/'+id;
   /** Archivo de una categoría según la mezcla: origen, variantes activas. null = silencio. */
   function pickFile(name){
     const m=mix[name]||{};
+    // Sonidos subidos por el administrador: sustituyen a los originales.
+    if(m.files?.length&&customBase)return customUrl(m.files[Math.floor(Math.random()*m.files.length)].id);
     const src=m.from&&bank[m.from]?m.from:name;
     if(src.startsWith('amb_'))return src;
     const on=Array.from({length:bank[src]},(_,i)=>i+1).filter(n=>!(m.off||[]).includes(n));
@@ -168,8 +171,9 @@ export function setupSfx(button){
   // Utilidades para el editor de SFX.
   play.bank=()=>loadBank().then(()=>bank);
   play.mix=()=>mix;
-  play.setMix=next=>{
+  play.setMix=(next,server)=>{
     mix=next&&typeof next==='object'?next:{};
+    if(server!==undefined)customBase=server;
     if(ambienceKey&&ambience){const key=ambienceKey;ambienceKey='';ambient(key);}
   };
   /** Reproduce una categoría (con la mezcla) o una variante concreta (file) con volumen y tono dados. */
@@ -177,6 +181,7 @@ export function setupSfx(button){
     if(key.startsWith('amb_')){const f=options.file||pickFile(key);if(f)sample(key,{...options,file:f,exact:true,track:true});return;}
     sample(key,{...options,track:true});
   });};
+  play.customUrl=customUrl;
   play.stopPreview=()=>{try{lastPreview?.stop();}catch{}lastPreview=null;};
   return play;
 }

@@ -156,6 +156,7 @@ export async function soundMix(){return (await getJSON(mixKey))||{};}
 export async function saveSoundMix(user,mix){
   if(!isAdmin(user.nick))throw Object.assign(new Error('Solo un administrador puede editar los sonidos.'),{status:403});
   const bank=await soundBank();
+  const current=await soundMix();
   const clean={};
   for(const [key,entry] of Object.entries(mix||{})){
     if(!Object.hasOwn(bank,key)||!entry||typeof entry!=='object')continue;
@@ -167,8 +168,48 @@ export async function saveSoundMix(user,mix){
     const pitch=Number(entry.pitch);if(Number.isFinite(pitch)&&pitch!==1)out.pitch=Math.round(Math.min(2,Math.max(.5,pitch))*100)/100;
     const off=Array.isArray(entry.off)?[...new Set(entry.off.map(Number).filter(n=>Number.isInteger(n)&&n>=1&&n<=count))].sort((a,b)=>a-b):[];
     if(off.length)out.off=off;
+    // Los archivos subidos los gestiona el servidor: se conservan tal cual.
+    if(current[key]?.files?.length)out.files=current[key].files;
     if(Object.keys(out).length)clean[key]=out;
   }
+  for(const [key,entry] of Object.entries(current))if(entry.files?.length&&!clean[key])clean[key]={files:entry.files};
   await setJSON(mixKey,clean);
   return clean;
+}
+const audioTypes={'audio/ogg':'ogg','audio/mpeg':'mp3','audio/mp3':'mp3','audio/wav':'wav','audio/x-wav':'wav','audio/wave':'wav','audio/webm':'webm'};
+export const MAX_SOUND_BYTES=450*1024;
+/** Sube un sonido propio para una categoría (reemplaza a sus variantes originales). */
+export async function uploadSound(user,{key,name,type,data}){
+  if(!isAdmin(user.nick))throw Object.assign(new Error('Solo un administrador puede editar los sonidos.'),{status:403});
+  const bank=await soundBank();
+  if(!Object.hasOwn(bank,key))fail('Categoría de sonido desconocida.');
+  if(!audioTypes[type])fail('Formato no admitido: usa OGG, MP3, WAV o WEBM.');
+  const bytes=Buffer.from(String(data||''),'base64');
+  if(!bytes.length)fail('El archivo está vacío.');
+  if(bytes.length>MAX_SOUND_BYTES)fail('El archivo es demasiado grande (máximo 450 KB). Recórtalo o pásalo a OGG/MP3.');
+  const mix=await soundMix();
+  const entry=mix[key]||(mix[key]={});
+  entry.files=entry.files||[];
+  if(entry.files.length>=8)fail('Máximo 8 sonidos propios por categoría.');
+  const id=randomBytes(8).toString('hex');
+  await setJSON('sfx:file:'+id,{type,data:bytes.toString('base64')});
+  entry.files.push({id,name:String(name||'sonido').replace(/[^\p{L}\p{N} ._-]/gu,'').slice(0,40)||'sonido'});
+  await setJSON(mixKey,mix);
+  return mix;
+}
+export async function deleteSound(user,{key,id}){
+  if(!isAdmin(user.nick))throw Object.assign(new Error('Solo un administrador puede editar los sonidos.'),{status:403});
+  const mix=await soundMix();
+  const entry=mix[key];
+  if(!entry?.files?.some(f=>f.id===id))fail('Ese sonido ya no existe.');
+  entry.files=entry.files.filter(f=>f.id!==id);
+  if(!entry.files.length)delete entry.files;
+  if(!Object.keys(entry).length)delete mix[key];
+  await remove('sfx:file:'+id);
+  await setJSON(mixKey,mix);
+  return mix;
+}
+export async function soundFile(id){
+  if(!/^[0-9a-f]{16}$/.test(String(id)))return null;
+  return getJSON('sfx:file:'+id);
 }

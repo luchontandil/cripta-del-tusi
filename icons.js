@@ -21,6 +21,7 @@ const paths={
   poison:'<path d="M12 3.5c3 4 5.5 7 5.5 10.2a5.5 5.5 0 0 1-11 0C6.5 10.5 9 7.5 12 3.5Z" fill="currentColor" fill-opacity=".25"/><circle cx="10" cy="14" r="1.2" fill="currentColor"/><circle cx="14" cy="16" r=".9" fill="currentColor"/>',
   expose:'<path d="M12 3.2 19 6v5.4c0 4.6-3 7.9-7 9.4-4-1.5-7-4.8-7-9.4V6Z"/><path d="m13 6.5-2.5 5 3 1-2 5"/>',
   weak:'<circle cx="12" cy="11" r="6.5"/><path d="M9 9.5l1.5 1.5M10.5 9.5 9 11M13.5 9.5l1.5 1.5M15 9.5 13.5 11M9.5 14.5c1.5-1 3.5-1 5 0M12 17.5v3"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
   slow:'<rect x="3.5" y="9" width="8" height="6" rx="3"/><rect x="12.5" y="9" width="8" height="6" rx="3"/><path d="M9.5 12h5"/>',
   glyph:'<path d="M12 2.8 20.5 12 12 21.2 3.5 12Z"/><path d="M12 7.5v9M7.5 12h9"/>',
   gold:'<path d="M3.5 19.5c1.2-3.6 4.4-6.8 8.5-6.8s7.3 3.2 8.5 6.8Z" fill="currentColor" fill-opacity=".55"/><path d="M3 19.5h18"/><circle cx="7.5" cy="10" r=".9" fill="currentColor"/><circle cx="16.5" cy="8.5" r=".8" fill="currentColor"/><circle cx="12" cy="6" r="1" fill="currentColor"/><circle cx="9.5" cy="15.5" r=".6" fill="#fff"/><circle cx="14" cy="16.2" r=".5" fill="#fff"/>',

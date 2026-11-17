@@ -192,25 +192,24 @@ const legendaryNames=['La Última Brasa','Juramento del Umbral','El Ojo Insomne'
   'Fauces del Abismo','Canción de Ceniza','El Vigía Eterno','Pacto de Sangre','Aliento del Oráculo','Silencio del Osario'];
 /**
  * Gemas (al estilo de Diablo II): cada tipo da un stat y su calidad sube con el nivel del objeto.
- * Calidades: dañada, astillada, defectuosa, completa, pulida, impecable y excelente.
+ * Calidades: dañada, astillada, completa, impecable y excelente.
  */
 export const gemQualities=[
-  {name:['dañado','dañada'],ilvl:1},{name:['astillado','astillada'],ilvl:4},{name:['defectuoso','defectuosa'],ilvl:7},
-  {name:['completo','completa'],ilvl:11},{name:['pulido','pulida'],ilvl:15},{name:['impecable','impecable'],ilvl:19},
-  {name:['excelente','excelente'],ilvl:23}
+  {name:['dañado','dañada'],ilvl:1},{name:['astillado','astillada'],ilvl:5},{name:['completo','completa'],ilvl:10},
+  {name:['impecable','impecable'],ilvl:15},{name:['excelente','excelente'],ilvl:21}
 ];
 export const gems={
-  ruby:{name:'Rubí',female:false,stat:'vitality',values:[5,8,11,15,20,25,32],colors:['#c8213a','#ff8a9a','#6e0f22']},
-  garnet:{name:'Granate',female:false,stat:'fire',values:[2,3,4,5,7,9,11],colors:['#d4561e','#ffb27a','#7a2a10']},
-  sapphire:{name:'Zafiro',female:false,stat:'ice',values:[2,3,4,5,7,9,11],colors:['#2a5fd0','#9cc4ff','#122e70']},
-  topaz:{name:'Topacio',female:false,stat:'lightning',values:[2,3,4,5,7,9,11],colors:['#e3b422','#fff1a0','#7a5a0e']},
-  amethyst:{name:'Amatista',female:true,stat:'magic',values:[2,3,4,5,7,9,11],colors:['#8a4fd8','#dcb8ff','#43206e']},
-  emerald:{name:'Esmeralda',female:true,stat:'chaos',values:[2,3,4,5,7,9,11],colors:['#1f9d55','#8ff0b4','#0c4d28']},
-  onyx:{name:'Ónice',female:false,stat:'physical',values:[2,3,4,5,7,9,11],colors:['#4a4a55','#b7b7c4','#16161c']},
-  diamond:{name:'Diamante',female:false,stat:'ward',values:[1,1,2,2,3,4,5],colors:['#cfe6ef','#ffffff','#7b98a6']},
-  tigereye:{name:'Ojo de tigre',female:false,stat:'critical',values:[2,3,4,5,6,8,10],colors:['#b9782a','#ffd28a','#5a3510']}
+  ruby:{name:'Rubí',female:false,stat:'vitality',values:[5,10,16,23,32],colors:['#c8213a','#ff8a9a','#6e0f22']},
+  garnet:{name:'Granate',female:false,stat:'fire',values:[2,4,6,8,11],colors:['#d4561e','#ffb27a','#7a2a10']},
+  sapphire:{name:'Zafiro',female:false,stat:'ice',values:[2,4,6,8,11],colors:['#2a5fd0','#9cc4ff','#122e70']},
+  topaz:{name:'Topacio',female:false,stat:'lightning',values:[2,4,6,8,11],colors:['#e3b422','#fff1a0','#7a5a0e']},
+  amethyst:{name:'Amatista',female:true,stat:'magic',values:[2,4,6,8,11],colors:['#8a4fd8','#dcb8ff','#43206e']},
+  emerald:{name:'Esmeralda',female:true,stat:'chaos',values:[2,4,6,8,11],colors:['#1f9d55','#8ff0b4','#0c4d28']},
+  onyx:{name:'Ónice',female:false,stat:'physical',values:[2,4,6,8,11],colors:['#4a4a55','#b7b7c4','#16161c']},
+  diamond:{name:'Diamante',female:false,stat:'ward',values:[1,2,3,4,5],colors:['#cfe6ef','#ffffff','#7b98a6']},
+  tigereye:{name:'Ojo de tigre',female:false,stat:'critical',values:[2,4,6,8,10],colors:['#b9782a','#ffd28a','#5a3510']}
 };
-/** Calidad de gema (0–6) para un nivel de objeto. */
+/** Calidad de gema (0–4) para un nivel de objeto. */
 export const gemQuality=ilvl=>gemQualities.reduce((q,info,i)=>ilvl>=info.ilvl?i:q,0);
 export function makeGem(id,type,quality){
   const gem=gems[type],q=Math.max(0,Math.min(gemQualities.length-1,quality));

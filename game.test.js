@@ -1147,15 +1147,15 @@ test('paso de sombra: se teletransporta (sin camino) y la forja sube rarezas nor
 });
 test('gemas: tipo y calidad según el nivel; el daño en área cae lejos del centro',async()=>{
   const E=await import('./engine.js');
-  assert.equal(E.gemQuality(1),0);assert.equal(E.gemQuality(11),3);assert.equal(E.gemQuality(30),6);
-  const ruby=E.makeGem(1,'ruby',0),best=E.makeGem(2,'ruby',6),amethyst=E.makeGem(3,'amethyst',3);
+  assert.equal(E.gemQuality(1),0);assert.equal(E.gemQuality(11),2);assert.equal(E.gemQuality(30),4);assert.equal(E.gemQualities.length,5);
+  const ruby=E.makeGem(1,'ruby',0),best=E.makeGem(2,'ruby',4),amethyst=E.makeGem(3,'amethyst',2);
   assert.equal(ruby.name,'Rubí dañado');assert.equal(best.name,'Rubí excelente');assert.equal(amethyst.name,'Amatista completa');
   assert.ok(best.stats.vitality>ruby.stats.vitality);
-  assert.ok(E.makeGem(4,'tigereye',6).stats.critical<=10,'el crítico de las gemas está acotado');
+  assert.ok(E.makeGem(4,'tigereye',4).stats.critical<=10,'el crítico de las gemas está acotado');
   // Las gemas salen del botín normal con su calidad
   const s=create();join(s,'p0','A','mago');s.floor=12;
   let gem;for(let i=0;i<400&&!gem;i++){const it=rollItem(s,Math.random);if(it.kind==='rune')gem=it;}
-  assert.ok(gem&&gem.gem&&gem.quality>=2&&gem.quality<=3);
+  assert.ok(gem&&gem.gem&&gem.quality>=1&&gem.quality<=2);
   // Caída en área: pleno en el centro, menos al lado
   const b=battle('mago');b.walls=[];
   const fire=skillFor(b.units.find(u=>!u.enemy),classes.mago.skills.findIndex(k=>k[0]==='Bola de fuego'));

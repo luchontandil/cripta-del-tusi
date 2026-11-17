@@ -1015,3 +1015,12 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 /* La previsualización de área gana al estilo de «hover» (la casilla central es la del ratón) */
 .cell.area-preview,.cell.area-preview:hover:not(:disabled){z-index:2;background:#8a4a30;box-shadow:inset 0 0 0 2px #ffab63}
 .cell.area-center,.cell.area-center:hover:not(:disabled){background:#b8683c;box-shadow:inset 0 0 0 2px #ffd081,0 0 10px #ffd08188}
+/* Forja */
+.forge-cards .loot-card{position:relative}
+.forge-worn{position:absolute;top:6px;right:6px;font-size:.65rem;padding:1px 6px;border-radius:4px;background:#f2cd8a22;color:#f2cd8a;border:1px solid #f2cd8a55}
+.forge-actions{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px}
+.forge-button{display:flex;justify-content:space-between;align-items:center;gap:4px;font-size:.72rem;padding:4px 6px;min-height:0}
+.forge-button b{display:inline-flex;align-items:center;gap:2px}
+.forge-button .icon{width:12px;height:12px}
+.icon-forge{color:#ffb070}
+.route-node.kind-forge{color:#ffb070;border-color:#7a4a2a}

@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,glyphText,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=52';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=52';
-import {setupSfx} from './music.js?v=52';
-import {icon} from './icons.js?v=52';
+  glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=54';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=54';
+import {setupSfx} from './music.js?v=54';
+import {icon} from './icons.js?v=54';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -57,7 +57,7 @@ let useIso=localStorage.getItem('cripta-view')!=='2d';
 const battlefield=el('battlefield');
 const worldMount=el('iso-world');
 function syncViewport(){
-  const shown=!!(iso&&useIso&&state?.units.length&&!el('game').hidden&&!['map','event','shop'].includes(state?.phase));
+  const shown=!!(iso&&useIso&&state?.units.length&&!el('game').hidden&&!['map','event','shop','forge'].includes(state?.phase));
   iso?.show(shown);
   battlefield.classList.toggle('isometric',shown);
   const toggle=el('view-toggle');
@@ -96,7 +96,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=52').then(({createIso})=>{
+import('./isometric.js?v=54').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -143,7 +143,14 @@ let savedMix={};
 fetch(serverBase()+'/api/sfx/mix',{signal:AbortSignal.timeout(12000)}).then(r=>r.json()).then(d=>{savedMix=d.mix||{};sfx.setMix(savedMix,serverBase());}).catch(()=>{});
 setInterval(refreshAccount,10000);
 function field(label,input){return h('label','field',label,input);}
+/** El campo «Nombre» solo hace falta sin cuenta: con sesión, el nombre es el nick. */
+function syncNameField(){
+  const field=el('name')?.closest('label');
+  if(!field)return;
+  field.hidden=!!account.user;
+}
 function renderAccount(){
+  syncNameField();
   const box=el('account');
   if(!box)return;
   if(!account.token||!account.user){
@@ -773,7 +780,7 @@ function renderInventory(player){
   const rewards=el('rewards');
   const shopping=state.phase==='shop';
   // Fuera de combate se puede gestionar el equipo; vender solo en la tienda.
-  const trading=lootReady()||['shop','map','event'].includes(state.phase);
+  const trading=lootReady()||['shop','forge','map','event'].includes(state.phase);
   const others=state.players.filter(p=>p.id!==player.id);
   holder.hidden=state.phase==='lobby'||!bagShown;
   el('field-shop').hidden=true;
@@ -792,11 +799,10 @@ function renderInventory(player){
   for(const [slot,label] of Object.entries(slots)){
     const item=player.equipment[slot];
     const actions=item&&trading?[actionButton('Quitar','unequip',{slot})]:[];
-    if(trading&&item?.socket)actions.push(actionButton('Extraer runa','unsocket',{slot}));
     const tile=inventorySlot(item,label,actions,slot);
     if(trading){
       if(item)draggable(tile,{from:'gear',slot});
-      dropZone(tile,p=>p.from==='bag'&&(p.slot===slot||(p.kind==='rune'&&!!item)),
+      dropZone(tile,p=>p.from==='bag'&&(p.slot===slot||(p.kind==='rune'&&!!item&&!item.socket)),
         p=>send({type:p.kind==='rune'?'socket':'equip',slot,item:p.item}));
     }
     gearGrid.append(tile);
@@ -810,7 +816,7 @@ function renderInventory(player){
     if(trading){
       if(item.kind==='gear')actions.push(actionButton('Equipar','equip',{item:item.id}));
       else for(const [slot,label] of Object.entries(slots)){
-        if(player.equipment[slot])actions.push(actionButton('Engarzar en '+label.toLowerCase(),'socket',{item:item.id,slot}));
+        if(player.equipment[slot]&&!player.equipment[slot].socket)actions.push(actionButton('Engarzar en '+label.toLowerCase()+' (permanente)','socket',{item:item.id,slot}));
       }
       if(shopping)actions.push(actionButton('Vender · '+(Math.floor(item.price/2)+(item.socket?Math.floor(item.socket.price/2):0))+' tusi','sell',{item:item.id}));
       for(const other of others){
@@ -905,6 +911,41 @@ function renderShop(box){
     sellHint,
     h('div','shop-wallet',icon('gold'),h('b',null,String(player.gold)),' tusi disponibles'),
     cards.length?h('div','loot-cards shop-cards',...cards):h('p','event-text','El mercader no tiene nada más que vender.'),
+    h('div','shop-footer',party,readyButton));
+}
+/** Forja: re-tirar stats o subir la rareza de cualquier objeto (equipado o en la mochila). */
+function renderForge(box){
+  const player=state.players.find(p=>p.id===session.id);
+  const items=[...Object.values(player.equipment),...player.bag].filter(i=>i?.kind==='gear');
+  const cards=items.map(item=>{
+    const card=lootCard(item,player);
+    card.querySelectorAll('button').forEach(b=>b.remove());
+    // Lo equipado no se compara consigo mismo.
+    if(Object.values(player.equipment).includes(item))card.querySelector('.loot-comparison')?.remove();
+    if(Object.values(player.equipment).includes(item))card.prepend(h('span','forge-worn','Equipado'));
+    const buttons=Object.entries(forgeModes).map(([mode,info])=>{
+      const blocked=forgeBlock(item,mode),cost=forgeCost(item,mode);
+      const b=actionButton('','forge',{item:item.id,mode});
+      b.className='forge-button'+(mode==='upgrade'?' primary':'');
+      b.append(h('span',null,info.name),h('b',null,icon('gold'),String(cost)));
+      b.title=blocked||info.text;
+      b.disabled=!!blocked||player.gold<cost;
+      return b;
+    });
+    card.append(h('div','forge-actions',...buttons));
+    return card;
+  });
+  const ready=state.ready||[];
+  const me=ready.includes(player.id);
+  const readyButton=btn('',()=>send({type:'ready'}));
+  readyButton.className=me?'ready-button done':'primary ready-button';
+  readyButton.append(icon(me?'check':'play'),me?'Listo · esperando al grupo':'Listo para seguir');
+  const party=h('div','ready-party',...state.players.map(p=>h('span','ready-chip'+(ready.includes(p.id)?' on':''),unitArt(p),p.name)));
+  box.replaceChildren(
+    h('div','journey-head',h('h3',null,icon('forge'),'Forja del herrero'),
+      h('p',null,'Re-tira los stats de tu equipo o sube su rareza a cambio de tusi. Re-tirar solo afijos o solo sufijos cuesta algo más; mejorar la rareza (añade un afijo o sufijo) es lo más caro.')),
+    h('div','shop-wallet',icon('gold'),h('b',null,String(player.gold)),' tusi disponibles'),
+    cards.length?h('div','loot-cards forge-cards',...cards):h('p','event-text','No tienes equipo que forjar.'),
     h('div','shop-footer',party,readyButton));
 }
 const trainingDialog=el('training');
@@ -1003,7 +1044,7 @@ function updateGameOver(){
   sfx(won?'win':'lose');
   gameoverDialog.showModal();
 }
-const nodeIcons={combat:'sword',elite:'elite',event:'question',boss:'crown',shop:'shop'};
+const nodeIcons={combat:'sword',elite:'elite',event:'question',boss:'crown',shop:'shop',forge:'forge'};
 /** Retratos pequeños de quienes votaron una opción. */
 function voters(option){
   const votes=state.vote?.votes||{};
@@ -1145,11 +1186,11 @@ function renderLobby(box){
 }
 function renderJourney(){
   const box=el('journey');
-  const show=['map','event','shop','lobby'].includes(state?.phase);
+  const show=['map','event','shop','forge','lobby'].includes(state?.phase);
   box.hidden=!show;
   if(!show)return;
   if(state.phase==='lobby'){renderLobby(box);return;}
-  if(state.phase==='map')renderMap(box);else if(state.phase==='shop')renderShop(box);else renderEvent(box);
+  if(state.phase==='map')renderMap(box);else if(state.phase==='shop')renderShop(box);else if(state.phase==='forge')renderForge(box);else renderEvent(box);
 }
 function pawnName(name){
   const tag=document.createElement('span');
@@ -1460,7 +1501,7 @@ function render(){
   const title={shop:'Piso '+state.floor+' · Tienda',map:'Piso '+(state.floor+1)+' · Elige el camino',event:'Evento · '+(state.event?.title||''),lobby:'Sala de expedición',combat:actLabel+'Piso '+state.floor+' · '+turn?.name+(mine?' (tú)':''),reward:rewardReady?'Botín y mercader':'Victoria',won:'Expedición completada',lost:'El grupo ha caído'}[state.phase];
   el('phase').textContent=title;
   updateGameOver();
-  const journey=['map','event','shop'].includes(state.phase);
+  const journey=['map','event','shop','forge'].includes(state.phase);
   el('turn-bar').hidden=state.phase!=='combat'&&!rewardReady&&!journey;
   el('turn-bar').classList.toggle('timer-only',state.phase!=='combat');
   if(!el('turn-bar').hidden)paintClock();
@@ -1614,7 +1655,8 @@ async function send(action){
   }catch(e){if(epoch===generation)error(e.message);}
   finally{if(epoch===generation)busy=false;}
 }
-const profile=()=>({name:el('name').value,classId:el('class').value});
+// Con la cuenta iniciada, el personaje se llama como la cuenta.
+const profile=()=>({name:account.user?.nick||el('name').value,classId:el('class').value});
 el('solo').onclick=()=>{
   if(busy)return;
   generation++;
@@ -1680,7 +1722,7 @@ async function refresh(){
 try{session=JSON.parse(sessionStorage.getItem('amber-session'));}catch{session=null;}
 refresh();
 setInterval(()=>{
-  if(state&&!session.code&&['combat','reward','map','event','shop'].includes(state.phase)&&Date.now()>=state.deadline){
+  if(state&&!session.code&&['combat','reward','map','event','shop','forge'].includes(state.phase)&&Date.now()>=state.deadline){
     const next=structuredClone(state);
     if(tick(next))setState(next);
   }

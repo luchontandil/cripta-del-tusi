@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -109,7 +109,7 @@ test('el jefe anuncia un glifo amplio y, al activarla en su turno, las cadenas d
   assert.equal(s.units[s.turn],hero);
   assert.equal(s.mp,1);
 });
-test('genera botín con afijos y permite equipar, engarzar, extraer y vender una runa',()=>{
+test('genera botín con afijos y permite equipar y engarzar runas permanentes',()=>{
   const s=battle('tirador');
   const hero=s.units[s.turn];
   const enemy=s.units.find(u=>u.enemy);
@@ -135,8 +135,13 @@ test('genera botín con afijos y permite equipar, engarzar, extraer y vender una
   p.bag.push(rune);
   act(s,'p0',{type:'socket',item:rune.id,slot:gear.slot},rng);
   assert.equal(p.equipment[gear.slot].socket,rune);
-  act(s,'p0',{type:'unsocket',slot:gear.slot},rng);
-  assert.throws(()=>act(s,'p0',{type:'sell',item:rune.id},rng),/tienda/);
+  // Las runas son permanentes: ni se extraen ni se reemplazan.
+  assert.throws(()=>act(s,'p0',{type:'unsocket',slot:gear.slot},rng),/permanentes/);
+  const other={kind:'rune',id:998,stats:{power:1},price:10};
+  p.bag.push(other);
+  assert.throws(()=>act(s,'p0',{type:'socket',item:other.id,slot:gear.slot},rng),/permanente/);
+  assert.equal(p.equipment[gear.slot].socket,rune);
+  assert.throws(()=>act(s,'p0',{type:'sell',item:other.id},rng),/tienda/);
   assert.equal(s.stock.length,0);
   assert.throws(()=>act(s,'p0',{type:'next'},rng),/habilidades/);
   const offer=trainingOffer(p);
@@ -332,11 +337,13 @@ test('dos clientes reciben la misma trayectoria completa y el cambio de turno', 
   assert.equal((await request(path+'/action',{type:'vote',option},host.key)).state.phase,'map');
   const started=await request(path+'/action',{type:'vote',option},peer.key);
   assert.equal(started.state.phase,'combat');
-  const origin=started.state.units.find(u=>u.id===host.id).pos;
-  const moved=await request(path+'/action',{type:'move',pos:origin-2},host.key);
+  const me=started.state.units.find(u=>u.id===host.id);
+  // Un destino a 2 pasos que de verdad sea alcanzable (el mapa es aleatorio).
+  const [goal,route]=[...paths(started.state,me,2)].find(([,r])=>r.length===2&&!started.state.traps?.some(t=>r.includes(t.pos)));
+  const moved=await request(path+'/action',{type:'move',pos:goal},host.key);
   const next=await request(path,null,peer.key);
   const event=next.state.events.find(e=>e.kind==='move');
-  assert.deepEqual(event.path,[origin-1,origin-2]);
+  assert.deepEqual(event.path,route);
   assert.deepEqual(event,moved.state.events.at(-1));
   assert.equal(next.state.mp,1);
   assert.ok(!JSON.stringify(next).includes(host.key));
@@ -915,4 +922,42 @@ test('planta carnívora: liana en línea recta, alcance infinito, con visión y 
   h.pos+=t.width;const start=h.pos;
   timeout(t);while(t.units[t.turn]===m)timeout(t);
   assert.equal(h.pos,start);
+});
+
+test('forja: re-tirar todo, solo afijos o solo sufijos y mejorar rareza, cobrando tusi',()=>{
+  let seed=99;const random=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+  const s=battle('guardia');
+  const p=s.players[0];
+  s.phase='forge';s.ready=[];
+  let item;
+  do{item=rollItem(s,random,{gear:true,ilvl:10});}while(item.grade!==1);
+  p.bag.push(item);
+  p.gold=1000;
+  // Re-tirar solo sufijos: los afijos (prefijos) no cambian.
+  const prefixes=JSON.stringify(item.affixes.filter(m=>m.type==='prefix'));
+  let gold=p.gold;
+  act(s,'p0',{type:'forge',item:item.id,mode:'suffix'},random);
+  assert.equal(JSON.stringify(item.affixes.filter(m=>m.type==='prefix')),prefixes);
+  assert.equal(p.gold,gold-forgeCost({...item,grade:1},'suffix'));
+  // Mejorar rareza: poco común (1+1) → raro (2+1 o 1+2) → legendario (2+2).
+  act(s,'p0',{type:'forge',item:item.id,mode:'upgrade'},random);
+  assert.equal(item.grade,2);assert.equal(item.affixes.length,3);
+  act(s,'p0',{type:'forge',item:item.id,mode:'upgrade'},random);
+  assert.equal(item.grade,3);assert.equal(item.affixes.length,4);
+  assert.equal(item.affixes.filter(m=>m.type==='prefix').length,2);
+  assert.throws(()=>act(s,'p0',{type:'forge',item:item.id,mode:'upgrade'},random),/legendario/);
+  // Re-tirar todo mantiene rareza y número de modificadores; sin tusi no se puede.
+  act(s,'p0',{type:'forge',item:item.id,mode:'reroll'},random);
+  assert.equal(item.grade,3);assert.equal(item.affixes.length,4);
+  assert.equal(new Set(item.affixes.map(m=>m.stat)).size,4,'sin stats repetidos');
+  p.gold=0;
+  assert.throws(()=>act(s,'p0',{type:'forge',item:item.id,mode:'reroll'},random),/tusi/);
+  // Precios: mejorar es lo más caro, re-tirar parte un poco más caro que todo.
+  assert.ok(forgeCost(item,'upgrade')>forgeCost(item,'prefix')&&forgeCost(item,'prefix')>forgeCost(item,'reroll'));
+});
+test('la forja aparece en el mapa de cada acto',()=>{
+  for(let actNo=1;actNo<=3;actNo++){
+    const route=makeRoute(rng,actNo);
+    assert.ok(route.rows[4].some(n=>n.kind==='forge'),'piso 5 del acto '+actNo);
+  }
 });

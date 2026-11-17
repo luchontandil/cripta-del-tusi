@@ -229,6 +229,33 @@ function rollRarity(ilvl,bonus,rng,minGrade=0){
   return weighted(weights.map((w,i)=>[i,w]),rng);
 }
 export const itemLevel=(s,extra=0)=>Math.max(1,s.floor+extra);
+/** Afijos (prefijos) y sufijos que puede llevar un objeto concreto. */
+function affixPool(slot,base){
+  return {prefix:[...slotAffixes[slot].prefix],suffix:slotAffixes[slot].suffix.filter(stat=>stat!=='action'||(slot==='amulet'||actionWeapons.has(base)))};
+}
+/** Tira un modificador nuevo de un tipo, evitando los stats que ya lleva. */
+function rollMod(type,slot,base,level,taken,rng){
+  const available=affixPool(slot,base)[type].filter(stat=>!taken.includes(stat)&&affixes[type][stat].some(tier=>tier[0]<=level));
+  if(!available.length)return null;
+  const stat=pick(available,rng);
+  const tierIndex=rollTier(affixes[type][stat],level,rng);
+  const [,low,high,label]=affixes[type][stat][tierIndex];
+  return {type,stat,tier:tierIndex+1,tiers:affixes[type][stat].length,value:roll(low,high,rng),label};
+}
+/** Recalcula stats, nombre y precio de un objeto a partir de sus modificadores. */
+function refreshItem(item,rng,wasGrade=item.grade){
+  const stats={};
+  for(const mod of item.affixes)stats[mod.stat]=(stats[mod.stat]||0)+mod.value;
+  item.stats=stats;
+  item.rarity=rarities[item.grade];
+  const prefix=item.affixes.find(m=>m.type==='prefix')?.label;
+  const suffix=item.affixes.find(m=>m.type==='suffix')?.label;
+  // Normales y poco comunes se llaman por sus afijos; raros y legendarios conservan su nombre (uno nuevo al subir de grado).
+  if(item.grade<2)item.name=[item.base,prefix?.toLowerCase(),suffix].filter(Boolean).join(' ');
+  else if(item.grade!==wasGrade)item.name=item.grade===3?pick(legendaryNames,rng):pick(rareFirst,rng)+' '+pick(rareSecond,rng);
+  item.price=5+item.grade*8+item.affixes.reduce((sum,m)=>sum+m.tier*2,0)+item.ilvl;
+  return item;
+}
 export function rollItem(s,rng,{bonus=0,gear=false,ilvl,minGrade=0}={}) {
   const itemId = ++s.itemId;
   const level=ilvl??itemLevel(s);
@@ -262,6 +289,65 @@ export function rollItem(s,rng,{bonus=0,gear=false,ilvl,minGrade=0}={}) {
     [base,prefix?.toLowerCase(),suffix].filter(Boolean).join(' ');
   const price=5+grade*8+mods.reduce((sum,m)=>sum+m.tier*2,0)+level;
   return {id:itemId,name,base,kind:'gear',slot,rarity:rarities[grade],grade,ilvl:level,affixes:mods,stats,price,socket:null};
+}
+// ───────────── Forja ─────────────
+/** Operaciones de la forja y su multiplicador de precio. */
+export const forgeModes={
+  reroll:{name:'Re-tirar todo',text:'Vuelve a tirar todos sus afijos y sufijos (misma rareza y nivel).',factor:1},
+  prefix:{name:'Re-tirar afijos',text:'Vuelve a tirar solo los afijos (prefijos).',factor:1.35},
+  suffix:{name:'Re-tirar sufijos',text:'Vuelve a tirar solo los sufijos.',factor:1.35},
+  upgrade:{name:'Mejorar rareza',text:'Sube un grado de rareza y añade el afijo o sufijo que le corresponde.',factor:2.6}
+};
+/** Precio de una operación de forja: crece con el nivel y la rareza del objeto. */
+export function forgeCost(item,mode){
+  const base=12+item.ilvl*3+item.grade*10;
+  return Math.round(base*(forgeModes[mode]?.factor||1));
+}
+/** ¿Se puede hacer esta operación sobre este objeto? Devuelve el motivo si no. */
+export function forgeBlock(item,mode){
+  if(!item||item.kind!=='gear')return 'Solo se forja equipo.';
+  if(mode==='upgrade'&&item.grade>=3)return 'Ya es legendario.';
+  if(mode==='prefix'&&!item.affixes.some(m=>m.type==='prefix'))return 'No tiene afijos.';
+  if(mode==='suffix'&&!item.affixes.some(m=>m.type==='suffix'))return 'No tiene sufijos.';
+  return null;
+}
+function forgeItem(item,mode,rng){
+  const level=item.ilvl,wasGrade=item.grade;
+  const reroll=type=>{
+    const count=item.affixes.filter(m=>m.type===type).length;
+    const kept=item.affixes.filter(m=>m.type!==type);
+    const taken=kept.map(m=>m.stat),fresh=[];
+    for(let i=0;i<count;i++){const mod=rollMod(type,item.slot,item.base,level,[...taken,...fresh.map(m=>m.stat)],rng);if(mod)fresh.push(mod);}
+    item.affixes=[...kept,...fresh].sort((a,b)=>a.type===b.type?0:a.type==='prefix'?-1:1);
+  };
+  if(mode==='reroll'){reroll('prefix');reroll('suffix');}
+  else if(mode==='prefix')reroll('prefix');
+  else if(mode==='suffix')reroll('suffix');
+  else if(mode==='upgrade'){
+    // Grados: normal 1 mod, poco común 1+1, raro 2+1 (o 1+2), legendario 2+2.
+    const count=type=>item.affixes.filter(m=>m.type===type).length;
+    item.grade++;
+    const types=['prefix','suffix'].filter(type=>count(type)<(item.grade===1?1:2));
+    const order=types.sort((a,b)=>count(a)-count(b)||rng()-.5);
+    for(const type of order){
+      const mod=rollMod(type,item.slot,item.base,level,item.affixes.map(m=>m.stat),rng);
+      if(mod){item.affixes.push(mod);break;}
+    }
+    item.affixes.sort((a,b)=>a.type===b.type?0:a.type==='prefix'?-1:1);
+  }
+  return refreshItem(item,rng,wasGrade);
+}
+const forgeTime=90000;
+function startForge(s){
+  s.floor++;
+  for(const p of s.players)p.level=s.floor;
+  s.phase='forge';
+  s.vote=null;
+  s.event=null;
+  s.ready=[];
+  s.turnStarted=Date.now();
+  s.deadline=s.turnStarted+forgeTime;
+  note(s,'Piso '+s.floor+' · Forja del herrero.');
 }
 const legacyStat={arcane:'magic',shadow:'chaos'};
 function sumStats(equipment) {
@@ -1160,6 +1246,7 @@ export const nodeKinds={
   elite:{name:'Élite',description:'Enemigos más duros y un limo colosal extra. Botín mejor y 50 % más de tusi.'},
   event:{name:'Evento',description:'Un encuentro sin combate. El grupo vota entre varias opciones.'},
   shop:{name:'Tienda',description:'Un mercader: compra y vende con tusi. Sin combate. Se sigue cuando todos están listos.'},
+  forge:{name:'Forja',description:'Un herrero: re-tira los stats de tu equipo o sube su rareza a cambio de tusi. Sin combate.'},
   boss:{name:'Jefe',description:'Cámara del jefe: un enemigo enorme con poderes propios.'}
 };
 const voteTime=15000;
@@ -1184,7 +1271,9 @@ export function makeRoute(rng,act=1){
     if(local>2&&new Set(kinds).size===1)kinds[kinds.length-1]=kinds[0]==='event'?'combat':'event';
     // Tiendas solo en el mapa: siempre en los pisos 3 y 7 del acto, a veces en el 6.
     if(local===3||local===7||(local===6&&rng()<.35))kinds[Math.floor(rng()*count)]='shop';
-    if(!kinds.some(kind=>kind==='combat'||kind==='elite'))kinds[kinds.indexOf('shop')===0?count-1:0]='combat';
+    // Forjas: siempre en el piso 5 del acto y a veces en el 2.
+    if(local===5||(local===2&&rng()<.3)){const i=Math.floor(rng()*count);if(kinds[i]!=='shop')kinds[i]='forge';else kinds[(i+1)%count]='forge';}
+    if(!kinds.some(kind=>kind==='combat'||kind==='elite'))kinds[['shop','forge'].includes(kinds[0])?count-1:0]='combat';
     rows.push(xs.map((x,i)=>({id:act+'-'+local+'-'+i,floor,kind:kinds[i],x,next:[]})));
   }
   // Ramas: cada sala lleva a la más cercana del piso siguiente y, a veces, se bifurca hacia una vecina.
@@ -1244,6 +1333,7 @@ function enterNode(s,node,rng){
   s.route.path.push(node.id);
   if(node.kind==='event'){startEvent(s,rng);return;}
   if(node.kind==='shop'){startShop(s,rng);return;}
+  if(node.kind==='forge'){startForge(s);return;}
   openFloor(s,rng,node.kind==='elite',node.boss||null);
 }
 function castVote(s,player,option,rng){
@@ -1402,7 +1492,7 @@ export function tick(s,rng=Math.random) {
     openRoute(s,rng);return true;
   }
   if(s.phase==='map'||s.phase==='event'){resolveVote(s,rng);return true;}
-  if(s.phase==='shop'){openRoute(s,rng);return true;}
+  if(s.phase==='shop'||s.phase==='forge'){openRoute(s,rng);return true;}
   if(s.phase!=='combat')return false;
   const unit=s.units[s.turn];
   if(!alive(unit)){advance(s,rng);return true;}
@@ -1812,10 +1902,7 @@ function gearAction(s,p,a,rng) {
     p.bag.push(p.equipment[a.slot]);
     delete p.equipment[a.slot];
   }else if(a.type==='unsocket'){
-    const gear=p.equipment[a.slot];
-    if(!gear?.socket)fail('Ese equipo no tiene runa.');
-    p.bag.push(gear.socket);
-    gear.socket=null;
+    fail('Las runas engarzadas son permanentes: no se pueden extraer.');
   }else if(a.type==='next'){
     if(s.players[0].id!==p.id)fail('Solo el anfitrión puede continuar.');
     if(s.picks.length!==s.players.length)fail('Falta elegir botín.');
@@ -1830,8 +1917,8 @@ function gearAction(s,p,a,rng) {
       p.equipment[item.slot]=item;
     }else if(a.type==='socket'&&item.kind==='rune'&&Object.hasOwn(p.equipment,a.slot)){
       const gear=p.equipment[a.slot];
+      if(gear.socket)fail('Ese equipo ya tiene una runa engarzada: es permanente y no se puede reemplazar.');
       p.bag.splice(bagIndex,1);
-      if(gear.socket)p.bag.push(gear.socket);
       gear.socket=item;
     }else if(a.type==='sell'){
       if(s.phase!=='shop')fail('Solo puedes vender en la tienda.');
@@ -1853,7 +1940,7 @@ export function act(s,id,a,rng=Math.random) {
     openRoute(s,rng);
     return;
   }
-  const calm=['reward','shop','map','event'].includes(s.phase);
+  const calm=['reward','shop','forge','map','event'].includes(s.phase);
   if(a.type==='give'){
     if(!calm)fail('Solo podéis intercambiar fuera del combate.');
     give(s,player,a);
@@ -1863,6 +1950,26 @@ export function act(s,id,a,rng=Math.random) {
   if(s.phase==='map'||s.phase==='event'){
     if(a.type!=='vote')fail('Ahora toca votar.');
     castVote(s,player,a.option,rng);
+    return;
+  }
+  if(s.phase==='forge'){
+    if(a.type==='ready'){
+      if(!s.ready.includes(player.id))s.ready.push(player.id);
+      else s.ready=s.ready.filter(id=>id!==player.id);
+      if(s.players.every(p=>s.ready.includes(p.id)))openRoute(s,rng);
+      return;
+    }
+    if(a.type!=='forge')fail('Acción no disponible en la forja.');
+    const item=player.bag.find(i=>i.id===a.item)||Object.values(player.equipment).find(i=>i.id===a.item);
+    if(!forgeModes[a.mode])fail('Operación de forja desconocida.');
+    const blocked=forgeBlock(item,a.mode);
+    if(blocked)fail(blocked);
+    const cost=forgeCost(item,a.mode);
+    if(player.gold<cost)fail('No tienes suficiente tusi.');
+    player.gold-=cost;
+    const before=item.rarity;
+    forgeItem(item,a.mode,rng);
+    note(s,player.name+' forja '+item.name+' ('+forgeModes[a.mode].name.toLowerCase()+(before!==item.rarity?' → '+item.rarity.toLowerCase():'')+') por '+cost+' tusi.');
     return;
   }
   if(s.phase==='shop'){

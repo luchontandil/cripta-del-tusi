@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,glyphText,monsterSkills,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=36';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=36';
-import {setupSfx} from './music.js?v=36';
-import {icon} from './icons.js?v=36';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=38';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=38';
+import {setupSfx} from './music.js?v=38';
+import {icon} from './icons.js?v=38';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -29,6 +29,7 @@ const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poi
 const specs={guardia:'Primera línea · debilita al enemigo',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
 const roles={guardia:'Tanque',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
 const sfx=setupSfx(el('field-sfx'));
+sfx.attach(el('entry-sfx'));
 /** Crea un elemento con clase y contenido (texto o nodos). */
 function h(tag,className,...children){
   const node=document.createElement(tag);
@@ -95,7 +96,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=36').then(({createIso})=>{
+import('./isometric.js?v=38').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();

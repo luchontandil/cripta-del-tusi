@@ -1,5 +1,5 @@
 // Short, synthesized effects. This module never starts a soundtrack.
-import {icon} from './icons.js?v=36';
+import {icon} from './icons.js?v=38';
 export function setupSfx(button){
   let context,master;
   let muted=false;
@@ -26,6 +26,9 @@ export function setupSfx(button){
       return true;
     }catch{return false;}
   }
+  // Algunos navegadores (Firefox) dejan el audio suspendido: se reintenta con cada gesto.
+  const unlock=()=>{if(context&&context.state!=='running')context.resume().catch(()=>{});};
+  for(const type of ['pointerdown','keydown','touchend'])document.addEventListener(type,unlock,true);
   function tone(from,to,duration,volume,type='sine',delay=0){
     const t=context.currentTime+delay;
     const oscillator=context.createOscillator(),gain=context.createGain();
@@ -42,6 +45,7 @@ export function setupSfx(button){
   // ── Banco de sonidos (OpenGameArt CC0 + Little Robot Sound Factory CC-BY 3.0; ver sfx/CREDITS.md) ──
   // Cada clave tiene varias variantes; se elige una al azar con un ligero cambio de tono.
   const base=new URL('./sfx/',import.meta.url);
+  const diag={decoded:0,failed:0,lastError:''};
   let bank=null,bankLoading=null;
   const buffers=new Map();
   function loadBank(){
@@ -49,7 +53,9 @@ export function setupSfx(button){
     return bankLoading;
   }
   function buffer(name){
-    if(!buffers.has(name))buffers.set(name,fetch(name.includes('/')?name:new URL(name+'.ogg',base)).then(r=>r.arrayBuffer()).then(data=>context.decodeAudioData(data)).catch(()=>null));
+    if(!buffers.has(name))buffers.set(name,fetch(name.includes('/')?name:new URL(name+'.ogg',base)).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();})
+      .then(data=>new Promise((ok,ko)=>context.decodeAudioData(data,ok,ko)))
+      .then(d=>{diag.decoded++;return d;}).catch(e=>{diag.failed++;diag.lastError=name+': '+(e?.message||e);return null;}));
     return buffers.get(name);
   }
   // Mapa de efectos del motor a claves del banco.
@@ -126,11 +132,15 @@ export function setupSfx(button){
       default:tone(310,720,.18,.13,'triangle');tone(520,175,.16,.13,'sine',.075);
     }
   };
+  const buttons=[button];
+  let anchor=button;
   function reflect(){
-    button.setAttribute('aria-pressed',String(!muted));
-    button.setAttribute('aria-expanded',String(!menu.hidden));
-    button.replaceChildren(icon(muted?'mute':'sound'));
-    button.title='Sonido';
+    for(const b of buttons){
+      b.setAttribute('aria-pressed',String(!muted));
+      b.setAttribute('aria-expanded',String(!menu.hidden&&anchor===b));
+      b.replaceChildren(icon(muted?'mute':'sound'));
+      b.title=muted?'Sonido desactivado':'Sonido';
+    }
     muteBox.checked=!muted;
     sfxRange.value=Math.round(volumeSfx*100);ambRange.value=Math.round(volumeAmbience*100);
     sfxOut.textContent=sfxRange.value+' %';ambOut.textContent=ambRange.value+' %';
@@ -141,11 +151,13 @@ export function setupSfx(button){
   menu.innerHTML=`<strong>Sonido</strong>
     <label class="sound-row"><input type="checkbox" data-k="on"> Sonido activado</label>
     <label class="sound-row">Efectos <input type="range" min="0" max="100" step="5" data-k="sfx"><output></output></label>
-    <label class="sound-row">Ambiente <input type="range" min="0" max="100" step="5" data-k="amb"><output></output></label>`;
+    <label class="sound-row">Ambiente <input type="range" min="0" max="100" step="5" data-k="amb"><output></output></label>
+    <button type="button" class="ghost sound-test" data-k="test">Probar sonido</button>
+    <p class="sound-diag" data-k="diag" hidden></p>`;
   document.body.append(menu);
   const muteBox=menu.querySelector('[data-k="on"]'),sfxRange=menu.querySelector('[data-k="sfx"]'),ambRange=menu.querySelector('[data-k="amb"]');
   const [sfxOut,ambOut]=menu.querySelectorAll('output');
-  function place(){const r=button.getBoundingClientRect();menu.style.top=(r.bottom+6)+'px';menu.style.left=Math.max(8,Math.min(innerWidth-236,r.right-228))+'px';}
+  function place(){const r=anchor.getBoundingClientRect();menu.style.top=(r.bottom+6)+'px';menu.style.left=Math.max(8,Math.min(innerWidth-236,r.right-228))+'px';}
   function setMuted(next){
     muted=next;
     try{localStorage.setItem('cripta-sfx-muted',muted?'yes':'no');}catch{}
@@ -154,19 +166,45 @@ export function setupSfx(button){
     reflect();
   }
   muteBox.addEventListener('change',()=>setMuted(!muteBox.checked));
+  const diagBox=menu.querySelector('[data-k="diag"]');
+  menu.querySelector('[data-k="test"]').addEventListener('click',async()=>{
+    diagBox.hidden=false;
+    if(muted){diagBox.textContent='El sonido está desactivado: marca «Sonido activado».';return;}
+    if(!ready()){diagBox.textContent='Este navegador no permite audio web.';return;}
+    try{await context.resume();}catch{}
+    tone(523,523,.25,.25,'triangle');tone(784,784,.3,.2,'triangle',.18);
+    await loadBank();
+    setTimeout(()=>{play('levelup');},600);
+    setTimeout(()=>{
+      const lines=[];
+      if(context.state!=='running')lines.push('⚠ El navegador tiene el audio bloqueado ('+context.state+'). En Firefox: pulsa el icono a la izquierda de la dirección → Permisos → Reproducción automática → «Permitir audio y vídeo», y recarga.');
+      else lines.push('Audio activo. Si no has oído dos notas y una fanfarria, revisa que la pestaña no esté silenciada y el mezclador de volumen del sistema.');
+      if(volumeSfx===0)lines.push('La barra de Efectos está a 0 %.');
+      if(!bank||!Object.keys(bank).length)lines.push('⚠ No se pudo cargar la lista de sonidos.');
+      if(diag.failed)lines.push('⚠ '+diag.failed+' sonidos no se pudieron cargar ('+diag.lastError+').');
+      lines.push('Cargados: '+diag.decoded+'.');
+      diagBox.textContent=lines.join(' ');
+    },1400);
+  });
   sfxRange.addEventListener('input',()=>{volumeSfx=sfxRange.value/100;try{localStorage.setItem('cripta-sfx-volume',volumeSfx);}catch{}
     if(master)master.gain.value=.6*volumeSfx;reflect();});
   sfxRange.addEventListener('change',()=>play('hit'));
   ambRange.addEventListener('input',()=>{volumeAmbience=ambRange.value/100;try{localStorage.setItem('cripta-amb-volume',volumeAmbience);}catch{}
     if(ambienceBus)ambienceBus.gain.value=.75*volumeAmbience;reflect();});
   reflect();
-  button.addEventListener('click',()=>{menu.hidden=!menu.hidden;if(!menu.hidden){place();ready();}reflect();});
-  document.addEventListener('pointerdown',event=>{if(!menu.hidden&&!menu.contains(event.target)&&!button.contains(event.target)){menu.hidden=true;reflect();}});
-  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!menu.hidden){menu.hidden=true;reflect();button.focus();}});
+  function attach(b){
+    if(!b)return;
+    if(!buttons.includes(b))buttons.push(b);
+    b.addEventListener('click',()=>{const same=anchor===b;anchor=b;menu.hidden=same?!menu.hidden:false;if(!menu.hidden){place();ready();}reflect();});
+  }
+  attach(button);
+  document.addEventListener('pointerdown',event=>{if(!menu.hidden&&!menu.contains(event.target)&&!buttons.some(b=>b.contains(event.target))){menu.hidden=true;reflect();}});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!menu.hidden){menu.hidden=true;reflect();anchor.focus();}});
   document.addEventListener('click',event=>{
     const control=event.target.closest?.('button, summary');
-    if(control&&control!==button&&!control.closest('#board')&&!control.disabled)play('click');
+    if(control&&!buttons.includes(control)&&!control.closest('#board')&&!control.disabled)play('click');
   },true);
+  play.attach=b=>{attach(b);reflect();};
   play.ambient=key=>{loadBank().then(()=>ambient(key));};
   // Utilidades para el editor de SFX.
   play.bank=()=>loadBank().then(()=>bank);

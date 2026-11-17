@@ -1,5 +1,5 @@
 // Sonido del juego: efectos, ambiente por acto y música de fondo.
-import {icon} from './icons.js?v=44';
+import {icon} from './icons.js?v=45';
 export function setupSfx(button){
   let context,master;
   let muted=false;
@@ -71,7 +71,7 @@ export function setupSfx(button){
   // ── Banco de sonidos (OpenGameArt CC0 + Little Robot Sound Factory CC-BY 3.0; ver sfx/CREDITS.md) ──
   // Cada clave tiene varias variantes; se elige una al azar con un ligero cambio de tono.
   const base=new URL('./sfx/',import.meta.url);
-  const SFX_VERSION='6';   // súbelo al cambiar archivos del banco
+  const SFX_VERSION='7';   // súbelo al cambiar archivos del banco
   const diag={decoded:0,failed:0,lastError:''};
   let bank=null,bankLoading=null;
   const buffers=new Map();

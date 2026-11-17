@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,skillSchool} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -150,14 +150,15 @@ test('genera botín con afijos y permite equipar, engarzar, extraer y vender una
   assert.ok(raised.stats.physical>=1);
   assert.ok(skillFor(raised,newSpell.index));
 });
-test('la vista previa aplica el crítico ×1,5 y solo resta armadura al daño físico',()=>{
+test('la vista previa aplica el crítico ×1,5 y la armadura frena las habilidades físicas',()=>{
   const s=battle('guardia');
   const hero=s.units[0], foe=s.units[1];
   hero.stats.physical=2;
   foe.stats.ward=3;
   assert.deepEqual(damagePreview(hero,foe,classes.guardia.skills[0]),{element:'physical',normal:[6,9],critical:[10,15],chance:.12});
-  hero.stats.fire=2;
-  assert.deepEqual(damagePreview(hero,foe,classes.guardia.skills.at(-1)).normal,[9,12]);
+  // Golpe de brasas es físico aunque sea de fuego: suma el daño físico (no el de fuego) y la armadura lo frena.
+  hero.stats.fire=5;
+  assert.deepEqual(damagePreview(hero,foe,classes.guardia.skills.at(-1)).normal,[6,9]);
 });
 test('la IA avanza hacia el rival aunque un aliado cierre el único paso',()=>{
   const s=battle('tirador');
@@ -479,7 +480,7 @@ test('los objetos siguen las reglas de rareza, afijos/sufijos y tiers por nivel'
 
 test('los enemigos se adaptan al poder real del grupo',()=>{
   const hero=(extra={})=>({classId:'guardia',level:3,skillRanks:[2,1,1,0],max:classes.guardia.hp+8+(extra.vitality||0),
-    stats:{physical:1,fire:1,ice:1,arcane:1,shadow:1,ward:0,critical:0,action:0,...extra}});
+    stats:{physical:1,fire:1,ice:1,magic:1,lightning:1,chaos:1,ward:0,critical:0,action:0,...extra}});
   const weak=enemyScaling(3,[hero()]);
   const strong=enemyScaling(3,[hero({physical:8,critical:25,ward:3,vitality:25})]);
   assert.ok(strong.hp>weak.hp);
@@ -807,4 +808,19 @@ test('cada monstruo tiene una habilidad propia: el diablillo estalla en cruz y l
   s.turn=s.units.indexOf(imp);s.enemyPlan=null;
   timeout(s);while(s.units[s.turn]===imp)timeout(s);
   assert.ok(hero.effects.weak);
+});
+test('daño: físicas suman solo el físico; hechizos suman mágico + su elemento; la armadura solo frena lo físico',()=>{
+  const stats={physical:3,magic:5,fire:7,ice:11,lightning:13,chaos:17};
+  const archer={classId:'tirador',stats},mage={classId:'mago',stats};
+  const skill=(cls,name)=>classes[cls].skills.find(sk=>sk[0]===name);
+  assert.equal(damageBonus(archer,skill('tirador','Flecha ígnea')),3);
+  assert.equal(damageBonus(mage,skill('mago','Bola de fuego')),5+7);
+  assert.equal(damageBonus(mage,skill('mago','Relámpago')),5+13);
+  assert.equal(damageBonus(mage,skill('mago','Descarga arcana')),5);
+  assert.equal(skillSchool(archer,skill('tirador','Flecha ígnea')),'physical');
+  const target={stats:{ward:4},effects:{}};
+  const phys=damagePreview(archer,target,skill('tirador','Flecha ígnea')).normal[0];
+  const magic=damagePreview(mage,target,skill('mago','Bola de fuego')).normal[0];
+  assert.equal(phys,skill('tirador','Flecha ígnea')[3]+3-4);
+  assert.equal(magic,skill('mago','Bola de fuego')[3]+12);
 });

@@ -243,3 +243,4 @@ No son de dominio público: solo para uso dentro de este juego, no se pueden reu
 ## Música
 
 - `music_dungeon.ogg` ← «Dungeon Pulse», aportada por el propietario del proyecto (convertida a OGG, normalizada y preparada para repetirse en bucle).
+- `el_lightning_1..3.ogg` ← sfx100v2_thunder_01.ogg (sfx_100_v2, CC0, OpenGameArt) en tres tonos

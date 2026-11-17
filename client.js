@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,glyphText,monsterSkills,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=44';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=44';
-import {setupSfx} from './music.js?v=44';
-import {icon} from './icons.js?v=44';
+  glyphInfo,glyphText,monsterSkills,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=45';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=45';
+import {setupSfx} from './music.js?v=45';
+import {icon} from './icons.js?v=45';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -96,7 +96,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=44').then(({createIso})=>{
+import('./isometric.js?v=45').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -461,9 +461,16 @@ function skillFacts(unit,skill){
   const healing=['heal','cleanse'].includes(kind);
   const utility=['dash','shield','haste','swap'].includes(kind)||max<=0;
   const element=skillElement(unit,skill);
-  const bonus=healing?Math.floor((unit.level||1)/2):utility?0:(unit.stats?.[element]||0);
+  const bonus=healing?Math.floor((unit.level||1)/2):utility?0:damageBonus(unit,skill);
+  const school=skillSchool(unit,skill);
   const crit=Math.min(100,Math.round(critChance(unit)*100)+(skillOptions(skill).crit||0));
-  return {cost,minRange,maxRange:range+reach,reach,healing,utility,element,bonus,low:min+bonus,high:max+bonus,kind,crit,modifiable:modifiableRange(skill)};
+  return {cost,minRange,maxRange:range+reach,reach,healing,utility,element,school,bonus,low:min+bonus,high:max+bonus,kind,crit,modifiable:modifiableRange(skill)};
+}
+/** De dónde sale el bonus de daño: físico, o mágico + elemento. */
+function bonusSource(unit,f){
+  if(f.school==='physical')return 'daño físico';
+  const elemental=['fire','ice','lightning','chaos'].includes(f.element);
+  return elemental?'mágico + '+elements[f.element].toLowerCase():'daño mágico';
 }
 /** Filas de la ficha de una habilidad. */
 function skillRows(unit,skill){
@@ -471,8 +478,9 @@ function skillRows(unit,skill){
   const rows=[statRow('ap','Coste',f.cost+' PA')];
   if(f.healing)rows.push(statRow('heal','Curación',f.low+'–'+f.high+(f.bonus?' (+'+f.bonus+' nivel)':'')));
   else if(!f.utility){
-    rows.push(statRow(f.element,'Elemento',elements[f.element],'element-'+f.element));
-    rows.push(statRow(f.element,'Daño',f.low+'–'+f.high+(f.bonus?' (+'+f.bonus+' equipo)':'')));
+    rows.push(statRow(f.school==='magic'?'magic':'physical','Tipo',f.school==='magic'?'Hechizo':'Físico','school-'+f.school));
+    if(f.element!=='physical'&&!(f.school==='magic'&&f.element==='magic'))rows.push(statRow(f.element,'Elemento',elements[f.element],'element-'+f.element));
+    rows.push(statRow(f.element,'Daño',f.low+'–'+f.high+(f.bonus?' (+'+f.bonus+' '+bonusSource(unit,f)+')':'')));
     rows.push(statRow('critical','Crítico',f.crit+' % · ×1,5'));
   }
   if(o.area)rows.push(statRow('blast','Área',areaNames[o.area]+(o.size>1?' · tamaño '+o.size:'')));
@@ -1133,7 +1141,7 @@ function eventSound(event){
     if(event.effect==='arrow')sfx('arrowhit',{delay:.25,volume:.85});
     // Sonido del elemento al impactar (llama, hielo que se quiebra, sombra, magia arcana),
     // salvo si el propio efecto ya es ese sonido.
-    const elementSound={fire:'el_fire',ice:'el_ice',shadow:'el_shadow',arcane:'arcane'}[event.element];
+    const elementSound={fire:'el_fire',ice:'el_ice',chaos:'el_shadow',magic:'arcane',lightning:'el_lightning'}[event.element];
     const already={el_fire:'blast',el_shadow:'venom',arcane:'arcane'}[elementSound];
     if(elementSound&&event.effect!==already){
       const travel=Math.min(.45,.12+.04*(state?.width?Math.abs((event.pos%state.width)-(event.from%state.width))+Math.abs(Math.floor(event.pos/state.width)-Math.floor(event.from/state.width)):3));
@@ -1625,13 +1633,13 @@ setInterval(refresh,400);
 
 
 // ───────────── Editor de SFX (solo administradores) ─────────────
-const sfxLabels={arcane:'Hechizo arcano',armor:'Golpe en armadura',arrow:'Disparo de flecha',arrowhit:'Impacto de flecha',blast:'Explosión y fuego',
+const sfxLabels={armor:'Golpe en armadura',arrow:'Disparo de flecha',arrowhit:'Impacto de flecha',blast:'Explosión y fuego',
   cleanse:'Purificar',click:'Clic de interfaz',coins:'Monedas',dash:'Salto y teletransporte',die_hero:'Muerte de héroe',die_monster:'Muerte de monstruo (sin uso)',thud:'Caída de un cuerpo',bones:'Huesos que caen',
   door:'Puerta y cambio de sala',equip:'Equipar objeto',glyph:'Glifo',heal:'Curación',hit:'Golpe recibido',hurt_hero:'Quejido de héroe',levelup:'Subir de nivel',
   loot:'Botín',lose:'Derrota',page:'Página y menú',push:'Empujón y tirón',shield:'Escudo',slash:'Corte',slow:'Ralentizar y hielo',step:'Pasos',
   step_wet:'Pasos en el barro',swing:'Golpe al aire',trap:'Trampa',venom:'Veneno',win:'Victoria',v_bat:'Voz: murciélago',v_beast:'Voz: bestia',
   v_boss:'Voz: jefe',v_ghost:'Voz: espectro',v_imp:'Voz: diablillo',v_plant:'Voz: planta',v_shade:'Voz: vampiro y súcubo',v_skeleton:'Voz: esqueleto',
-  v_slime:'Voz: limo',v_worm:'Voz: gusano',amb_crypt:'Ambiente: mazmorra',el_fire:'Elemento: fuego (impacto)',el_ice:'Elemento: hielo (impacto)',el_shadow:'Elemento: sombra (impacto)',amb_jungle:'Ambiente: jungla',amb_hell:'Ambiente: infierno'};
+  v_slime:'Voz: limo',v_worm:'Voz: gusano',amb_crypt:'Ambiente: mazmorra',el_fire:'Elemento: fuego (impacto)',el_ice:'Elemento: hielo (impacto)',el_shadow:'Elemento: caótico (impacto)',el_lightning:'Elemento: rayo (impacto)',arcane:'Hechizo mágico',amb_jungle:'Ambiente: jungla',amb_hell:'Ambiente: infierno'};
 function sfxEditorButton(){
   const b=btn('',()=>openSfxEditor());b.className='ghost';
   b.append(icon('sound'),'Editor de SFX');

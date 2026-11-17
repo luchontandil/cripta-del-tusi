@@ -16,7 +16,7 @@
   --danger:#ff8f7a;--good:#a8de8c;
 
   --pa:#8fd3ff;--pa-bg:#17324a;--pm:#b5ea98;--pm-bg:#1e3a26;
-  --fire:#ff9a5c;--ice:#93e2ff;--arcane:#c5a9ff;--shadow:#d79bf0;--physical:#e8d6b4;--poison:#c3e276;
+  --fire:#ff9a5c;--ice:#93e2ff;--arcane:#c5a9ff;--magic:#c5a9ff;--lightning:#ffe066;--chaos:#b6e36a;--shadow:#d79bf0;--physical:#e8d6b4;--poison:#c3e276;
 
   --rarity-common:#e6e1d8;--rarity-uncommon:#6fa8ff;--rarity-rare:#ffe066;--rarity-epic:#ffa733;
 
@@ -984,3 +984,9 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
   background:#17131c;border:2px solid #4a3a2a;color:var(--gold);box-shadow:0 3px 0 #0008}
 .entry-sfx[aria-pressed="false"]{color:#ff8a7a;border-color:#7a3a30}
 .in-expedition .entry-sfx{display:none}
+
+/* Tipos de daño: Físico, Mágico, Fuego, Hielo, Rayo, Caótico */
+.icon-magic{color:var(--magic)}.icon-lightning{color:var(--lightning)}.icon-chaos{color:var(--chaos)}
+.tip-row.element-magic .tip-value{color:var(--magic)}.tip-row.element-lightning .tip-value{color:var(--lightning)}.tip-row.element-chaos .tip-value{color:var(--chaos)}
+.ability-element.element-magic{color:var(--magic)}.ability-element.element-lightning{color:var(--lightning)}.ability-element.element-chaos{color:var(--chaos)}
+.tip-row.school-physical .tip-value{color:var(--physical)}.tip-row.school-magic .tip-value{color:var(--magic)}

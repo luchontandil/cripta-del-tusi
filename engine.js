@@ -26,9 +26,9 @@ export const classes = {
     ['Flecha ígnea',2,6,6,9,'damage','✹',2,{element:'fire',max:{crit:15}}]
   ]},
   mistico: {name:'Clérigo', hp:36, initiative:12, skills:[
-    ['Luz ardiente',2,4,5,8,'damage','✦',0,{element:'arcane',max:{range:1}}],
+    ['Luz ardiente',2,4,5,8,'damage','✦',0,{element:'magic',max:{range:1}}],
     ['Restaurar',2,5,6,10,'heal','✚',0,{max:{range:1}}],
-    ['Sello de fragilidad',1,4,1,3,'expose','✷',0,{element:'arcane',value:3,max:{value:2}}],
+    ['Sello de fragilidad',1,4,1,3,'expose','✷',0,{element:'magic',value:3,max:{value:2}}],
     ['Purificar',2,3,3,6,'cleanse','❖',0,{max:{range:2}}],
     ['Escudo sagrado',2,4,0,0,'shield','⛨',0,{value:3,max:{value:2}}],
     ['Celeridad divina',2,4,0,0,'haste','➝',0,{value:2,max:{range:2}}],
@@ -36,21 +36,21 @@ export const classes = {
     ['Alba radiante',3,4,8,12,'heal','✚',0,{area:'cross',max:{cost:-1}}]
   ]},
   mago: {name:'Mago', hp:30, initiative:13, skills:[
-    ['Descarga arcana',2,6,6,9,'damage','✦',0,{element:'arcane',max:{crit:15}}],
+    ['Descarga arcana',2,6,6,9,'damage','✦',0,{element:'magic',max:{crit:15}}],
     ['Bola de fuego',3,5,6,10,'blast','✹',2,{element:'fire',area:'cross',max:{size:1}}],
     ['Escarcha',2,5,3,6,'slow','❄',0,{element:'ice',value:2,max:{value:1}}],
     ['Cono de hielo',3,1,6,9,'slow','❄',0,{element:'ice',area:'cone',value:1,max:{size:1}}],
-    ['Relámpago',3,1,6,10,'damage','✦',0,{element:'arcane',area:'line',size:3,max:{size:1}}],
-    ['Onda de choque',2,3,4,6,'push','✦',0,{element:'arcane',push:2,max:{push:1}}],
+    ['Relámpago',3,1,6,10,'damage','✦',0,{element:'lightning',area:'line',size:3,max:{size:1}}],
+    ['Onda de choque',2,3,4,6,'push','✦',0,{element:'magic',push:2,max:{push:1}}],
     ['Teletransporte',3,4,0,0,'dash','↢',1,{teleport:true,los:false,max:{range:1}}],
-    ['Rayo umbrío',2,6,7,10,'damage','✦',0,{element:'shadow',max:{modifiable:true}}]
+    ['Rayo umbrío',2,6,7,10,'damage','✦',0,{element:'chaos',max:{modifiable:true}}]
   ]},
   sombra: {name:'Ninja', hp:35, initiative:15, skills:[
     ['Shuriken',2,5,5,8,'damage','✧',1,{element:'physical',max:{crit:15}}],
-    ['Cuchilla envenenada',2,4,3,5,'venom','✧',0,{element:'shadow',value:3,max:{value:2}}],
+    ['Cuchilla envenenada',2,4,3,5,'venom','✧',0,{element:'chaos',value:3,max:{value:2}}],
     ['Paso de sombra',2,3,0,0,'dash','↢',1,{max:{range:1}}],
-    ['Puñalada trasera',3,1,12,16,'damage','⚔',0,{element:'shadow',max:{crit:20}}],
-    ['Bomba de humo',2,4,3,5,'slow','❄',0,{element:'shadow',area:'cross',value:1,max:{value:1}}],
+    ['Puñalada trasera',3,1,12,16,'damage','⚔',0,{element:'chaos',max:{crit:20}}],
+    ['Bomba de humo',2,4,3,5,'slow','❄',0,{element:'chaos',area:'cross',value:1,max:{value:1}}],
     ['Kunai con cadena',2,5,4,6,'pull','↢',2,{element:'physical',pull:3,max:{range:1}}],
     ['Sustitución',2,5,0,0,'swap','↢',1,{max:{cost:-1}}],
     ['Corte glacial',2,2,5,8,'slow','❄',0,{element:'ice',value:2,max:{modifiable:true}}]
@@ -94,16 +94,40 @@ export function skillFor(unit,index,preview=false){
   }
   return skill;
 }
-export const elements={physical:'Físico',fire:'Fuego',ice:'Hielo',arcane:'Arcano',shadow:'Sombra'};
+/** Tipos de daño. «Caótico» engloba venenos y magias oscuras. */
+export const elements={physical:'Físico',magic:'Mágico',fire:'Fuego',ice:'Hielo',lightning:'Rayo',chaos:'Caótico'};
 const damageKeys=Object.keys(elements);
+/** Elementos propiamente dichos (los que suman a los hechizos además del daño mágico). */
+const elementalKeys=['fire','ice','lightning','chaos'];
 export function skillElement(unit,skill){
   const opts=skillOptions(skill);
   if(opts.element)return opts.element;
   if(skill[5]==='blast'||skill[6]==='✹')return 'fire';
-  if(unit.classId==='sombra')return 'shadow';
-  if(unit.classId==='mago'||unit.classId==='mistico')return 'arcane';
+  if(unit.classId==='mago'||unit.classId==='mistico')return 'magic';
   return 'physical';
 }
+/**
+ * Escuela de una habilidad: «physical» (flechas, dagas, espadas, mazas…) o «magic» (hechizos).
+ * Las de mago y clérigo son mágicas; el resto, físicas (aunque tengan un elemento, como Flecha ígnea).
+ */
+export function skillSchool(unit,skill){
+  const opts=skillOptions(skill);
+  if(opts.school)return opts.school;
+  return unit.classId==='mago'||unit.classId==='mistico'?'magic':'physical';
+}
+/**
+ * Bonus de daño de una habilidad:
+ *  - físicas: solo el daño físico, sea cual sea su elemento;
+ *  - mágicas: daño mágico + el de su elemento (fuego, hielo, rayo o caótico).
+ */
+export function damageBonus(unit,skill){
+  const stats=unit.stats||{};
+  if(skillSchool(unit,skill)==='physical')return stats.physical||0;
+  const element=skillElement(unit,skill);
+  return (stats.magic||0)+(elementalKeys.includes(element)?stats[element]||0:0);
+}
+/** La armadura frena las habilidades físicas; los hechizos la atraviesan. */
+const armorType=(unit,skill)=>skillSchool(unit,skill)==='physical'?'physical':skillElement(unit,skill);
 export const modifiableRange=skill=>skillOptions(skill).modifiable??(skill[2]>1&&!['dash','swap'].includes(skill[5]));
 /** Tipos de habilidad que se lanzan sobre aliados. */
 export const supportKinds=['heal','cleanse','shield','haste'];
@@ -135,8 +159,9 @@ export const affixes={
     physical:[[1,1,2,'Cortante'],[2,2,3,'Brutal'],[3,3,5,'Implacable'],[5,5,7,'Feroz'],[7,7,9,'Letal'],[11,9,12,'Devastador'],[16,12,15,'Aniquilador'],[21,15,19,'Apocalíptico']],
     fire:[[1,1,2,'Humeante'],[2,2,3,'Ardiente'],[3,3,5,'Candente'],[5,5,7,'Infernal'],[7,7,9,'Calcinante'],[11,9,12,'Volcánico'],[16,12,15,'Solar'],[21,15,19,'Primordial']],
     ice:[[1,1,2,'Invernal'],[2,2,3,'Polar'],[3,3,5,'Glacial'],[5,5,7,'Boreal'],[7,7,9,'Hiemal'],[11,9,12,'Ártico'],[16,12,15,'Perpetuo'],[21,15,19,'Absoluto']],
-    arcane:[[1,1,2,'Brillante'],[2,2,3,'Estelar'],[3,3,5,'Astral'],[5,5,7,'Celestial'],[7,7,9,'Sideral'],[11,9,12,'Cósmico'],[16,12,15,'Divino'],[21,15,19,'Infinito']],
-    shadow:[[1,1,2,'Lúgubre'],[2,2,3,'Sepulcral'],[3,3,5,'Umbral'],[5,5,7,'Abisal'],[7,7,9,'Espectral'],[11,9,12,'Abismal'],[16,12,15,'Insondable'],[21,15,19,'Primigenio']],
+    magic:[[1,1,2,'Brillante'],[2,2,3,'Estelar'],[3,3,5,'Astral'],[5,5,7,'Celestial'],[7,7,9,'Sideral'],[11,9,12,'Cósmico'],[16,12,15,'Divino'],[21,15,19,'Infinito']],
+    lightning:[[1,1,2,'Chispeante'],[2,2,3,'Eléctrico'],[3,3,5,'Crepitante'],[5,5,7,'Tormentoso'],[7,7,9,'Fulminante'],[11,9,12,'Tronante'],[16,12,15,'Huracanado'],[21,15,19,'del Trueno Eterno']],
+    chaos:[[1,1,2,'Lúgubre'],[2,2,3,'Sepulcral'],[3,3,5,'Umbral'],[5,5,7,'Abisal'],[7,7,9,'Espectral'],[11,9,12,'Abismal'],[16,12,15,'Insondable'],[21,15,19,'Primigenio']],
     ward:[[1,1,1,'Firme'],[3,1,2,'Resistente'],[5,2,3,'Inquebrantable'],[7,3,4,'Impenetrable'],[13,4,5,'Colosal'],[19,5,7,'Inmortal']]
   },
   suffix:{
@@ -147,16 +172,16 @@ export const affixes={
     action:[[3,1,1,'del Erudito']]
   }
 };
-const elementsAll=['physical','fire','ice','arcane','shadow'];
+const elementsAll=['physical','magic','fire','ice','lightning','chaos'];
 const slotAffixes={
   weapon:{prefix:elementsAll,suffix:['critical','reach','action']},
-  helmet:{prefix:['ward','fire','ice','arcane'],suffix:['vitality','critical','reach']},
-  armor:{prefix:['ward','physical','shadow'],suffix:['vitality','critical']},
+  helmet:{prefix:['ward','fire','ice','magic','lightning'],suffix:['vitality','critical','reach']},
+  armor:{prefix:['ward','physical','chaos'],suffix:['vitality','critical']},
   gloves:{prefix:elementsAll,suffix:['critical','reach']},
-  belt:{prefix:['ward','physical','fire'],suffix:['vitality','critical']},
-  boots:{prefix:['ward','ice','shadow'],suffix:['movement','vitality']},
+  belt:{prefix:['ward','physical','fire','lightning'],suffix:['vitality','critical']},
+  boots:{prefix:['ward','ice','chaos'],suffix:['movement','vitality']},
   ring:{prefix:elementsAll,suffix:['critical','reach','vitality']},
-  amulet:{prefix:['arcane','fire','shadow','ward'],suffix:['action','vitality','reach']},
+  amulet:{prefix:['magic','fire','lightning','chaos','ward'],suffix:['action','vitality','reach']},
   charm:{prefix:elementsAll,suffix:['critical','reach']}
 };
 const rareFirst=['Lamento','Colmillo','Susurro','Ruina','Presagio','Garra','Aullido','Eco','Lamento','Fauces','Maldición','Grito'];
@@ -164,7 +189,7 @@ const rareSecond=['sombrío','de hueso','carmesí','del ocaso','funesto','de la 
 const legendaryNames=['La Última Brasa','Juramento del Umbral','El Ojo Insomne','Lágrima de Tusi','Promesa Rota','Corona del Rey Caído',
   'Fauces del Abismo','Canción de Ceniza','El Vigía Eterno','Pacto de Sangre','Aliento del Oráculo','Silencio del Osario'];
 const inscriptions = [
-  ['Brasa','fire',2],['Escarcha','ice',2],['Acero','physical',2],['Éter','arcane',2],['Umbría','shadow',2],['Brújula','reach',1],
+  ['Brasa','fire',2],['Escarcha','ice',2],['Acero','physical',2],['Éter','magic',2],['Chispa','lightning',2],['Umbría','chaos',2],['Brújula','reach',1],
   ['Muralla','ward',1], ['Centella','critical',8], ['Pulso','vitality',5]
 ];
 const pick = (values,rng) => values[Math.floor(rng()*values.length)];
@@ -238,11 +263,13 @@ export function rollItem(s,rng,{bonus=0,gear=false,ilvl,minGrade=0}={}) {
   const price=5+grade*8+mods.reduce((sum,m)=>sum+m.tier*2,0)+level;
   return {id:itemId,name,base,kind:'gear',slot,rarity:rarities[grade],grade,ilvl:level,affixes:mods,stats,price,socket:null};
 }
+const legacyStat={arcane:'magic',shadow:'chaos'};
 function sumStats(equipment) {
   const totals=Object.fromEntries(Object.keys(statNames).map(key=>[key,0]));
   for (const gear of Object.values(equipment)) {
     for (const stats of [gear.stats,gear.socket?.stats||{}]) {
-      for (const [key,value] of Object.entries(stats)){
+      for (const [raw,value] of Object.entries(stats)){
+        const key=legacyStat[raw]||raw;
         if(!Object.hasOwn(totals,key))continue;
         if(key==='movement'&&gear.slot!=='boots')continue;
         if(key==='action'&&gear.slot!=='amulet'&&!(gear.slot==='weapon'&&actionWeapons.has(gear.base||gear.name)))continue;
@@ -330,20 +357,20 @@ export const bosses={
   cerberus:{name:'Cancerbero',act:2,range:1,initiative:18,hp:1.05,powers:'Embestida sobre el héroe más lejano y aullido que resta PM a todo el grupo.'},
   oracle:{name:'Oráculo de Ceniza',act:3,range:4,initiative:16,hp:1,glyphs:['damage','poison'],element:'fire',powers:'Glifos de brasas y veneno, y mirada ardiente a distancia.'},
   skeletonking:{name:'Rey Osario',act:1,range:1,initiative:12,hp:1.1,powers:'Invoca esqueletos y se protege con un escudo de huesos mientras viven.'},
-  umbralking:{name:'Rey del Umbral',act:1,range:4,initiative:16,hp:1,glyphs:['slow','poison'],element:'arcane',powers:'Glifos de cadenas y veneno; cadena que arrastra a un héroe hacia él.'},
+  umbralking:{name:'Rey del Umbral',act:1,range:4,initiative:16,hp:1,glyphs:['slow','poison'],element:'magic',powers:'Glifos de cadenas y veneno; cadena que arrastra a un héroe hacia él.'},
   sporemother:{name:'Madre Espora',act:2,range:3,initiative:14,hp:1.1,glyphs:['poison','slow'],powers:'Glifos de esporas y lianas; hace brotar plantas escupidoras a su alrededor.'},
   firedemon:{name:'Demonio de Fuego',act:3,range:2,initiative:15,hp:1.1,glyphs:['damage'],element:'fire',powers:'Nova de fuego a su alrededor y suelo en llamas.'},
-  vampqueen:{name:'Reina Vampira',act:3,range:3,initiative:17,hp:1.05,glyphs:['poison','damage'],element:'shadow',powers:'Roba vida con cada golpe e invoca murciélagos.'}
+  vampqueen:{name:'Reina Vampira',act:3,range:3,initiative:17,hp:1.05,glyphs:['poison','damage'],element:'chaos',powers:'Roba vida con cada golpe e invoca murciélagos.'}
 };
 /** Jefes de cada acto: [opciones a mitad, opciones al final]. */
 const actBosses=[[['skeletonking'],['umbralking']],[['cerberus'],['sporemother']],[['oracle','vampqueen'],['firedemon']]];
 /** Rasgos de cada monstruo: elemento de su ataque, robo de vida, encanto, armadura, movimiento. */
 export const monsterTraits={
   bat:{movement:1,initiative:9},
-  skull:{element:'arcane'},
+  skull:{element:'magic'},
   skeleton:{ward:2,initiative:7},
-  succubus:{element:'shadow',charm:true,range:5,initiative:12},
-  vampire:{lifesteal:.5,element:'shadow',initiative:10},
+  succubus:{element:'chaos',charm:true,range:5,initiative:12},
+  vampire:{lifesteal:.5,element:'chaos',initiative:10},
   imp:{element:'fire',range:6,initiative:13},
   worm:{ward:2},
   slimeking:{ward:1},
@@ -580,7 +607,7 @@ export function heroOffense(hero){
     const skill=skillFor(hero,i);
     if(!skill||[...supportKinds,'dash','swap'].includes(skill[5])||!(skill[4]>0))return;
     const element=skillElement(hero,skill);
-    const average=(skill[3]+skill[4])/2+(hero.stats?.[element]||0);
+    const average=(skill[3]+skill[4])/2+damageBonus(hero,skill);
     const area=skillOptions(skill).area?1.6:1;
     best=Math.max(best,average*area*Math.floor(ap/skill[1]));
   });
@@ -733,9 +760,9 @@ export const critChance=unit=>Math.min(1,.12+(unit.stats?.critical||0)/100);
 export function damagePreview(unit,target,skill){
   if([...supportKinds,'dash','swap'].includes(skill[5])||!(skill[4]>0))return null;
   const element=skillElement(unit,skill);
-  const bonus=unit.stats?.[element]||0;
+  const bonus=damageBonus(unit,skill),armor=armorType(unit,skill);
   const extra=target.effects?.expose?.value||0;
-  const range=critical=>[skill[3],skill[4]].map(base=>netDamage(target,base+bonus,element,critical,extra));
+  const range=critical=>[skill[3],skill[4]].map(base=>netDamage(target,base+bonus,armor,critical,extra));
   return {normal:range(false),critical:range(true),chance:Math.min(1,critChance(unit)+(skillOptions(skill).crit||0)/100),element};
 }
 function hit(s,actor,target,raw,kind='damage',critical=false,element='physical') {
@@ -762,8 +789,8 @@ function effect(unit,key,value,turns) {
 /** Fuerza de cada glifo según el piso: crece con la partida para que siga pesando. */
 export function glyphPower(kind,floor=1){
   const f=Math.max(1,floor);
-  if(kind==='poison')return {damage:3+Math.floor(f/4),element:'shadow',poison:2+Math.floor(f/5),turns:2};
-  if(kind==='slow')return {damage:3+Math.floor(f/4),element:'arcane',slow:2};
+  if(kind==='poison')return {damage:3+Math.floor(f/4),element:'chaos',poison:2+Math.floor(f/5),turns:2};
+  if(kind==='slow')return {damage:3+Math.floor(f/4),element:'magic',slow:2};
   return {damage:7+Math.floor(f/2),element:'fire'};
 }
 /** Radio de los glifos de jefe (rombo de 13 casillas). */
@@ -791,7 +818,7 @@ function triggerTrap(s,trap,unit){
   const source={name:trapInfo[trap.kind].name,pos:unit.pos};
   if(trap.kind==='spikes')hit(s,source,unit,3+s.floor,'trap',false,'physical');
   else{
-    hit(s,source,unit,2,'trap',false,'shadow');
+    hit(s,source,unit,2,'trap',false,'chaos');
     if(alive(unit)){effect(unit,'poison',2+Math.floor(s.floor/2),2);note(s,unit.name+' respira gas venenoso.');}
   }
 }
@@ -827,7 +854,7 @@ function beginTurn(s) {
   s.mp=Math.max(0,3+(u.stats?.movement||0)+(bonus.mp||0)+(u.effects.haste?.value||0)-(u.effects.slow?.value||0));
   s.turnStarted=Date.now();
   s.deadline=s.turnStarted+(u.enemy?350:60000);
-  if(u.effects.poison)hit(s,{name:'Veneno',pos:u.pos},u,u.effects.poison.value,'poison',false,'shadow');
+  if(u.effects.poison)hit(s,{name:'Veneno',pos:u.pos},u,u.effects.poison.value,'poison',false,'chaos');
   applyGlyphs(s,u,-1);
 }
 function endEffects(unit) {
@@ -1283,7 +1310,7 @@ export function tick(s,rng=Math.random) {
 function monsterAttack(s,unit,target,rng){
   const trait=monsterTraits[unit.look]||{};
   const element=unit.element||trait.element||'physical';
-  const cue=element==='fire'?'blast':element==='shadow'?'venom':element==='arcane'?'arcane':unit.range>1?'arrow':'slash';
+  const cue=element==='fire'?'blast':element==='chaos'?'venom':element==='magic'||element==='lightning'?'arcane':unit.range>1?'arrow':'slash';
   const special=skillReady(unit)&&!['slime','worm','vampire','bat'].includes(unit.look)?unit.look:null;
   if(special)useSkill(s,unit);
   // Golpes en área: aplastar, erupción y bola de fuego.
@@ -1429,7 +1456,7 @@ function bossPower(s,boss,heroes,rng){
     emit(s,{kind:'spell',effect:'slow',actor:boss.id,from:boss.pos,pos:target.pos});
     note(s,'El Rey del Umbral encadena a '+target.name+' y lo arrastra.');
     drag(s,boss,target,2);
-    if(alive(target))hit(s,boss,target,3+Math.floor(s.floor/2),'damage',false,'arcane');
+    if(alive(target))hit(s,boss,target,3+Math.floor(s.floor/2),'damage',false,'magic');
     return false;
   }
   if(boss.look==='firedemon'&&cycle%2===0){
@@ -1564,7 +1591,7 @@ function applySkill(s,unit,target,skill,rng){
   if(max>0&&!!target.enemy!==!!unit.enemy){
     const element=skillElement(unit,skill);
     const critical=rng()<Math.min(1,critChance(unit)+(opts.crit||0)/100);
-    hit(s,unit,target,roll(min,max,rng)+(unit.stats?.[element]||0),'damage',critical,element);
+    hit(s,unit,target,roll(min,max,rng)+damageBonus(unit,skill),'damage',critical,armorType(unit,skill));
   }
   if(!alive(target))return;
   if(kind==='expose'){effect(target,'expose',value||3,2);note(s,target.name+' queda vulnerable: todos los atacantes infligen +'+(value||3)+'.');}

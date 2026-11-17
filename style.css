@@ -1006,3 +1006,9 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 .ability-reach{position:absolute;left:3px;bottom:20px;width:14px;height:14px;display:grid;place-items:center;border-radius:3px;background:#17131ccc;color:#f3b5d0}
 .ability-reach .icon{width:11px;height:11px}
 .tip-reach-note{font-size:.72rem;color:#f3b5d0;margin:4px 0 0}
+/* Croquis del área de una habilidad (estilo Dofus) */
+.area-sketch{width:52px;height:auto;vertical-align:middle;margin-left:6px;display:inline-block}
+.area-sketch polygon{stroke:#0e0b10;stroke-width:.6}
+.area-sketch .sk-off{fill:#ffffff14}
+.area-sketch .sk-on{fill:#6fd36a}
+.area-sketch .sk-center{fill:#f2cd8a}

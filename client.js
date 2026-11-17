@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,glyphText,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=50';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=50';
-import {setupSfx} from './music.js?v=50';
-import {icon} from './icons.js?v=50';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=51';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=51';
+import {setupSfx} from './music.js?v=51';
+import {icon} from './icons.js?v=51';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -96,7 +96,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=50').then(({createIso})=>{
+import('./isometric.js?v=51').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -480,6 +480,41 @@ function bonusSource(unit,f){
   const elemental=['fire','ice','lightning','chaos'].includes(f.element);
   return elemental?'mágico + '+elements[f.element].toLowerCase():'daño mágico';
 }
+/**
+ * Croquis del área (como en Dofus): rejilla isométrica en miniatura con las casillas afectadas.
+ * Se calcula con la misma función que el juego, con el lanzador abajo (para conos y líneas).
+ */
+function areaSketch(skill){
+  const o=skillOptions(skill);
+  const kind=o.area||(skill[5]==='blast'?'cross':null);
+  if(!kind)return null;
+  const size=o.size||1,R=Math.min(4,size+1),N=2*R+3;
+  const fake={width:N,height:N,walls:[],voids:[]};
+  const c=Math.floor(N/2),center=c*N+c;
+  const caster={pos:(c+2)*N+c};
+  const hit=new Set(spellArea(fake,center,skill,caster));
+  const hw=7,hh=3.6,cells=[];
+  let minX=0,maxX=0,minY=0,maxY=0;
+  for(let y=-R;y<=R;y++)for(let x=-R;x<=R;x++){
+    if(Math.abs(x)+Math.abs(y)>R+1)continue;
+    const px=(x-y)*hw,py=(x+y)*hh;
+    minX=Math.min(minX,px-hw);maxX=Math.max(maxX,px+hw);minY=Math.min(minY,py-hh);maxY=Math.max(maxY,py+hh);
+    const pos=(c+y)*N+(c+x);
+    cells.push({px,py,on:hit.has(pos),center:pos===center});
+  }
+  const ns='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(ns,'svg');
+  svg.setAttribute('viewBox',[minX-1,minY-1,maxX-minX+2,maxY-minY+2].join(' '));
+  svg.setAttribute('class','area-sketch');
+  svg.setAttribute('aria-hidden','true');
+  for(const cell of cells){
+    const poly=document.createElementNS(ns,'polygon');
+    poly.setAttribute('points',[[cell.px,cell.py-hh],[cell.px+hw,cell.py],[cell.px,cell.py+hh],[cell.px-hw,cell.py]].map(p=>p.join(',')).join(' '));
+    poly.setAttribute('class',cell.center?'sk-center':cell.on?'sk-on':'sk-off');
+    svg.append(poly);
+  }
+  return svg;
+}
 /** Filas de la ficha de una habilidad. */
 function skillRows(unit,skill){
   const f=skillFacts(unit,skill),o=skillOptions(skill);
@@ -491,7 +526,12 @@ function skillRows(unit,skill){
     rows.push(statRow(f.element,'Daño',f.low+'–'+f.high+(f.bonus?' (+'+f.bonus+' '+bonusSource(unit,f)+')':'')));
     rows.push(statRow('critical','Crítico',f.crit+' % · ×1,5'));
   }
-  if(o.area)rows.push(statRow('blast','Área',areaNames[o.area]+(o.size>1?' · tamaño '+o.size:'')));
+  const sketch=areaSketch(skill);
+  if(o.area||sketch){
+    const row=statRow('blast','Área',o.area?areaNames[o.area]+(o.size>1?' · tamaño '+o.size:''):'cruz');
+    if(sketch)row.querySelector('.tip-value').append(sketch);
+    rows.push(row);
+  }
   if(o.push||o.pull)rows.push(statRow('mp',o.push?'Empuje':'Atrae',o.pull==='melee'?'Hasta el contacto':(o.push||o.pull)+((o.push||o.pull)>1?' casillas':' casilla')));
   if(o.inLine)rows.push(statRow('move','Lanzar','En línea recta'));
   if(o.anyTarget)rows.push(statRow('users','Objetivo','Aliado o enemigo'));

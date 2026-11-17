@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=71';
-import {playerColors} from './engine.js?v=71';
+import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=72';
+import {playerColors} from './engine.js?v=72';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -580,12 +580,14 @@ export function createIso(mount,onCell){
       piece(routeGroup,'disc','#e1fbff',p.x,.048,p.z,.21,.024,.21,true);
     }
   }
+  // Con una habilidad elegida se apunta a casillas: las figuras no tapan las casillas de detrás.
+  let groundOnly=false;
   function aimAt(event){
     const rect=mount.getBoundingClientRect();
     mouse.set((event.clientX-rect.left)/rect.width*2-1,1-(event.clientY-rect.top)/rect.height*2);
     ray.setFromCamera(mouse,camera);
-    const visible=[...models.values()].filter(model=>model.unit.hp>0);
-    const hit=ray.intersectObjects(visible.map(model=>model.root),true)[0];
+    const visible=groundOnly?[]:[...models.values()].filter(model=>model.unit.hp>0);
+    const hit=visible.length?ray.intersectObjects(visible.map(model=>model.root),true)[0]:null;
     if(hit){
       let root=hit.object;
       while(root.parent&&root.parent!==figures)root=root.parent;
@@ -911,6 +913,7 @@ export function createIso(mount,onCell){
     const after=groundAt(event);
     if(before&&after){pan.x+=before.x-after.x;pan.z+=before.z-after.z;fit();}
   }
-  return {show,sync,anchor,highlight,move,impact,zoom,resetHover(){hover=null;},get active(){return active;}};
+  return {show,sync,anchor,highlight,move,impact,zoom,resetHover(){hover=null;},get active(){return active;},
+    set aiming(value){groundOnly=!!value;}};
 }
 

@@ -21514,7 +21514,7 @@ class PerspectiveCamera extends Camera {
 	/**
 	 * Constructs a new perspective camera.
 	 *
-	 * @param {number} [fov=65] - The vertical field of view.
+	 * @param {number} [fov=66] - The vertical field of view.
 	 * @param {number} [aspect=1] - The aspect ratio.
 	 * @param {number} [near=0.1] - The camera's near plane.
 	 * @param {number} [far=2000] - The camera's far plane.

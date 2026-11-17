@@ -1147,3 +1147,7 @@ body:not(.in-expedition) .tagline{margin:0 0 8px;font-size:.72rem}
 .hero-sheet .tip-row:last-child,.tip-stats .tip-row:last-child{border-bottom:0}
 .hero-sheet .tip-value,.tip-stats .tip-value{font-size:.98rem;font-weight:700;color:#f3e6c8}
 .hero-sheet .tip-label{font-size:.8rem}
+/* Versión «live» abajo a la izquierda */
+.live-version{position:fixed;left:8px;bottom:6px;z-index:5;font-size:.68rem;letter-spacing:.03em;color:#ffffff70;background:#0008;padding:2px 7px;border-radius:3px;pointer-events:auto;user-select:text}
+.live-version.stale{color:#ffcf6e}
+body.in-expedition .live-version{opacity:.55}

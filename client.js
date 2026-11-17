@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=65';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=65';
-import {setupSfx} from './music.js?v=65';
-import {icon} from './icons.js?v=65';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=66';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=66';
+import {setupSfx} from './music.js?v=66';
+import {icon} from './icons.js?v=66';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=65').then(({createIso})=>{
+import('./isometric.js?v=66').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -162,7 +162,22 @@ async function refreshAccount(){
     if(state?.phase==='lobby')renderJourney();
   }catch{}
 }
-accountCall('status').then(data=>{account.persistent=data.persistent;renderAccount();}).catch(()=>{});
+accountCall('status').then(data=>{account.persistent=data.persistent;renderAccount();paintVersion(data);}).catch(()=>paintVersion(null));
+/** Versión abajo a la izquierda: la de esta página y la del servidor «live». */
+const CLIENT_VERSION=(import.meta.url.match(/[?&]v=(\d+)/)||[])[1]||(document.querySelector('script[src*="v="]')?.src.match(/v=(\d+)/)||[])[1]||'?';
+function paintVersion(data){
+  let box=el('live-version');
+  if(!box){box=h('div','live-version');box.id='live-version';document.body.append(box);}
+  const parts=['Versión '+CLIENT_VERSION];
+  if(!data)parts.push('servidor sin conexión');
+  else{
+    parts.push('servidor live: '+(data.commit||'local'));
+    if(data.assets&&data.assets!==CLIENT_VERSION)parts.push('(servidor en v'+data.assets+')');
+  }
+  box.textContent=parts.join(' · ');
+  box.title='Página: v'+CLIENT_VERSION+(data?'\nServidor: commit '+(data.commit||'local')+', ficheros v'+(data.assets||'?'):'');
+  box.classList.toggle('stale',!!(data&&data.assets&&data.assets!==CLIENT_VERSION));
+}
 // Mezcla de sonidos definida por el administrador (volumen, tono y variantes de cada categoría).
 let savedMix={};
 fetch(serverBase()+'/api/sfx/mix',{signal:AbortSignal.timeout(12000)}).then(r=>r.json()).then(d=>{savedMix=d.mix||{};sfx.setMix(savedMix,serverBase());}).catch(()=>{});

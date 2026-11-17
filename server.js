@@ -1,9 +1,16 @@
+import {readFileSync} from 'node:fs';
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { create, join, act, tick } from './engine.js';
 import * as accounts from './accounts.js';
+// Versión publicada: Render pone el commit en RENDER_GIT_COMMIT; la de los ficheros sale de index.html.
+const liveVersion={
+  commit:(process.env.RENDER_GIT_COMMIT||'').slice(0,7)||null,
+  assets:(readFileSync(new URL('./index.html',import.meta.url),'utf8').match(/client\.js\?v=(\d+)/)||[])[1]||null,
+  since:Date.now()
+};
 import { persistent } from './store.js';
 
 export const rooms = new Map();
@@ -114,7 +121,7 @@ async function settle(room){
 async function accountRoute(operation,method,body,tokenValue){
   if(method==='POST'&&operation==='register')return accounts.register(body.nick,body.password);
   if(method==='POST'&&operation==='login')return accounts.login(body.nick,body.password);
-  if(method==='GET'&&operation==='status')return {persistent};
+  if(method==='GET'&&operation==='status')return {persistent,...liveVersion};
   const user=await accounts.userFromToken(tokenValue);
   if(!user)throw Object.assign(new Error('Sesión de cuenta caducada. Vuelve a entrar.'),{status:401});
   if(method==='POST'&&operation==='logout'){await accounts.logout(tokenValue);return {ok:true};}

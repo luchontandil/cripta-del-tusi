@@ -1,5 +1,5 @@
 // Sonido del juego: efectos, ambiente por acto y música de fondo.
-import {icon} from './icons.js?v=43';
+import {icon} from './icons.js?v=44';
 export function setupSfx(button){
   let context,master;
   let muted=false;
@@ -9,7 +9,7 @@ export function setupSfx(button){
   const keys={sfx:'cripta-vol-sfx',amb:'cripta-vol-amb',music:'cripta-vol-music'};
   let volumeSfx=stored(keys.sfx,.15),volumeAmbience=stored(keys.amb,.25),volumeMusic=stored(keys.music,.05);
   let ambienceBus=null,musicBus=null;
-  const MUSIC_GAIN=6;   // escala de la barra de música: al 5 % queda de fondo, ~15 dB bajo los efectos
+  const MUSIC_GAIN=2;   // escala de la barra de música: al 5 % queda bien de fondo
   try{muted=localStorage.getItem('cripta-sfx-muted')==='yes';}catch{}
   function ready(){
     if(muted)return false;
@@ -28,31 +28,32 @@ export function setupSfx(button){
         musicBus.gain.value=MUSIC_GAIN*volumeMusic;
         musicBus.connect(context.destination);
       }
-      startMusic();
       if(context.state!=='running')context.resume().catch(()=>{});
       return true;
     }catch{return false;}
   }
-  // Música de fondo en bucle («Dungeon Pulse»), arranca con el primer gesto.
+  // Música de fondo en bucle («Dungeon Pulse»). Se descarga en streaming desde que carga la página
+  // y suena en cuanto el navegador lo permite (con el primer gesto del jugador).
+  const track=new Audio();
+  track.src=new URL('./sfx/music_dungeon.ogg?v=1',import.meta.url).href;
+  track.loop=true;track.preload='auto';track.crossOrigin='anonymous';
   let music=null;
   function startMusic(){
     if(music||muted||!context)return;
-    music={pending:true};
-    buffer('music_dungeon').then(data=>{
-      if(!data||muted||!music?.pending){music=null;return;}
-      const source=context.createBufferSource(),gain=context.createGain();
-      source.buffer=data;source.loop=true;
-      gain.gain.value=0;gain.gain.setTargetAtTime(1,context.currentTime,2);
-      source.connect(gain).connect(musicBus);source.start();
+    try{
+      const source=context.createMediaElementSource(track),gain=context.createGain();
+      gain.gain.value=0;gain.gain.setTargetAtTime(1,context.currentTime,.25);
+      source.connect(gain).connect(musicBus);
       music={source,gain};
-    });
+    }catch{music={gain:null};}
+    track.play().catch(()=>{music=null;});
   }
   function stopMusic(){
-    if(music?.source){const old=music;old.gain.gain.setTargetAtTime(0,context.currentTime,.4);setTimeout(()=>{try{old.source.stop();}catch{}},2000);}
-    music=null;
+    track.pause();
   }
+  function resumeMusic(){if(music&&!muted&&track.paused)track.play().catch(()=>{});}
   // Algunos navegadores (Firefox) dejan el audio suspendido: se reintenta con cada gesto.
-  const unlock=()=>{if(context&&context.state!=='running')context.resume().catch(()=>{});};
+  const unlock=()=>{if(muted)return;if(!context)ready();else if(context.state!=='running')context.resume().catch(()=>{});startMusic();resumeMusic();};
   for(const type of ['pointerdown','keydown','touchend'])document.addEventListener(type,unlock,true);
   function tone(from,to,duration,volume,type='sine',delay=0){
     const t=context.currentTime+delay;
@@ -190,7 +191,7 @@ export function setupSfx(button){
     muted=next;
     try{localStorage.setItem('cripta-sfx-muted',muted?'yes':'no');}catch{}
     if(muted){const key=ambienceKey;ambient('');ambienceKey=key;stopMusic();}
-    else{play('click');const key=ambienceKey;ambienceKey='';ambient(key);}
+    else{play('click');startMusic();resumeMusic();const key=ambienceKey;ambienceKey='';ambient(key);}
     reflect();
   }
   muteBox.addEventListener('change',()=>setMuted(!muteBox.checked));

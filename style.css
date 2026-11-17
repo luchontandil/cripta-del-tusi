@@ -945,3 +945,5 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 .inventory-slot.drop-valid,.drop-valid{outline:2px dashed #f2cd8a;outline-offset:-2px;box-shadow:0 0 12px #f2cd8a88,inset 0 0 14px #f2cd8a44;animation:dropPulse 1s ease-in-out infinite}
 @keyframes dropPulse{50%{box-shadow:0 0 18px #f2cd8acc,inset 0 0 18px #f2cd8a66}}
 .iso-label{box-sizing:border-box}
+.tip-skill strong{color:#f3c46b}
+.effect-weak{color:#c9a3ff}

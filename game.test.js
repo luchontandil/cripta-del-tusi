@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -73,7 +73,7 @@ test('la vulnerabilidad se aplica a otro atacante y el clérigo cura a un aliado
   act(s,'p1',{type:'skill',skill:1,pos:30},rng);
   assert.equal(archer.hp,23);
 });
-test('el jefe anuncia una sola cruz y, al activarla en su turno, las cadenas dañan y restan PM',()=>{
+test('el jefe anuncia un glifo amplio y, al activarla en su turno, las cadenas dañan y restan PM',()=>{
   const s=battle('tirador');
   s.route=makeRoute(rng,1);
   s.floor=7;
@@ -89,7 +89,9 @@ test('el jefe anuncia una sola cruz y, al activarla en su turno, las cadenas da�
   assert.equal(glyph.kind,'slow');
   assert.ok(glyph.warn);
   const center=glyph.cells[0];
-  assert.deepEqual(new Set(glyph.cells),new Set([center,center-s.width,center+s.width,center-1,center+1]));
+  // Rombo de radio 2 recortado por muros y líquidos.
+  assert.ok(glyph.cells.length>5);
+  assert.ok(glyph.cells.every(pos=>distance(s,center,pos)<=2&&!s.walls.includes(pos)));
   const hero=s.units.find(u=>u.id==='p0');
   hero.pos=center;
   const before=hero.hp;
@@ -775,4 +777,34 @@ test('las trampas no se amontonan ni se ponen en pasillos',()=>{
     s.phase='reward';s.picks=['p0'];act(s,'p0',{type:'next'},seq);
   }
   assert.ok(rooms>10);
+});
+
+test('los glifos de jefe se pueden lanzar pegados a un muro y escalan con el piso',()=>{
+  const s=battle('guardia');
+  s.walls=[];s.water=[];
+  const corner=s.width+1;
+  s.walls=[corner-1,corner-s.width];
+  const cells=glyphCells(s,corner);
+  assert.equal(cells[0],corner);
+  assert.ok(cells.every(pos=>!s.walls.includes(pos)));
+  assert.ok(glyphPower('damage',20).damage>glyphPower('damage',1).damage);
+});
+test('cada monstruo tiene una habilidad propia: el diablillo estalla en cruz y la calavera maldice',()=>{
+  const s=battle('guardia');
+  s.walls=[];s.water=[];s.traps=[];
+  const hero=s.units.find(u=>!u.enemy);
+  for(const u of s.units.filter(u=>u.enemy))u.hp=0;
+  const imp=s.units.find(u=>u.enemy);
+  Object.assign(imp,{hp:30,max:30,look:'imp',name:'Diablillo',range:6,cd:1,damage:4,effects:{},stats:{ward:0,movement:0}});
+  hero.pos=3*s.width+5;imp.pos=3*s.width+8;
+  s.turn=s.units.indexOf(imp);s.enemyPlan=null;s.mp=3;s.ap=4;
+  const before=hero.hp;
+  timeout(s);while(s.units[s.turn]===imp)timeout(s);
+  assert.ok(hero.hp<before);
+  assert.equal(imp.cd,3);
+  Object.assign(imp,{look:'skull',name:'Calavera',cd:0});
+  hero.effects={};
+  s.turn=s.units.indexOf(imp);s.enemyPlan=null;
+  timeout(s);while(s.units[s.turn]===imp)timeout(s);
+  assert.ok(hero.effects.weak);
 });

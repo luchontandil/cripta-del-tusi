@@ -1,5 +1,5 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
+  glyphInfo,glyphText,monsterSkills,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
   playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=33';
 import {portrait,spellIcon,equipmentIcon} from './art.js?v=33';
 import {setupSfx} from './music.js?v=33';
@@ -24,8 +24,8 @@ function lootReady(){
 const onPages=location.hostname.endsWith('.github.io');
 el('server').value=localStorage.getItem('amber-server')||(onPages?'https://cripta-del-tusi.onrender.com':location.origin);
 const error=message=>{el('error').textContent=message;};
-const iconName={expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno'};
-const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno'};
+const iconName={expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',weak:'Maldito',haste:'Prisa',shield:'Escudo'};
+const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',weak:v=>'−'+v+' PA',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo'};
 const specs={guardia:'Primera línea · debilita al enemigo',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
 const roles={guardia:'Tanque',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
 const sfx=setupSfx(el('field-sfx'));
@@ -362,7 +362,7 @@ function effectChips(unit){
 }
 function glyphNodes(glyph){
   const info=glyphInfo[glyph.kind];
-  return [h('div','tip-glyph glyph-'+glyph.kind,icon('glyph'),h('div',null,h('strong',null,info.name),h('p',null,info.description),
+  return [h('div','tip-glyph glyph-'+glyph.kind,icon('glyph'),h('div',null,h('strong',null,info.name),h('p',null,glyphText(glyph.kind,state.floor)),
     h('small',null,glyph.warn?'Se activa en el próximo turno del jefe.':'Activo')))];
 }
 /** Qué hace especial a cada monstruo, en una frase. */
@@ -420,6 +420,8 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
   nodes.push(stats);
   const note=unit.boss?bosses[unit.look]?.powers:traitNote(monsterTraits[unit.look]);
   if(unit.enemy&&note)nodes.push(h('p','tip-note',note));
+  const special=unit.enemy&&!unit.boss&&monsterSkills[unit.look];
+  if(special)nodes.push(h('p','tip-note tip-skill',h('strong',null,special.name+': '),special.text+(special.cd&&(unit.cd??1)<=0?' · ¡Lista!':'')));
   const chips=effectChips(unit);
   if(chips)nodes.push(chips);
   if(glyph)nodes.push(...glyphNodes(glyph));

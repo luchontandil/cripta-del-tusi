@@ -351,6 +351,26 @@ export const monsterTraits={
   plant:{range:4,movement:-2,poison:true,initiative:8},
   lavaslime:{element:'fire',ward:1,initiative:7}
 };
+/** Habilidad propia de cada monstruo (con recarga en turnos del propio monstruo). */
+export const monsterSkills={
+  skeleton:{name:'Golpe de escudo',cd:3,text:'Cada 3 turnos golpea con el escudo: empuja 1 casilla y resta 1 PM.'},
+  slime:{name:'Salto viscoso',cd:3,text:'Cada 3 turnos salta hasta 5 casillas para caer junto a un héroe.'},
+  skull:{name:'Maldición',cd:3,text:'Cada 3 turnos su rayo maldice: −1 PA en el próximo turno del objetivo.'},
+  worm:{name:'Excavar',cd:3,text:'Cada 3 turnos se entierra y emerge junto al héroe más débil.'},
+  slimeking:{name:'Aplastar',cd:2,text:'Cada 2 turnos se deja caer y golpea a todos los héroes pegados a él.'},
+  bat:{name:'Picar y huir',cd:0,text:'Tras morder, se aleja volando con el movimiento que le quede.'},
+  slug:{name:'Escupitajo de baba',cd:3,text:'Cada 3 turnos escupe hasta 3 casillas: daño y −2 PM.'},
+  plant:{name:'Raíces',cd:3,text:'Cada 3 turnos sus raíces inmovilizan al objetivo (−3 PM).'},
+  lavaslime:{name:'Erupción',cd:3,text:'Cada 3 turnos estalla: daño de fuego a todos los héroes pegados a él.'},
+  vampire:{name:'Paso de niebla',cd:3,text:'Cada 3 turnos se vuelve niebla y aparece junto al héroe con menos vida.'},
+  imp:{name:'Bola de fuego',cd:3,text:'Cada 3 turnos su ataque estalla en cruz alrededor del objetivo.'},
+  succubus:{name:'Beso',cd:3,text:'Cada 3 turnos atrae al objetivo 2 casillas hacia ella.'}
+};
+const skillReady=unit=>!unit.boss&&monsterSkills[unit.look]&&(unit.cd??1)<=0;
+function useSkill(s,unit){
+  unit.cd=monsterSkills[unit.look].cd;
+  note(s,unit.name+' usa '+monsterSkills[unit.look].name.toLowerCase()+'.');
+}
 function monster(species,id,floor,{ranged=false,elite=false,solo=false}={}){
   const trait=monsterTraits[species]||{};
   const factor=(ranged?.75:elite?1.15:1)*(solo?.85:1);
@@ -739,10 +759,18 @@ function effect(unit,key,value,turns) {
   const previous=unit.effects[key];
   unit.effects[key]={value:Math.max(previous?.value||0,value),turns:Math.max(previous?.turns||0,turns)};
 }
-export const glyphPower={damage:{damage:9,element:'fire'},poison:{damage:4,element:'shadow',poison:3,turns:2},slow:{damage:4,element:'arcane',slow:2}};
+/** Fuerza de cada glifo según el piso: crece con la partida para que siga pesando. */
+export function glyphPower(kind,floor=1){
+  const f=Math.max(1,floor);
+  if(kind==='poison')return {damage:3+Math.floor(f/4),element:'shadow',poison:2+Math.floor(f/5),turns:2};
+  if(kind==='slow')return {damage:3+Math.floor(f/4),element:'arcane',slow:2};
+  return {damage:7+Math.floor(f/2),element:'fire'};
+}
+/** Radio de los glifos de jefe (rombo de 13 casillas). */
+export const GLYPH_RADIUS=2;
 /** Aplica un glifo activo a un héroe: daño y, según el tipo, veneno o pérdida de PM. */
 function triggerGlyph(s,g,unit) {
-  const power=glyphPower[g.kind];
+  const power=glyphPower(g.kind,s.floor);
   hit(s,{name:glyphInfo[g.kind].name,pos:unit.pos},unit,power.damage,'glyph',false,power.element);
   if(!alive(unit))return;
   if(power.poison) {
@@ -795,7 +823,7 @@ function beginTurn(s) {
   const u=s.units[s.turn];
   s.enemyPlan=null;
   const bonus=u.enemy?{}:s.mods||{};
-  s.ap=Math.max(1,4+(u.stats?.action||0)+(bonus.ap||0));
+  s.ap=Math.max(1,4+(u.stats?.action||0)+(bonus.ap||0)-(u.effects.weak?.value||0));
   s.mp=Math.max(0,3+(u.stats?.movement||0)+(bonus.mp||0)+(u.effects.haste?.value||0)-(u.effects.slow?.value||0));
   s.turnStarted=Date.now();
   s.deadline=s.turnStarted+(u.enemy?350:60000);
@@ -856,10 +884,26 @@ function advance(s,rng) {
   }
 }
 export const glyphInfo={
-  damage:{name:'Glifo de brasas',description:'Al activarse en el turno del jefe, y al entrar o empezar el turno encima: 9 de daño de fuego.'},
-  poison:{name:'Glifo de veneno',description:'Al activarse en el turno del jefe, y al entrar o empezar el turno encima: 4 de daño de sombra y veneno de 3 PV durante 2 turnos.'},
-  slow:{name:'Glifo de cadenas',description:'En cada turno del jefe: 4 de daño arcano y −2 PM en el próximo turno de quien esté encima.'}
+  damage:{name:'Glifo de brasas'},
+  poison:{name:'Glifo de veneno'},
+  slow:{name:'Glifo de cadenas'}
 };
+/** Descripción de un glifo con sus valores reales en este piso. */
+export function glyphText(kind,floor){
+  const p=glyphPower(kind,floor);
+  if(kind==='poison')return 'Al activarse en el turno del jefe, y al entrar o empezar el turno encima: '+p.damage+' de daño de sombra y veneno de '+p.poison+' PV durante 2 turnos.';
+  if(kind==='slow')return 'En cada turno del jefe: '+p.damage+' de daño arcano y −'+p.slow+' PM en el próximo turno de quien esté encima.';
+  return 'Al activarse en el turno del jefe, y al entrar o empezar el turno encima: '+p.damage+' de daño de fuego.';
+}
+/** Casillas de un glifo centrado en pos: rombo de radio 2, recortado por muros y líquidos. */
+export function glyphCells(s,center,radius=GLYPH_RADIUS){
+  const out=[];
+  for(let pos=0;pos<s.width*s.height;pos++){
+    if(!onBoard(s,pos)||s.walls.includes(pos)||s.water?.includes(pos))continue;
+    if(distance(s,center,pos)<=radius)out.push(pos);
+  }
+  return [center,...out.filter(pos=>pos!==center)];
+}
 function castGlyph(s,boss,heroes) {
   const existing=s.glyphs.find(g=>g.owner===boss.id);
   if(existing?.warn){
@@ -871,22 +915,44 @@ function castGlyph(s,boss,heroes) {
     return;
   }
   s.glyphs=s.glyphs.filter(g=>g.owner!==boss.id);
-  const target=heroes.reduce((a,b)=>distance(s,boss.pos,a.pos)<=distance(s,boss.pos,b.pos)?a:b);
-  const centers=Array.from({length:s.width*s.height},(_,i)=>i)
-    .filter(pos=>onBoard(s,pos)&&!s.walls.includes(pos)&&!s.water?.includes(pos)&&adjacent(s,pos).filter(n=>!s.walls.includes(n)&&!s.water?.includes(n)).length===4)
-    .sort((a,b)=>distance(s,a,target.pos)-distance(s,b,target.pos));
-  const center=centers[0];
+  const living=heroes.filter(alive);
+  if(!living.length)return;
+  const target=living.reduce((a,b)=>distance(s,boss.pos,a.pos)<=distance(s,boss.pos,b.pos)?a:b);
+  // El centro puede estar pegado a un muro: el área se recorta. Se busca cubrir a más héroes,
+  // y a igualdad, al más cercano y con el centro justo encima de alguien.
+  let best=null;
+  for(let pos=0;pos<s.width*s.height;pos++){
+    if(!onBoard(s,pos)||s.walls.includes(pos)||s.water?.includes(pos))continue;
+    const covered=living.filter(h=>distance(s,pos,h.pos)<=GLYPH_RADIUS);
+    if(!covered.length)continue;
+    const score=covered.length*10-distance(s,pos,target.pos)-covered.reduce((n,h)=>n+distance(s,pos,h.pos),0)*.2;
+    if(!best||score>best.score)best={pos,score};
+  }
+  const center=best?.pos;
   if(center===undefined)return;
   const kinds=bosses[boss.look]?.glyphs||['damage'];
   const kind=kinds[(boss.glyphCycle||0)%kinds.length];
   boss.glyphCycle=(boss.glyphCycle||0)+1;
-  s.glyphs.push({owner:boss.id,kind,cells:[center,...adjacent(s,center)],warn:true});
+  s.glyphs.push({owner:boss.id,kind,cells:glyphCells(s,center),warn:true});
+  emit(s,{kind:'spell',effect:'glyph',actor:boss.id,from:boss.pos,pos:center});
   note(s,boss.name+' anuncia '+glyphInfo[kind].name.toLowerCase()+'.');
 }
-function attackOptions(s,unit,heroes,pos){
-  return heroes.filter(h=>distance(s,pos,h.pos)<=unit.range&&lineOfSight(s,pos,h.pos,unit.id))
-    .sort((a,b)=>a.hp-b.hp||distance(s,pos,a.pos)-distance(s,pos,b.pos));
+/** Alcance actual de un monstruo (el escupitajo de la babosa llega más lejos cuando está listo). */
+const reachOf=unit=>unit.look==='slug'&&skillReady(unit)?3:unit.range;
+/** Qué tan apetecible es un héroe: remata a quien pueda matar, va a por sanadores y frágiles. */
+function priority(s,unit,hero,pos){
+  const ward=hero.stats?.ward||0;
+  const lethal=hero.hp<=Math.max(1,unit.damage-(unit.range>1?0:ward))?40:0;
+  const healer=hero.classId==='mistico'?5:0;
+  const fragile=Math.max(0,8-ward)*.6;
+  return lethal+healer+fragile-hero.hp*.35-distance(s,pos,hero.pos)*.3;
 }
+function attackOptions(s,unit,heroes,pos){
+  const reach=reachOf(unit);
+  return heroes.filter(h=>alive(h)&&distance(s,pos,h.pos)<=reach&&lineOfSight(s,pos,h.pos,unit.id))
+    .sort((a,b)=>priority(s,unit,b,pos)-priority(s,unit,a,pos));
+}
+const trapsOn=(s,path)=>path.filter(pos=>s.traps?.some(t=>t.pos===pos)).length;
 export function planEnemy(s,unit,heroes){
   const routes=paths(s,unit,s.width*s.height);
   const firing=[];
@@ -894,19 +960,38 @@ export function planEnemy(s,unit,heroes){
     const target=attackOptions(s,unit,heroes,pos)[0];
     if(!target)continue;
     const nearest=Math.min(...heroes.map(h=>distance(s,pos,h.pos)));
-    const lethal=target.hp<=unit.damage?5:0;
-    const rangedSafety=unit.range>1?Math.min(nearest,unit.range)*2.7:0;
-    const score=lethal+rangedSafety-target.hp*.13-path.length*.54;
+    const rangedSafety=unit.range>1?Math.min(nearest,unit.range)*2.2:0;
+    // Cuerpo a cuerpo: evita quedar rodeado por varios héroes a la vez.
+    const crowd=unit.range>1?0:heroes.filter(h=>distance(s,pos,h.pos)===1).length;
+    const score=priority(s,unit,target,pos)+rangedSafety-crowd*1.5-path.length*.4-trapsOn(s,path)*12;
     firing.push({path,score});
   }
   const local=firing.filter(option=>option.path.length<=s.mp).sort((a,b)=>b.score-a.score);
   if(local.length)return local[0].path;
-  const approach=firing.sort((a,b)=>a.path.length-b.path.length||b.score-a.score)[0];
-  if(approach)return approach.path.slice(0,s.mp);
+  const approach=firing.sort((a,b)=>(a.path.length+trapsOn(s,a.path)*4)-(b.path.length+trapsOn(s,b.path)*4)||b.score-a.score)[0];
+  if(approach){
+    // Avanza sin detenerse sobre una trampa si puede evitarlo.
+    let step=approach.path.slice(0,s.mp);
+    while(step.length&&s.traps?.some(t=>t.pos===step.at(-1)))step=step.slice(0,-1);
+    return step;
+  }
   const nearest=pos=>Math.min(...heroes.map(hero=>distance(s,pos,hero.pos)));
-  const available=[...routes].filter(([pos,path])=>path.length<=s.mp&&nearest(pos)<nearest(unit.pos));
+  const available=[...routes].filter(([pos,path])=>path.length<=s.mp&&nearest(pos)<nearest(unit.pos)&&!trapsOn(s,path));
   available.sort(([a,pa],[b,pb])=>nearest(a)-nearest(b)||pa.length-pb.length);
   return available[0]?.[1]||[];
+}
+/** Tras atacar, los tiradores y los murciélagos se alejan con el movimiento que les quede. */
+function retreat(s,unit,heroes){
+  if(s.mp<=0||!alive(unit))return;
+  if(unit.range<=1&&unit.look!=='bat')return;
+  const living=heroes.filter(alive);
+  if(!living.length)return;
+  const nearest=pos=>Math.min(...living.map(h=>distance(s,pos,h.pos)));
+  const here=nearest(unit.pos);
+  if(unit.range>1&&here>=3)return;
+  const options=[...paths(s,unit,s.mp)].filter(([pos,path])=>!trapsOn(s,path)&&nearest(pos)>here);
+  options.sort(([a,pa],[b,pb])=>nearest(b)-nearest(a)||pa.length-pb.length);
+  if(options[0])move(s,unit,options[0][1]);
 }
 // ───────────── Camino entre pisos, eventos y votaciones ─────────────
 export const nodeKinds={
@@ -1169,6 +1254,14 @@ export function tick(s,rng=Math.random) {
         unit.cycle=(unit.cycle||0)+1;
         if(consumed||!heroes.some(alive)){advance(s,rng);return true;}
       }
+      if(!unit.boss&&monsterSkills[unit.look])unit.cd=(unit.cd??2)-1;
+      const canAttack=[[unit.pos],...paths(s,unit,s.mp)].some(([pos])=>attackOptions(s,unit,heroes,pos).length);
+      const leapt=!unit.boss&&monsterLeap(s,unit,heroes,canAttack);
+      if(leapt){
+        if(alive(unit)&&alive(leapt))monsterAttack(s,unit,leapt,rng);
+        advance(s,rng);
+        return true;
+      }
       const route=planEnemy(s,unit,heroes);
       if(route.length){
         move(s,unit,route);
@@ -1178,7 +1271,10 @@ export function tick(s,rng=Math.random) {
       }
     }
     const target=attackOptions(s,unit,heroes.filter(alive),unit.pos)[0];
-    if(target&&alive(unit))monsterAttack(s,unit,target,rng);
+    if(target&&alive(unit)){
+      monsterAttack(s,unit,target,rng);
+      retreat(s,unit,heroes);
+    }
   }else note(s,unit.name+' se quedó sin tiempo.');
   advance(s,rng);
   return true;
@@ -1188,10 +1284,39 @@ function monsterAttack(s,unit,target,rng){
   const trait=monsterTraits[unit.look]||{};
   const element=unit.element||trait.element||'physical';
   const cue=element==='fire'?'blast':element==='shadow'?'venom':element==='arcane'?'arcane':unit.range>1?'arrow':'slash';
-  emit(s,{kind:'spell',effect:cue,actor:unit.id,from:unit.pos,pos:target.pos});
+  const special=skillReady(unit)&&!['slime','worm','vampire','bat'].includes(unit.look)?unit.look:null;
+  if(special)useSkill(s,unit);
+  // Golpes en área: aplastar, erupción y bola de fuego.
+  if(special==='slimeking'||special==='lavaslime'){
+    const victims=s.units.filter(u=>!u.enemy&&alive(u)&&distance(s,unit.pos,u.pos)===1);
+    const cells=[unit.pos,...adjacent(s,unit.pos)];
+    emit(s,{kind:'spell',effect:special==='lavaslime'?'blast':'push',actor:unit.id,from:unit.pos,pos:unit.pos,area:cells});
+    for(const v of victims)hit(s,unit,v,unit.damage+1+roll(0,2,rng),'damage',false,element);
+    return;
+  }
+  if(special==='imp'){
+    const cells=[target.pos,...adjacent(s,target.pos)];
+    emit(s,{kind:'spell',effect:'blast',actor:unit.id,from:unit.pos,pos:target.pos,area:cells});
+    hit(s,unit,target,unit.damage+1+roll(0,2,rng),'damage',false,element);
+    for(const v of s.units.filter(u=>!u.enemy&&alive(u)&&u!==target&&distance(s,target.pos,u.pos)===1))
+      hit(s,unit,v,Math.max(1,unit.damage-1),'damage',false,element);
+    return;
+  }
+  emit(s,{kind:'spell',effect:special==='slug'||special==='plant'?'poison':special==='skull'?'arcane':special==='succubus'?'pull':special==='skeleton'?'push':cue,actor:unit.id,from:unit.pos,pos:target.pos});
   const before=target.hp;
-  hit(s,unit,target,unit.damage+roll(0,2,rng),'damage',false,element);
+  hit(s,unit,target,unit.damage+roll(0,2,rng)+(special==='skeleton'?1:0),'damage',false,element);
   const dealt=before-target.hp;
+  if(special&&alive(target)){
+    if(special==='skeleton'){
+      effect(target,'slow',1,1);
+      const to=target.pos+(target.pos-unit.pos);
+      if(adjacent(s,target.pos).includes(to)&&freeCell(s,to))move(s,target,[to],false);
+    }
+    if(special==='skull'){effect(target,'weak',1,1);note(s,target.name+' queda maldito: −1 PA en su próximo turno.');}
+    if(special==='slug'){effect(target,'slow',2,1);note(s,target.name+' queda pringado: −2 PM.');}
+    if(special==='plant'){effect(target,'slow',3,1);note(s,target.name+' queda atrapado por raíces.');}
+    if(special==='succubus')drag(s,unit,target,2);
+  }
   const steal=unit.look==='vampqueen'?1:trait.lifesteal||0;
   if(steal&&dealt){
     const amount=Math.min(unit.max-unit.hp,Math.ceil(dealt*steal));
@@ -1234,6 +1359,36 @@ function summon(s,boss,species,count){
   if(made.length)note(s,boss.name+' invoca '+made.length+' '+monsterNames[species].toLowerCase()+(made.length>1?'s':'')+'.');
   return made;
 }
+/** Arrastra a un héroe hasta n casillas hacia quien lo atrae. */
+function drag(s,puller,target,n){
+  const steps=[];
+  let pos=target.pos;
+  for(let i=0;i<n;i++){
+    const next=adjacent(s,pos).filter(c=>freeCell(s,c)&&!steps.includes(c)&&distance(s,puller.pos,c)<distance(s,puller.pos,pos)).sort((a,b)=>distance(s,puller.pos,a)-distance(s,puller.pos,b))[0];
+    if(next===undefined)break;
+    steps.push(next);pos=next;
+  }
+  if(steps.length)move(s,target,steps,false);
+}
+/**
+ * Habilidades de movimiento (salto, excavar, niebla). Devuelve el objetivo junto al que cae, o null.
+ */
+function monsterLeap(s,unit,heroes,canAttack){
+  if(!skillReady(unit)||!['slime','worm','vampire'].includes(unit.look))return null;
+  if(unit.look==='slime'&&canAttack)return null;
+  const living=heroes.filter(alive);
+  const pool=unit.look==='slime'?living.filter(h=>distance(s,unit.pos,h.pos)<=6)
+    :unit.look==='vampire'?living.filter(h=>distance(s,unit.pos,h.pos)<=7):living;
+  const target=[...pool].sort((a,b)=>a.hp-b.hp)[0];
+  if(!target)return null;
+  const landing=adjacent(s,target.pos).filter(pos=>freeCell(s,pos)&&!s.traps?.some(t=>t.pos===pos))
+    .sort((a,b)=>distance(s,unit.pos,a)-distance(s,unit.pos,b))[0];
+  if(landing===undefined)return null;
+  useSkill(s,unit);
+  emit(s,{kind:'spell',effect:'dash',actor:unit.id,from:unit.pos,pos:landing});
+  move(s,unit,[landing],false);
+  return target;
+}
 /**
  * Poderes de los jefes. Devuelve true si el poder consume el turno entero.
  */
@@ -1271,16 +1426,9 @@ function bossPower(s,boss,heroes,rng){
   if(boss.look==='umbralking'&&cycle%2===1){
     const target=near.find(h=>distance(s,boss.pos,h.pos)<=5&&lineOfSight(s,boss.pos,h.pos,boss.id));
     if(!target)return false;
-    const steps=[];
-    let pos=target.pos;
-    for(let i=0;i<2;i++){
-      const next=adjacent(s,pos).filter(c=>freeCell(s,c)&&!steps.includes(c)&&distance(s,boss.pos,c)<distance(s,boss.pos,pos)).sort((a,b)=>distance(s,boss.pos,a)-distance(s,boss.pos,b))[0];
-      if(next===undefined)break;
-      steps.push(next);pos=next;
-    }
     emit(s,{kind:'spell',effect:'slow',actor:boss.id,from:boss.pos,pos:target.pos});
     note(s,'El Rey del Umbral encadena a '+target.name+' y lo arrastra.');
-    if(steps.length)move(s,target,steps,false);
+    drag(s,boss,target,2);
     if(alive(target))hit(s,boss,target,3+Math.floor(s.floor/2),'damage',false,'arcane');
     return false;
   }

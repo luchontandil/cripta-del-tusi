@@ -1,6 +1,6 @@
 # Créditos de sonido — Cripta del Tusi
 
-Todos los sonidos se han descargado de OpenGameArt.org el 17-11-2026, revisando la licencia de cada pack.
+La mayoría de los sonidos se han descargado de OpenGameArt.org y Kenney.nl el 17-11-2026, revisando la licencia de cada pack. Todo el banco está normalizado por grupos (interfaz, pasos, combate, voces, ambiente).
 Se han recortado, pasado a mono, normalizado y convertido a OGG; algunos ambientes, además, bajados de tono.
 
 **Atribución obligatoria (CC-BY 3.0):** los sonidos marcados como *Fantasy Sound Effects Library* son de **Little Robot Sound Factory** — www.littlerobotsoundfactory.com — con licencia [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/). El resto son CC0 (dominio público): no exigen atribución, pero se cita igualmente a sus autores.
@@ -45,20 +45,9 @@ Fuente: https://opengameart.org/content/80-cc0-rpg-sfx
 ## 75 CC0 breaking / falling / hit sfx — rubberduck · CC0
 Fuente: https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx
 
-- `hit_1.ogg` ← bfh1_hit_01.ogg
-- `hit_2.ogg` ← bfh1_hit_02.ogg
-- `hit_3.ogg` ← bfh1_hit_03.ogg
-- `hit_4.ogg` ← bfh1_hit_04.ogg
-- `hit_5.ogg` ← bfh1_hit_05.ogg
-- `armor_1.ogg` ← bfh1_metal_hit_01.ogg
-- `armor_2.ogg` ← bfh1_metal_hit_02.ogg
-- `armor_3.ogg` ← bfh1_metal_hit_03.ogg
-- `armor_4.ogg` ← bfh1_metal_hit_04.ogg
 - `arrowhit_1.ogg` ← bfh1_wood_hit_01.ogg
 - `arrowhit_2.ogg` ← bfh1_wood_hit_02.ogg
 - `arrowhit_3.ogg` ← bfh1_wood_hit_03.ogg
-- `shield_1.ogg` ← bfh1_metal_hit_05.ogg
-- `shield_2.ogg` ← bfh1_metal_hit_06.ogg
 - `push_1.ogg` ← bfh1_hit_06.ogg
 - `push_2.ogg` ← bfh1_hit_07.ogg
 - `push_3.ogg` ← bfh1_hit_08.ogg
@@ -83,33 +72,16 @@ Fuente: https://opengameart.org/content/fantasy-sound-effects-library
 
 - `arcane_4.ogg` ← Spell_00.wav
 - `arcane_5.ogg` ← Spell_01.wav
-- `trap_1.ogg` ← Trap_00.wav
-- `trap_2.ogg` ← Trap_01.wav
-- `trap_3.ogg` ← Trap_02.wav
 - `v_imp_1.ogg` ← Goblin_00.wav
 - `v_imp_2.ogg` ← Goblin_01.wav
 - `v_imp_3.ogg` ← Goblin_02.wav
 - `v_imp_4.ogg` ← Goblin_03.wav
 - `v_imp_5.ogg` ← Goblin_04.wav
-- `step_1.ogg` ← Footstep_Dirt_00.wav
-- `step_2.ogg` ← Footstep_Dirt_01.wav
-- `step_3.ogg` ← Footstep_Dirt_02.wav
-- `step_4.ogg` ← Footstep_Dirt_03.wav
-- `step_5.ogg` ← Footstep_Dirt_04.wav
-- `step_wet_1.ogg` ← Footstep_Water_00.wav
-- `step_wet_2.ogg` ← Footstep_Water_01.wav
-- `step_wet_3.ogg` ← Footstep_Water_02.wav
-- `step_wet_4.ogg` ← Footstep_Water_03.wav
-- `step_wet_5.ogg` ← Footstep_Water_04.wav
-- `click_1.ogg` ← Menu_Select_00.wav
 - `coins_1.ogg` ← Pickup_Gold_00.wav
 - `coins_2.ogg` ← Pickup_Gold_01.wav
 - `coins_3.ogg` ← Pickup_Gold_02.wav
 - `coins_4.ogg` ← Pickup_Gold_03.wav
 - `coins_5.ogg` ← Pickup_Gold_04.wav
-- `levelup_1.ogg` ← Jingle_Achievement_00.wav
-- `win_1.ogg` ← Jingle_Win_00.wav
-- `lose_1.ogg` ← Jingle_Lose_00.wav
 - `amb_hell.ogg` ← Ambience_Cave_00.wav
 
 ## 40 CC0 water / splash / slime SFX — rubberduck · CC0
@@ -184,25 +156,67 @@ Fuente: https://opengameart.org/content/80-cc0-creture-sfx-2
 - `die_hero_3.ogg` ← human_07.ogg
 - `die_hero_4.ogg` ← human_08.ogg
 
-## 50 RPG sound effects — Kenney · CC0
-Fuente: https://opengameart.org/content/50-rpg-sound-effects
-
-- `click_2.ogg` ← metalClick.ogg
-- `loot_1.ogg` ← cloth1.ogg
-- `loot_2.ogg` ← cloth2.ogg
-- `loot_3.ogg` ← cloth3.ogg
-- `loot_4.ogg` ← dropLeather.ogg
-- `equip_1.ogg` ← beltHandle1.ogg
-- `equip_2.ogg` ← beltHandle2.ogg
-- `equip_3.ogg` ← drawKnife1.ogg
-- `equip_4.ogg` ← drawKnife2.ogg
-- `page_1.ogg` ← bookFlip1.ogg
-- `page_2.ogg` ← bookFlip2.ogg
-- `page_3.ogg` ← bookFlip3.ogg
-- `door_1.ogg` ← doorOpen_1.ogg
-- `door_2.ogg` ← doorOpen_2.ogg
-
 ## Loopable Dungeon Ambience — JaggedStone · CC0
 Fuente: https://opengameart.org/content/loopable-dungeon-ambience
 
-- `amb_crypt.ogg` ← dungeon_ambient_1_0.ogg
+
+
+## Impact Sounds e Interface Sounds — Kenney · CC0
+Fuente: https://kenney.nl/assets/impact-sounds · https://kenney.nl/assets/interface-sounds
+
+- `step_1.ogg` ← footstep_concrete_000.ogg
+- `step_2.ogg` ← footstep_concrete_001.ogg
+- `step_3.ogg` ← footstep_concrete_002.ogg
+- `step_4.ogg` ← footstep_concrete_003.ogg
+- `step_5.ogg` ← footstep_concrete_004.ogg
+- `step_wet_1.ogg` ← footstep_grass_000.ogg
+- `step_wet_2.ogg` ← footstep_grass_001.ogg
+- `step_wet_3.ogg` ← footstep_grass_002.ogg
+- `step_wet_4.ogg` ← footstep_grass_003.ogg
+- `step_wet_5.ogg` ← footstep_grass_004.ogg
+- `hit_1.ogg` ← impactPunch_medium_000.ogg
+- `hit_2.ogg` ← impactPunch_medium_001.ogg
+- `hit_3.ogg` ← impactPunch_medium_002.ogg
+- `hit_4.ogg` ← impactPunch_medium_003.ogg
+- `hit_5.ogg` ← impactPunch_medium_004.ogg
+- `armor_1.ogg` ← impactPlate_medium_000.ogg
+- `armor_2.ogg` ← impactPlate_medium_001.ogg
+- `armor_3.ogg` ← impactPlate_medium_002.ogg
+- `armor_4.ogg` ← impactPlate_medium_003.ogg
+- `armor_5.ogg` ← impactPlate_medium_004.ogg
+- `shield_1.ogg` ← impactMetal_heavy_000.ogg
+- `shield_2.ogg` ← impactMetal_heavy_001.ogg
+- `shield_3.ogg` ← impactMetal_heavy_002.ogg
+- `equip_1.ogg` ← impactMetal_light_000.ogg
+- `equip_2.ogg` ← impactMetal_light_001.ogg
+- `equip_3.ogg` ← impactMetal_light_002.ogg
+- `equip_4.ogg` ← impactMetal_light_003.ogg
+- `trap_1.ogg` ← impactMining_000.ogg
+- `trap_2.ogg` ← impactMining_001.ogg
+- `trap_3.ogg` ← impactMining_002.ogg
+- `trap_4.ogg` ← impactMining_003.ogg
+- `click_1.ogg` ← click_001.ogg
+- `click_2.ogg` ← click_002.ogg
+- `click_3.ogg` ← click_003.ogg
+- `click_4.ogg` ← click_004.ogg
+- `page_1.ogg` ← select_001.ogg
+- `page_2.ogg` ← select_002.ogg
+- `page_3.ogg` ← select_003.ogg
+
+## Dungeon Crawl: RPG Game Sounds — Soundsnap (licencia de Soundsnap del propietario del proyecto)
+Fuente: https://www.soundsnap.com/playlist/dungeon_crawl_rpg_game_sounds
+No son de dominio público: solo para uso dentro de este juego, no se pueden reutilizar ni redistribuir por separado.
+
+- `levelup_1.ogg` ← Mystic Zone/01 DSGNTonl, Tonal, Mystic, UI, Notification.wav
+- `levelup_2.ogg` ← Mystic Zone/02 DSGNTonl, Tonal, Mystic, UI, Notification.wav
+- `levelup_3.ogg` ← Mystic Zone/05 DSGNTonl, Tonal, Mystic, UI, Notification.wav
+- `levelup_4.ogg` ← Mystic Zone/09 DSGNTonl, Tonal, Mystic, UI, Notification.wav
+- `loot_1.ogg` ← Mystic Zone/10 DSGNTonl, Tonal, Mystic, UI, Notification.wav
+- `loot_2.ogg` ← Mystic Zone/03 DSGNTonl, Tonal, Mystic, UI, Notification.wav
+- `win_1.ogg` ← Point of Interest/01 DSGNTonl, POI, Strings, Bell.wav
+- `win_2.ogg` ← Point of Interest/04 DSGNTonl, POI, Bell.wav
+- `lose_1.ogg` ← Death/04 DSGNErie, Danger, Tense, Dark, Human.wav
+- `lose_2.ogg` ← Death/06 DSGNBoom, Danger, Tense, Dark, PianoHit.wav
+- `door_1.ogg` ← Unknown Area/02 DSGNErie, Dark, Synth.wav
+- `door_2.ogg` ← Unknown Area/04 DSGNErie, Dark, Synth, Deep.wav
+- `amb_crypt.ogg` ← Ambience(Loop)/01 DSGNDron, Dungeon, Ambience, Drone, Dark, Loop.wav

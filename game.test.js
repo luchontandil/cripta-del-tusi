@@ -1164,3 +1164,30 @@ test('gemas: tipo y calidad según el nivel; el daño en área cae lejos del cen
   assert.equal(E.areaFalloff(b,3*w+5,3*w+6,fire),.8);
   assert.equal(E.areaFalloff(b,3*w+5,3*w+6,classes.mago.skills[0]),1,'un solo objetivo no cae');
 });
+test('la vida no se recupera de sala a sala; los caídos vuelven con el 10 %',()=>{
+  const s=battle('guardia','mago');
+  const [guard,mage]=s.units.filter(u=>!u.enemy);
+  guard.hp=20;mage.hp=0;
+  s.phase='reward';s.picks=['p0','p1'];s.training=false;
+  for(const p of s.players)p.trained=true;
+  act(s,'p0',{type:'next'},rng);
+  enterCombat(s);
+  assert.equal(s.phase,'combat');
+  const [g2,m2]=s.units.filter(u=>!u.enemy);
+  assert.equal(g2.hp,Math.min(g2.max,20+Math.max(0,g2.max-guard.max)),'el guardián conserva su vida');
+  assert.equal(m2.hp,Math.ceil(m2.max*.1));
+});
+test('todos los eventos y sus opciones se aplican sin errores',async()=>{
+  const E=await import('./engine.js');
+  for(const [id,event] of Object.entries(E.events)){
+    for(const [i,option] of event.options.entries()){
+      const s=battle('guardia','mistico');
+      s.players.forEach(p=>p.gold=50);
+      s.pending={};
+      option.apply(s,rng);
+      for(const p of s.players){assert.ok(p.gold>=0,id+' '+i);const {max}=E.heroStats(p,s.floor);assert.ok(max>0);}
+      for(const u of s.units.filter(u=>!u.enemy))assert.ok(u.hp>=1&&u.hp<=u.max,id+' '+i+' vida '+u.hp+'/'+u.max);
+    }
+  }
+  assert.ok(Object.keys(E.events).length>=15);
+});

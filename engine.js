@@ -410,7 +410,11 @@ export function heroStats(p,level=p.level||1){
   stats.critical+=3*(m.precision||0);
   stats.ward+=m.coraza||0;
   stats.movement+=m.celeridad||0;
-  const max=classes[p.classId].hp+stats.vitality+(level-1)*4;
+  // Bendiciones (o maldiciones) permanentes de los eventos.
+  const b=p.boons||{};
+  for(const key of damageKeys)stats[key]+=b.power||0;
+  stats.vitality+=b.vitality||0;stats.critical+=b.critical||0;stats.ward+=b.ward||0;
+  const max=Math.max(1,classes[p.classId].hp+stats.vitality+(level-1)*4);
   return {stats,max,initiative:classes[p.classId].initiative};
 }
 function sumStats(equipment) {
@@ -1017,7 +1021,9 @@ function openFloor(s,rng,elite=false,boss=null) {
     p.trained=true;
     const {stats,max}=heroStats(p,level);
     return {id:p.id,name:p.name,classId:p.classId,color:p.color,level,skillRanks:[...p.skillRanks],initiative:classes[p.classId].initiative,stats,max,
-      hp:previous?Math.min(max,Math.max(previous.hp,0)+Math.ceil(max*.45)):max,
+      // La vida NO se recupera de sala a sala: se conserva la que quedaba (más lo que suba la vida máxima).
+      // Quien cayó vuelve con el 10 %.
+      hp:!previous?max:previous.hp>0?Math.max(1,Math.min(max,previous.hp+Math.max(0,max-(previous.max||max)))):Math.ceil(max*.1),
       pos:heroPositions[i],effects:{}};
   });
   const lineup=encounter(s.floor,s.players.length,{elite,boss,rng:floorRandom((s.mapSeed^0x9e3779b9)>>>0)});
@@ -1213,7 +1219,12 @@ function finish(s,rng) {
   }
   if(s.units.some(u=>u.enemy&&alive(u)))return false;
   const bossFight=s.node?.kind==='boss';
-  if(bossFight)s.bossKills=(s.bossKills||0)+1;
+  if(bossFight){
+    s.bossKills=(s.bossKills||0)+1;
+    // Respiro tras derrotar a un jefe: el grupo recupera la mitad de su vida.
+    healParty(s,.5);
+    note(s,'El jefe cae: el grupo recupera la mitad de su vida.');
+  }
   s.phase=bossFight&&s.floor===ACTS*FLOORS_PER_ACT?'won':'reward';
   s.mods={};
   s.glyphs=[];
@@ -1510,6 +1521,16 @@ function hurtParty(s,pct){
   for(const hero of heroes)hero.hp=Math.max(1,hero.hp-Math.floor(hero.hp*pct));
 }
 const addMod=(s,key,value)=>{s.pending[key]=(s.pending[key]||0)+value;};
+/** Bendición permanente para todo el grupo (power: daño de todos los tipos). */
+function addBoon(s,key,value,players=s.players){
+  for(const p of players){p.boons=p.boons||{};p.boons[key]=(p.boons[key]||0)+value;}
+}
+const boonName={power:'de daño',vitality:'de vida máxima',critical:'% de crítico',ward:'de armadura'};
+const payAll=(s,amount)=>{for(const p of s.players)p.gold=Math.max(0,p.gold-amount);};
+const tougher=(s,factor)=>{s.pending.enemyHp=(s.pending.enemyHp||1)*factor;};
+const weaker=(s,pct)=>{s.pending.startHpPct=Math.min(s.pending.startHpPct||1,pct);};
+/** Una gema al azar con una calidad más de la que toca por nivel. */
+const fineGem=(s,rng)=>makeGem(++s.itemId,pick(Object.keys(gems),rng),gemQuality(itemLevel(s))+1);
 const giveAll=(s,make)=>{for(const p of s.players)p.bag.push(make(p));};
 export function modText(mods={}){
   const parts=[];
@@ -1519,7 +1540,7 @@ export function modText(mods={}){
   if(mods.startHpPct)parts.push('empezáis con el '+Math.round(mods.startHpPct*100)+' % de vida');
   return parts.join(', ');
 }
-const events={
+export const events={
   fountain:{title:'Fuente de aguas negras',text:'Un manantial oscuro brota entre las losas. El agua huele a hierro y a promesas.',needsHeroes:true,options:[
     {label:'Beber',detail:'Todo el grupo se cura por completo, pero tiene −1 PM en el próximo combate.',apply:s=>{healParty(s,1);addMod(s,'mp',-1);}},
     {label:'Llenar los odres',detail:'Todo el grupo recupera un 30 % de su vida.',apply:s=>healParty(s,.3)},
@@ -1535,7 +1556,7 @@ const events={
     {label:'Descansar',detail:'Todo el grupo recupera un 50 % de su vida.',apply:s=>healParty(s,.5)},
     {label:'Entrenar',detail:'+1 PA y +1 PM en el próximo combate, pero empezáis con el 80 % de la vida.',apply:s=>{addMod(s,'ap',1);addMod(s,'mp',1);s.pending.startHpPct=Math.min(s.pending.startHpPct||1,.8);}}]},
   peddler:{title:'Buhonero errante',text:'Un mercader encapuchado arrastra un carro lleno de baratijas brillantes.',options:[
-    {label:'Comprar gemas',detail:'Cada uno paga hasta 10 de tusi y recibe una gema.',apply:(s,rng)=>{for(const p of s.players){p.gold=Math.max(0,p.gold-10);let rune;do rune=rollItem(s,rng);while(rune.kind!=='rune');p.bag.push(rune);}}},
+    {label:'Comprar gemas',detail:'Cada uno paga hasta 10 de tusi y recibe una gema.',apply:(s,rng)=>{for(const p of s.players){p.gold=Math.max(0,p.gold-10);p.bag.push(makeGem(++s.itemId,pick(Object.keys(gems),rng),gemQuality(itemLevel(s))));}}},
     {label:'Pedir consejo',detail:'+1 PM en el próximo combate.',apply:s=>addMod(s,'mp',1)},
     {label:'Robarle',detail:'Cada uno recibe 25 de tusi, pero empezáis el próximo combate con el 75 % de la vida.',apply:s=>{for(const p of s.players)p.gold+=25;s.pending.startHpPct=Math.min(s.pending.startHpPct||1,.75);}}]},
   library:{title:'Biblioteca olvidada',text:'Estanterías podridas guardan tomos de técnicas perdidas.',options:[
@@ -1549,7 +1570,60 @@ const events={
         if(hero)hero.skillRanks=[...p.skillRanks];
         note(s,p.name+' mejora '+choice.name+' a '+(choice.rank+1)+'/3.');
       }}},
-    {label:'Saquear',detail:'Cada uno recibe 12 de tusi.',apply:s=>{for(const p of s.players)p.gold+=12;}}]}
+    {label:'Saquear',detail:'Cada uno recibe 12 de tusi.',apply:s=>{for(const p of s.players)p.gold+=12;}}]},
+  herbalist:{title:'Herbolaria del pantano',text:'Una anciana remueve un caldero humeante. «Todo tiene un precio, querida», dice sin mirar.',needsHeroes:true,options:[
+    {label:'Ungüento',detail:'Cada uno paga 10 de tusi y todo el grupo recupera un 45 % de su vida.',apply:s=>{payAll(s,10);healParty(s,.45);}},
+    {label:'Tónico amargo',detail:'+6 de vida máxima permanente para todos, pero empezáis el próximo combate con el 85 % de la vida.',apply:s=>{addBoon(s,'vitality',6);weaker(s,.85);}},
+    {label:'Seguir',detail:'No ocurre nada.',apply:()=>{}}]},
+  shrine:{title:'Santuario de los caídos',text:'Cientos de velas rodean las armaduras de antiguos héroes. Un silencio pesado lo cubre todo.',options:[
+    {label:'Arrodillarse',detail:'Todos pierden un 20 % de su vida actual y ganan +1 de armadura permanente.',apply:s=>{hurtParty(s,.2);addBoon(s,'ward',1);}},
+    {label:'Tomar las ofrendas',detail:'Cada uno recibe 25 de tusi, pero los enemigos del próximo combate tendrán un 20 % más de vida.',apply:s=>{for(const p of s.players)p.gold+=25;tougher(s,1.2);}},
+    {label:'Encender una vela',detail:'+1 PM en el próximo combate.',apply:s=>addMod(s,'mp',1)}]},
+  dice:{title:'Los dados del esqueleto',text:'Un esqueleto con sombrero agita un cubilete. «¿Una partidita? Los vivos siempre pierden… casi siempre.»',options:[
+    {label:'Apostar 15 tusi',detail:'Cada uno por su cuenta: 50 % de ganar 40 de tusi; si no, pierde lo apostado.',apply:(s,rng)=>{for(const p of s.players){
+      if(p.gold<15){note(s,p.name+' no tiene para apostar.');continue;}
+      if(rng()<.5){p.gold+=40;note(s,p.name+' gana a los dados: +40 de tusi.');}else{p.gold-=15;note(s,p.name+' pierde 15 de tusi.');}}}},
+    {label:'Apostar sangre',detail:'Cada uno por su cuenta: 50 % de recibir un objeto raro o mejor; si no, pierde un 30 % de su vida.',apply:(s,rng)=>{for(const p of s.players){
+      if(rng()<.5){p.bag.push(rollItem(s,rng,{gear:true,minGrade:2,ilvl:itemLevel(s,1)}));note(s,p.name+' gana un objeto raro.');}
+      else{const hero=s.units.find(u=>u.id===p.id&&!u.enemy);if(hero&&hero.hp>0)hero.hp=Math.max(1,hero.hp-Math.floor(hero.hp*.3));else weaker(s,.7);note(s,p.name+' pierde la apuesta y sangra.');}}}},
+    {label:'No jugar',detail:'El esqueleto se encoge de hombros. No ocurre nada.',apply:()=>{}}]},
+  mirror:{title:'Espejo encantado',text:'Tu reflejo no imita tus gestos: sonríe, y señala algo detrás de ti.',options:[
+    {label:'Mirar tu reflejo',detail:'+4 % de crítico permanente para todos, pero los enemigos del próximo combate tendrán un 15 % más de vida.',apply:s=>{addBoon(s,'critical',4);tougher(s,1.15);}},
+    {label:'Romperlo',detail:'Cada uno recibe una gema de una calidad mejor de la habitual, pero −1 PM en el próximo combate.',apply:(s,rng)=>{giveAll(s,()=>fineGem(s,rng));addMod(s,'mp',-1);}},
+    {label:'Taparlo',detail:'No ocurre nada.',apply:()=>{}}]},
+  anvil:{title:'Yunque de los enanos',text:'Un yunque todavía caliente y un martillo de runas. Quien lo usó se fue con prisa.',options:[
+    {label:'Afilar las armas',detail:'Cada uno paga 20 de tusi y gana +1 de daño permanente (todos los tipos).',apply:s=>{const payers=s.players.filter(p=>p.gold>=20);for(const p of payers)p.gold-=20;addBoon(s,'power',1,payers);
+      for(const p of s.players.filter(p=>!payers.includes(p)))note(s,p.name+' no tiene tusi para afilar su arma.');}},
+    {label:'Fundir chatarra',detail:'Cada uno recibe 18 de tusi.',apply:s=>{for(const p of s.players)p.gold+=18;}}]},
+  prisoner:{title:'Aventurero encadenado',text:'Un mercenario cuelga de unos grilletes. «Sacadme de aquí y os pagaré… o al menos os daré lo que llevo.»',options:[
+    {label:'Liberarlo',detail:'Cada uno recibe un objeto poco común o mejor, pero el ruido atrae: los enemigos tendrán un 10 % más de vida.',apply:(s,rng)=>{giveAll(s,()=>rollItem(s,rng,{gear:true,minGrade:1,ilvl:itemLevel(s,1)}));tougher(s,1.1);}},
+    {label:'Quitarle la bolsa',detail:'Cada uno recibe 30 de tusi, pero su maldición os persigue: −1 PA en el próximo combate.',apply:s=>{for(const p of s.players)p.gold+=30;addMod(s,'ap',-1);}},
+    {label:'Ignorarlo',detail:'No ocurre nada.',apply:()=>{}}]},
+  oracle:{title:'Oráculo ciego',text:'Una figura de ojos vendados os llama por vuestros nombres antes de que habléis.',options:[
+    {label:'Escuchar la profecía',detail:'Todos pierden un 15 % de su vida actual; +1 PA y +1 PM en el próximo combate.',apply:s=>{hurtParty(s,.15);addMod(s,'ap',1);addMod(s,'mp',1);}},
+    {label:'Pagar 25 tusi',detail:'Quien pague mejora al azar una habilidad que ya conoce (máximo 3/3).',apply:(s,rng)=>{for(const p of s.players){
+      if(p.gold<25){note(s,p.name+' no tiene para pagar al oráculo.');continue;}
+      const options=trainingChoices(p).filter(choice=>choice.rank>0);if(!options.length)continue;
+      p.gold-=25;const choice=pick(options,rng);p.skillRanks[choice.index]++;
+      const hero=s.units.find(u=>u.id===p.id);if(hero)hero.skillRanks=[...p.skillRanks];
+      note(s,p.name+' mejora '+choice.name+' a '+(choice.rank+1)+'/3.');}}},
+    {label:'Marcharse',detail:'No ocurre nada.',apply:()=>{}}]},
+  idol:{title:'Ídolo maldito',text:'Una estatuilla de obsidiana con los ojos de rubí. Susurra promesas en una lengua muerta.',options:[
+    {label:'Tomar el ídolo',detail:'+2 de daño permanente para todos, pero −8 de vida máxima permanente.',apply:s=>{addBoon(s,'power',2);addBoon(s,'vitality',-8);}},
+    {label:'Arrancarle los ojos',detail:'Cada uno recibe un Rubí de una calidad mejor de la habitual, pero los enemigos tendrán un 15 % más de vida.',apply:s=>{giveAll(s,()=>makeGem(++s.itemId,'ruby',gemQuality(itemLevel(s))+1));tougher(s,1.15);}},
+    {label:'Dejarlo',detail:'No ocurre nada.',apply:()=>{}}]},
+  mushrooms:{title:'Setas luminosas',text:'Un corro de setas que brillan con un azul enfermizo. Huelen a pan recién hecho.',needsHeroes:true,options:[
+    {label:'Comerlas',detail:'Cada uno por su cuenta: 60 % de recuperar un 50 % de su vida; si no, pierde un 15 % pero gana +1 PM en el próximo combate.',apply:(s,rng)=>{let sick=false;
+      for(const hero of heroesOf(s)){if(rng()<.6){hero.hp=Math.min(hero.max,Math.max(hero.hp,0)+Math.ceil(hero.max*.5));note(s,hero.name+' se siente renovado.');}
+        else{hero.hp=Math.max(1,hero.hp-Math.floor(hero.hp*.15));sick=true;note(s,hero.name+' ve colores durante un rato.');}}
+      if(sick)addMod(s,'mp',1);}},
+    {label:'Recolectarlas',detail:'Cada uno recibe 14 de tusi.',apply:s=>{for(const p of s.players)p.gold+=14;}}]},
+  fallen:{title:'Restos de un héroe',text:'Un esqueleto con armadura abraza su espada. A su lado, una bolsa de cuero.',options:[
+    {label:'Dar sepultura',detail:'+5 de vida máxima permanente para todos.',apply:s=>addBoon(s,'vitality',5)},
+    {label:'Saquear',detail:'Cada uno recibe 12 de tusi y una gema de una calidad mejor de la habitual, pero empezáis el próximo combate con el 85 % de la vida.',apply:(s,rng)=>{for(const p of s.players)p.gold+=12;giveAll(s,()=>fineGem(s,rng));weaker(s,.85);}}]},
+  wellspring:{title:'Manantial sagrado',text:'Agua clara brota de una grieta. Por primera vez en mucho tiempo, el aire huele limpio.',needsHeroes:true,options:[
+    {label:'Beber despacio',detail:'Todo el grupo recupera un 60 % de su vida.',apply:s=>healParty(s,.6)},
+    {label:'Llenar frascos',detail:'Todo el grupo recupera un 25 % ahora y empezáis el próximo combate con +1 PA.',apply:s=>{healParty(s,.25);addMod(s,'ap',1);}}]}
 };
 /** Re-tirar el género de la tienda: crece con el piso y con cada re-tirada en la misma tienda. */
 export function shopRerollCost(s){return 10+Math.floor(s.floor*1.5)+8*(s.rerolls||0);}

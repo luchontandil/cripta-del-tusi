@@ -1203,8 +1203,12 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;bac
 .forge-preview-reroll .affix::before,.forge-preview-prefix .affix.prefix::before,.forge-preview-suffix .affix.suffix::before{content:'↻';color:#ffd76a;margin-right:4px;font-weight:700}
 .forge-preview-reroll .affix-group,.forge-preview-prefix .affix-group.prefix,.forge-preview-suffix .affix-group.suffix{color:#ffd76a}
 .forge-preview-upgrade h4{text-shadow:0 0 8px #ffd76a}
-.forge-preview-upgrade .affix-list::after{content:'+ 1 prefijo o sufijo nuevo';display:block;margin-top:4px;color:#ffd76a;font-size:.76rem;font-weight:700}
 .forge-preview-socket .item-holes{color:#ffd76a}
-.forge-preview-socket .item-holes::after{content:'+ ◇';color:#ffd76a;font-weight:700;margin-left:4px}
 .forge-hint{display:flex;align-items:center;gap:5px;font-size:.72rem;color:#a8977a;margin:6px 0 2px}
 .forge-hint .icon{width:12px;height:12px}
+/* Forja: vista previa sin cambiar el alto de la carta */
+.forge-card .item-holes{flex-wrap:nowrap;white-space:nowrap}
+.forge-ghost{visibility:hidden}
+.affix-list .upgrade-ghost{list-style:none;margin-top:4px;color:#ffd76a;font-size:.76rem;font-weight:700}
+.forge-preview-upgrade .upgrade-ghost{visibility:visible}
+.forge-preview-socket .socket-ghost{visibility:visible;color:#ffd76a!important;text-shadow:0 0 6px #ffd76a}

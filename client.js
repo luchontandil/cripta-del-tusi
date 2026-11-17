@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=70';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=70';
-import {setupSfx} from './music.js?v=70';
-import {icon} from './icons.js?v=70';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=71';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=71';
+import {setupSfx} from './music.js?v=71';
+import {icon} from './icons.js?v=71';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=70').then(({createIso})=>{
+import('./isometric.js?v=71').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1135,6 +1135,11 @@ function renderForge(box){
     card.classList.add('forge-card');
     // Prefijos y sufijos agrupados y con título, para ver qué se va a re-tirar.
     card.querySelector('.affix-list')?.replaceWith(affixList(item,'stat-list',true));
+    // Huecos de la vista previa ya reservados (invisibles): al pasar el ratón solo se iluminan, la carta no cambia de alto.
+    const list=card.querySelector('.affix-list');
+    if(list)list.append(h('li','forge-ghost upgrade-ghost',forgeBlock(item,'upgrade')?'\u00a0':'+ 1 prefijo o sufijo nuevo'));
+    const holes=card.querySelector('.item-holes');
+    if(holes&&!forgeBlock(item,'socket'))holes.append(h('b','hole forge-ghost socket-ghost','◇'));
     // Lo equipado no se compara consigo mismo.
     if(forgeTab==='equipped')card.querySelector('.loot-comparison')?.remove();
     const buttons=Object.entries(forgeModes).map(([mode,info])=>{

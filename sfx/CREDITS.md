@@ -226,3 +226,16 @@ No son de dominio público: solo para uso dentro de este juego, no se pueden reu
 - `door_1.ogg` ← Unknown Area/02 DSGNErie, Dark, Synth.wav
 - `door_2.ogg` ← Unknown Area/04 DSGNErie, Dark, Synth, Deep.wav
 - `amb_crypt.ogg` ← Ambience(Loop)/01 DSGNDron, Dungeon, Ambience, Drone, Dark, Loop.wav
+
+## Sonidos de elemento (impacto de habilidades)
+
+- `el_fire_1.ogg` ← spell_fire_05.ogg (CC0, OpenGameArt: 80 CC0 RPG SFX / Breaking and falling)
+- `el_fire_2.ogg` ← spell_fire_06.ogg (CC0, OpenGameArt: 80 CC0 RPG SFX / Breaking and falling)
+- `el_fire_3.ogg` ← spell_fire_07.ogg (CC0, OpenGameArt: 80 CC0 RPG SFX / Breaking and falling)
+- `el_ice_1.ogg` ← bfh1_glass_breaking_01.ogg (CC0, OpenGameArt: 80 CC0 RPG SFX / Breaking and falling)
+- `el_ice_2.ogg` ← bfh1_glass_breaking_02.ogg (CC0, OpenGameArt: 80 CC0 RPG SFX / Breaking and falling)
+- `el_ice_3.ogg` ← bfh1_glass_breaking_03.ogg (CC0, OpenGameArt: 80 CC0 RPG SFX / Breaking and falling)
+- `el_ice_4.ogg` ← bfh1_glass_breaking_04.ogg (CC0, OpenGameArt: 80 CC0 RPG SFX / Breaking and falling)
+- `el_shadow_1.ogg` ← 01 DSGNErie, Dark, Synth, Low.wav (Soundsnap)
+- `el_shadow_2.ogg` ← 03 DSGNErie, Dark, Synth.wav (Soundsnap)
+- `el_shadow_3.ogg` ← 01 DSGNErie, Danger, Tense, Dark.wav (Soundsnap)

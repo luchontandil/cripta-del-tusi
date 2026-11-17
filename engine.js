@@ -1302,7 +1302,7 @@ function monsterAttack(s,unit,target,rng){
       hit(s,unit,v,Math.max(1,unit.damage-1),'damage',false,element);
     return;
   }
-  emit(s,{kind:'spell',effect:special==='slug'||special==='plant'?'poison':special==='skull'?'arcane':special==='succubus'?'pull':special==='skeleton'?'push':cue,actor:unit.id,from:unit.pos,pos:target.pos});
+  emit(s,{kind:'spell',effect:special==='slug'||special==='plant'?'poison':special==='skull'?'arcane':special==='succubus'?'pull':special==='skeleton'?'push':cue,actor:unit.id,from:unit.pos,pos:target.pos,...(element!=='physical'?{element}:{})});
   const before=target.hp;
   hit(s,unit,target,unit.damage+roll(0,2,rng)+(special==='skeleton'?1:0),'damage',false,element);
   const dealt=before-target.hp;
@@ -1453,9 +1453,11 @@ function bossPower(s,boss,heroes,rng){
   return false;
 }
 const support=kind=>supportKinds.includes(kind);
-function spellCue(s,unit,pos,kind,area){
+function spellCue(s,unit,pos,kind,area,skill){
   const effect=kind==='damage'?(unit.classId==='tirador'?'arrow':unit.classId==='mago'||unit.classId==='mistico'?'arcane':'slash'):kind;
-  emit(s,{kind:'spell',effect,actor:unit.id,from:unit.pos,pos,area});
+  // Elemento de la habilidad (para el sonido de impacto): solo en las que no son de apoyo.
+  const element=skill&&!supportKinds.includes(kind)&&kind!=='dash'?skillElement(unit,skill):null;
+  emit(s,{kind:'spell',effect,actor:unit.id,from:unit.pos,pos,area,...(element&&element!=='physical'?{element}:{})});
 }
 export function hasRange(s,unit,pos,skill) {
   const [,cost,range,,,,,min=0]=skill;
@@ -1703,7 +1705,7 @@ export function act(s,id,a,rng=Math.random) {
     if(!castableCell(s,unit,a.pos,skill))fail('Casilla fuera de alcance o sin línea de visión.');
     s.ap-=cost;
     const area=spellArea(s,a.pos,skill,unit);
-    spellCue(s,unit,a.pos,kind,area);
+    spellCue(s,unit,a.pos,kind,area,skill);
     const support=supportKinds.includes(kind);
     for(const other of s.units.filter(u=>alive(u)&&area.includes(u.pos)&&(support?!u.enemy:u.enemy)))applySkill(s,unit,other,skill,rng);
     finish(s,rng);
@@ -1712,7 +1714,7 @@ export function act(s,id,a,rng=Math.random) {
   }
   if(!targetable(s,unit,target,skill))fail('Objetivo inválido, fuera de alcance o sin línea de visión.');
   s.ap-=cost;
-  spellCue(s,unit,target.pos,kind);
+  spellCue(s,unit,target.pos,kind,undefined,skill);
   applySkill(s,unit,target,skill,rng);
   finish(s,rng);
   if(s.phase==='combat'&&!alive(unit))advance(s,rng);

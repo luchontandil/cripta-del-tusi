@@ -44,5 +44,8 @@
 "amb_jungle": 1,
 "amb_hell": 1,
 "thud": 4,
-"bones": 4
+"bones": 4,
+"el_fire": 3,
+"el_ice": 4,
+"el_shadow": 3
 }

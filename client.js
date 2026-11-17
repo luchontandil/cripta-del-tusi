@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,glyphText,monsterSkills,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=41';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=41';
-import {setupSfx} from './music.js?v=41';
-import {icon} from './icons.js?v=41';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=42';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=42';
+import {setupSfx} from './music.js?v=42';
+import {icon} from './icons.js?v=42';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -96,7 +96,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=41').then(({createIso})=>{
+import('./isometric.js?v=42').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1131,6 +1131,14 @@ function eventSound(event){
     sfx(event.effect==='slash'?'swing':event.effect);
     // La flecha: zumbido al soltarla y golpe seco al llegar.
     if(event.effect==='arrow')sfx('arrowhit',{delay:.25,volume:.85});
+    // Sonido del elemento al impactar (llama, hielo que se quiebra, sombra, magia arcana),
+    // salvo si el propio efecto ya es ese sonido.
+    const elementSound={fire:'el_fire',ice:'el_ice',shadow:'el_shadow',arcane:'arcane'}[event.element];
+    const already={el_fire:'blast',el_shadow:'venom',arcane:'arcane'}[elementSound];
+    if(elementSound&&event.effect!==already){
+      const travel=Math.min(.45,.12+.04*(state?.width?Math.abs((event.pos%state.width)-(event.from%state.width))+Math.abs(Math.floor(event.pos/state.width)-Math.floor(event.from/state.width)):3));
+      sfx(elementSound,{delay:travel,volume:.8});
+    }
     if(actor?.enemy&&voices[actor.look])sfx(voices[actor.look],{volume:actor.boss?.9:.55});
     if(actor?.boss&&event.effect!=='slash')sfx('v_boss',{volume:.8,delay:.1});
     return;
@@ -1623,7 +1631,7 @@ const sfxLabels={arcane:'Hechizo arcano',armor:'Golpe en armadura',arrow:'Dispar
   loot:'Botín',lose:'Derrota',page:'Página y menú',push:'Empujón y tirón',shield:'Escudo',slash:'Corte',slow:'Ralentizar y hielo',step:'Pasos',
   step_wet:'Pasos en el barro',swing:'Golpe al aire',trap:'Trampa',venom:'Veneno',win:'Victoria',v_bat:'Voz: murciélago',v_beast:'Voz: bestia',
   v_boss:'Voz: jefe',v_ghost:'Voz: espectro',v_imp:'Voz: diablillo',v_plant:'Voz: planta',v_shade:'Voz: vampiro y súcubo',v_skeleton:'Voz: esqueleto',
-  v_slime:'Voz: limo',v_worm:'Voz: gusano',amb_crypt:'Ambiente: mazmorra',amb_jungle:'Ambiente: jungla',amb_hell:'Ambiente: infierno'};
+  v_slime:'Voz: limo',v_worm:'Voz: gusano',amb_crypt:'Ambiente: mazmorra',el_fire:'Elemento: fuego (impacto)',el_ice:'Elemento: hielo (impacto)',el_shadow:'Elemento: sombra (impacto)',amb_jungle:'Ambiente: jungla',amb_hell:'Ambiente: infierno'};
 function sfxEditorButton(){
   const b=btn('',()=>openSfxEditor());b.className='ghost';
   b.append(icon('sound'),'Editor de SFX');

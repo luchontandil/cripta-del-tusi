@@ -229,18 +229,36 @@ function rollRarity(ilvl,bonus,rng,minGrade=0){
   return weighted(weights.map((w,i)=>[i,w]),rng);
 }
 export const itemLevel=(s,extra=0)=>Math.max(1,s.floor+extra);
+/** Runas engarzadas en un objeto (los objetos antiguos tenían una sola en «socket»). */
+export function runesOf(item){return item?.runes||(item?.socket?[item.socket]:[]);}
+/** Huecos de runa de un objeto (antiguos: 1). */
+export function socketsOf(item){return item?.sockets??1;}
+export const MAX_SOCKETS=2;
+/** Huecos al generar: 0, 1 o 2 (este último raro); los objetos mejores traen más a menudo. */
+function rollSockets(grade,rng){
+  const table=[[70,27,3],[55,38,7],[42,47,11],[28,54,18]][grade];
+  return weighted(table.map((w,i)=>[i,w]),rng);
+}
+/**
+ * Legendarios: muy de vez en cuando un afijo «ascendido» sale con tiers de niveles superiores
+ * a los del objeto (aunque sea de nivel bajo).
+ */
+function tierLevel(grade,level,rng){
+  return grade===3&&rng()<.03?level+4+Math.floor(rng()*9):level;
+}
 /** Afijos (prefijos) y sufijos que puede llevar un objeto concreto. */
 function affixPool(slot,base){
   return {prefix:[...slotAffixes[slot].prefix],suffix:slotAffixes[slot].suffix.filter(stat=>stat!=='action'||(slot==='amulet'||actionWeapons.has(base)))};
 }
 /** Tira un modificador nuevo de un tipo, evitando los stats que ya lleva. */
-function rollMod(type,slot,base,level,taken,rng){
+function rollMod(type,slot,base,level,taken,rng,grade=0){
   const available=affixPool(slot,base)[type].filter(stat=>!taken.includes(stat)&&affixes[type][stat].some(tier=>tier[0]<=level));
   if(!available.length)return null;
   const stat=pick(available,rng);
-  const tierIndex=rollTier(affixes[type][stat],level,rng);
+  const reach=tierLevel(grade,level,rng);
+  const tierIndex=rollTier(affixes[type][stat],reach,rng);
   const [,low,high,label]=affixes[type][stat][tierIndex];
-  return {type,stat,tier:tierIndex+1,tiers:affixes[type][stat].length,value:roll(low,high,rng),label};
+  return {type,stat,tier:tierIndex+1,tiers:affixes[type][stat].length,value:roll(low,high,rng),label,...(affixes[type][stat][tierIndex][0]>level?{ascended:true}:{})};
 }
 /** Recalcula stats, nombre y precio de un objeto a partir de sus modificadores. */
 function refreshItem(item,rng,wasGrade=item.grade){
@@ -253,7 +271,7 @@ function refreshItem(item,rng,wasGrade=item.grade){
   // Normales y poco comunes se llaman por sus afijos; raros y legendarios conservan su nombre (uno nuevo al subir de grado).
   if(item.grade<2)item.name=[item.base,prefix?.toLowerCase(),suffix].filter(Boolean).join(' ');
   else if(item.grade!==wasGrade)item.name=item.grade===3?pick(legendaryNames,rng):pick(rareFirst,rng)+' '+pick(rareSecond,rng);
-  item.price=5+item.grade*8+item.affixes.reduce((sum,m)=>sum+m.tier*2,0)+item.ilvl;
+  item.price=5+item.grade*8+item.affixes.reduce((sum,m)=>sum+m.tier*2,0)+item.ilvl+socketsOf(item)*4;
   return item;
 }
 export function rollItem(s,rng,{bonus=0,gear=false,ilvl,minGrade=0}={}) {
@@ -276,9 +294,9 @@ export function rollItem(s,rng,{bonus=0,gear=false,ilvl,minGrade=0}={}) {
       if(!available.length)break;
       const stat=pick(available,rng);
       pool[type].splice(pool[type].indexOf(stat),1);
-      const tierIndex=rollTier(affixes[type][stat],level,rng);
+      const tierIndex=rollTier(affixes[type][stat],tierLevel(grade,level,rng),rng);
       const [,low,high,label]=affixes[type][stat][tierIndex];
-      mods.push({type,stat,tier:tierIndex+1,tiers:affixes[type][stat].length,value:roll(low,high,rng),label});
+      mods.push({type,stat,tier:tierIndex+1,tiers:affixes[type][stat].length,value:roll(low,high,rng),label,...(affixes[type][stat][tierIndex][0]>level?{ascended:true}:{})});
     }
   }
   const stats={};
@@ -288,7 +306,8 @@ export function rollItem(s,rng,{bonus=0,gear=false,ilvl,minGrade=0}={}) {
   const name=grade===3?pick(legendaryNames,rng):grade===2?pick(rareFirst,rng)+' '+pick(rareSecond,rng):
     [base,prefix?.toLowerCase(),suffix].filter(Boolean).join(' ');
   const price=5+grade*8+mods.reduce((sum,m)=>sum+m.tier*2,0)+level;
-  return {id:itemId,name,base,kind:'gear',slot,rarity:rarities[grade],grade,ilvl:level,affixes:mods,stats,price,socket:null};
+  const sockets=rollSockets(grade,rng);
+  return {id:itemId,name,base,kind:'gear',slot,rarity:rarities[grade],grade,ilvl:level,affixes:mods,stats,price:price+sockets*4,sockets,runes:[]};
 }
 // ───────────── Forja ─────────────
 /** Operaciones de la forja y su multiplicador de precio. */
@@ -296,7 +315,8 @@ export const forgeModes={
   reroll:{name:'Re-tirar todo',text:'Vuelve a tirar todos sus afijos y sufijos (misma rareza y nivel).',factor:1},
   prefix:{name:'Re-tirar afijos',text:'Vuelve a tirar solo los afijos (prefijos).',factor:1.35},
   suffix:{name:'Re-tirar sufijos',text:'Vuelve a tirar solo los sufijos.',factor:1.35},
-  upgrade:{name:'Mejorar rareza',text:'Sube un grado de rareza y añade el afijo o sufijo que le corresponde.',factor:2.6}
+  upgrade:{name:'Mejorar rareza',text:'Sube un grado de rareza y añade el afijo o sufijo que le corresponde.',factor:2.6},
+  socket:{name:'Añadir hueco',text:'Abre un hueco de runa más (máximo 2).',factor:1.8}
 };
 /** Precio de una operación de forja: crece con el nivel y la rareza del objeto. */
 export function forgeCost(item,mode){
@@ -307,6 +327,7 @@ export function forgeCost(item,mode){
 export function forgeBlock(item,mode){
   if(!item||item.kind!=='gear')return 'Solo se forja equipo.';
   if(mode==='upgrade'&&item.grade>=3)return 'Ya es legendario.';
+  if(mode==='socket'&&socketsOf(item)>=MAX_SOCKETS)return 'Ya tiene el máximo de huecos ('+MAX_SOCKETS+').';
   if(mode==='prefix'&&!item.affixes.some(m=>m.type==='prefix'))return 'No tiene afijos.';
   if(mode==='suffix'&&!item.affixes.some(m=>m.type==='suffix'))return 'No tiene sufijos.';
   return null;
@@ -317,9 +338,15 @@ function forgeItem(item,mode,rng){
     const count=item.affixes.filter(m=>m.type===type).length;
     const kept=item.affixes.filter(m=>m.type!==type);
     const taken=kept.map(m=>m.stat),fresh=[];
-    for(let i=0;i<count;i++){const mod=rollMod(type,item.slot,item.base,level,[...taken,...fresh.map(m=>m.stat)],rng);if(mod)fresh.push(mod);}
+    for(let i=0;i<count;i++){const mod=rollMod(type,item.slot,item.base,level,[...taken,...fresh.map(m=>m.stat)],rng,item.grade);if(mod)fresh.push(mod);}
     item.affixes=[...kept,...fresh].sort((a,b)=>a.type===b.type?0:a.type==='prefix'?-1:1);
   };
+  if(mode==='socket'){
+    item.runes=runesOf(item);delete item.socket;
+    item.sockets=Math.min(MAX_SOCKETS,socketsOf(item)+1);
+    item.price+=4;
+    return item;
+  }
   if(mode==='reroll'){reroll('prefix');reroll('suffix');}
   else if(mode==='prefix')reroll('prefix');
   else if(mode==='suffix')reroll('suffix');
@@ -330,7 +357,7 @@ function forgeItem(item,mode,rng){
     const types=['prefix','suffix'].filter(type=>count(type)<(item.grade===1?1:2));
     const order=types.sort((a,b)=>count(a)-count(b)||rng()-.5);
     for(const type of order){
-      const mod=rollMod(type,item.slot,item.base,level,item.affixes.map(m=>m.stat),rng);
+      const mod=rollMod(type,item.slot,item.base,level,item.affixes.map(m=>m.stat),rng,item.grade);
       if(mod){item.affixes.push(mod);break;}
     }
     item.affixes.sort((a,b)=>a.type===b.type?0:a.type==='prefix'?-1:1);
@@ -353,7 +380,7 @@ const legacyStat={arcane:'magic',shadow:'chaos'};
 function sumStats(equipment) {
   const totals=Object.fromEntries(Object.keys(statNames).map(key=>[key,0]));
   for (const gear of Object.values(equipment)) {
-    for (const stats of [gear.stats,gear.socket?.stats||{}]) {
+    for (const stats of [gear.stats,...runesOf(gear).map(r=>r.stats||{})]) {
       for (const [raw,value] of Object.entries(stats)){
         const key=legacyStat[raw]||raw;
         if(!Object.hasOwn(totals,key))continue;
@@ -821,8 +848,10 @@ function makeLayout(s,rng){
   return {name,style,walls:blocks,water,traps};
 }
 /** Daño esperado por turno de un héroe con su mejor habilidad ofensiva. */
+/** PA y PM base de todos los personajes. */
+export const BASE_AP=6,BASE_MP=3;
 export function heroOffense(hero){
-  const ap=4+(hero.stats?.action||0);
+  const ap=BASE_AP+(hero.stats?.action||0);
   let best=0;
   classes[hero.classId].skills.forEach((_,i)=>{
     const skill=skillFor(hero,i);
@@ -989,9 +1018,12 @@ function hit(s,actor,target,raw,kind='damage',critical=false,element='physical')
   const extra=kind==='damage'?(target.effects.expose?.value||0):0;
   const damage=Math.min(target.hp,netDamage(target,raw,element,critical,extra));
   target.hp-=damage;
+  if(target.hp>0)target.lastHit=damage;
   emit(s,{kind,unit:target.id,pos:target.pos,from:actor.pos,amount:damage,critical});
   note(s,actor.name+' → '+target.name+' · −'+damage+' PV'+(extra?' (+'+extra+' vulnerabilidad)':'')+(critical?' · crítico':''));
   if(target.hp<=0)releaseMinions(s,target);
+  // Golpes de fuego (monstruos, glifos, hechizos) prenden; el hielo apaga.
+  else if(kind==='damage'||kind==='glyph')ignite(s,target,damage,element);
 }
 /** Al morir un invocador, sus invocaciones se deshacen con él. */
 function releaseMinions(s,owner){
@@ -1001,6 +1033,18 @@ function releaseMinions(s,owner){
     emit(s,{kind:'damage',unit:minion.id,pos:minion.pos,from:owner.pos,amount});
     note(s,minion.name+' se deshace al caer '+owner.name+'.');
   }
+}
+/**
+ * Quemadura: un golpe de fuego deja al objetivo ardiendo 2 turnos; al empezar cada uno de sus
+ * turnos recibe un cuarto del golpe como daño de fuego. El hielo la apaga.
+ */
+function ignite(s,target,dealt,element){
+  if(!alive(target))return;
+  if(element==='ice'&&target.effects.burn){delete target.effects.burn;note(s,'El hielo apaga las llamas de '+target.name+'.');return;}
+  if(element!=='fire'||!(dealt>0))return;
+  const had=!!target.effects.burn;
+  effect(target,'burn',Math.max(1,Math.ceil(dealt/4)),2);
+  if(!had)note(s,target.name+' arde: −'+target.effects.burn.value+' PV al empezar sus próximos 2 turnos.');
 }
 function effect(unit,key,value,turns) {
   const previous=unit.effects[key];
@@ -1070,11 +1114,12 @@ function beginTurn(s) {
   const u=s.units[s.turn];
   s.enemyPlan=null;
   const bonus=u.enemy?{}:s.mods||{};
-  s.ap=Math.max(1,4+(u.stats?.action||0)+(bonus.ap||0)-(u.effects.weak?.value||0));
-  s.mp=Math.max(0,3+(u.stats?.movement||0)+(bonus.mp||0)+(u.effects.haste?.value||0)-(u.effects.slow?.value||0));
+  s.ap=Math.max(1,(u.enemy?4:BASE_AP)+(u.stats?.action||0)+(bonus.ap||0)-(u.effects.weak?.value||0));
+  s.mp=Math.max(0,(u.enemy?3:BASE_MP)+(u.stats?.movement||0)+(bonus.mp||0)+(u.effects.haste?.value||0)-(u.effects.slow?.value||0));
   s.turnStarted=Date.now();
   s.deadline=s.turnStarted+(u.enemy?350:60000);
   if(u.effects.poison)hit(s,{name:'Veneno',pos:u.pos},u,u.effects.poison.value,'poison',false,'chaos');
+  if(u.effects.burn&&alive(u))hit(s,{name:'Quemadura',pos:u.pos},u,u.effects.burn.value,'burn',false,'fire');
   applyGlyphs(s,u,-1);
 }
 function endEffects(unit) {
@@ -1249,7 +1294,7 @@ export const nodeKinds={
   forge:{name:'Forja',description:'Un herrero: re-tira los stats de tu equipo o sube su rareza a cambio de tusi. Sin combate.'},
   boss:{name:'Jefe',description:'Cámara del jefe: un enemigo enorme con poderes propios.'}
 };
-const voteTime=15000;
+const voteTime=45000;
 /** Árbol de un acto: 8 pisos, 3-4 caminos por piso, jefe a mitad (piso 4) y al final (piso 8). */
 export function makeRoute(rng,act=1){
   const rows=[];
@@ -1320,7 +1365,7 @@ function openRoute(s,rng){
     note(s,'Acto '+s.act+' · '+actNames[s.act-1]+'.');
   }
   const options=routeOptions(s);
-  if(options.length===1){enterNode(s,findNode(s,options[0]),rng);return;}
+  // El mapa se muestra siempre, aunque solo haya un camino.
   s.phase='map';
   s.event=null;
   s.vote={kind:'map',options,votes:{}};
@@ -1481,6 +1526,7 @@ export function trainingChoices(player){
   return player.skillRanks.flatMap((rank,index)=>rank<3?[{index,rank,name:classes[player.classId].skills[index][0]}]:[]);
 }
 export function tick(s,rng=Math.random) {
+  if(s.paused)return false;
   if(Date.now()<s.deadline)return false;
   if(s.phase==='reward'){
     for(const p of s.players.filter(p=>s.training&&!p.trained)){
@@ -1714,7 +1760,8 @@ function bossPower(s,boss,heroes,rng){
   }
   if(boss.look==='skeletonking'){
     const minions=s.units.filter(u=>alive(u)&&u.minion===boss.id);
-    if(cycle%2===0&&minions.length<4)minions.push(...summon(s,boss,'skeleton',2));
+    // Invoca cada 3 ciclos (antes cada 2).
+    if(cycle%3===0&&minions.length<4)minions.push(...summon(s,boss,'skeleton',2));
     boss.stats.ward=3+2*minions.length;
     if(minions.length)note(s,'Escudo de huesos: el Rey Osario tiene '+boss.stats.ward+' de armadura.');
     return false;
@@ -1843,7 +1890,7 @@ function applySkill(s,unit,target,skill,rng){
     if(kind==='haste'){effect(target,'haste',value||2,target===unit?2:1);note(s,name+' → '+target.name+': +'+(value||2)+' PM en su próximo turno.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
     const amount=Math.min(target.max-target.hp,roll(min,max,rng)+Math.floor(unit.level/2));
     target.hp+=amount;
-    if(kind==='cleanse')for(const key of ['poison','slow','expose'])delete target.effects[key];
+    if(kind==='cleanse')for(const key of ['poison','burn','slow','expose','weak'])delete target.effects[key];
     emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount});
     note(s,name+' → '+target.name+' · +'+amount+' PV'+(kind==='cleanse'?' · purificado':''));
     return;
@@ -1860,7 +1907,9 @@ function applySkill(s,unit,target,skill,rng){
   if(max>0&&!!target.enemy!==!!unit.enemy){
     const element=skillElement(unit,skill);
     const critical=rng()<Math.min(1,critChance(unit)+(opts.crit||0)/100);
+    const before=target.hp;
     hit(s,unit,target,roll(min,max,rng)+damageBonus(unit,skill),'damage',critical,armorType(unit,skill));
+    ignite(s,target,before-target.hp,element);
   }
   if(!alive(target))return;
   if(kind==='expose'){effect(target,'expose',value||3,2);note(s,target.name+' queda vulnerable: todos los atacantes infligen +'+(value||3)+'.');}
@@ -1917,13 +1966,15 @@ function gearAction(s,p,a,rng) {
       p.equipment[item.slot]=item;
     }else if(a.type==='socket'&&item.kind==='rune'&&Object.hasOwn(p.equipment,a.slot)){
       const gear=p.equipment[a.slot];
-      if(gear.socket)fail('Ese equipo ya tiene una runa engarzada: es permanente y no se puede reemplazar.');
+      const set=runesOf(gear);
+      if(socketsOf(gear)===0)fail('Ese equipo no tiene huecos de runa (la forja puede abrirle uno).');
+      if(set.length>=socketsOf(gear))fail('Ese equipo no tiene huecos libres: las runas engarzadas son permanentes y no se pueden reemplazar.');
       p.bag.splice(bagIndex,1);
-      gear.socket=item;
+      gear.runes=[...set,item];delete gear.socket;
     }else if(a.type==='sell'){
       if(s.phase!=='shop')fail('Solo puedes vender en la tienda.');
       p.bag.splice(bagIndex,1);
-      const earned=Math.floor(item.price/2)+(item.socket?Math.floor(item.socket.price/2):0);
+      const earned=Math.floor(item.price/2)+runesOf(item).reduce((sum,r)=>sum+Math.floor(r.price/2),0);
       p.gold+=earned;
       note(s,p.name+' vende '+item.name+' por '+earned+' tusi.');
     }else fail('Acción de inventario inválida.');
@@ -1940,6 +1991,22 @@ export function act(s,id,a,rng=Math.random) {
     openRoute(s,rng);
     return;
   }
+  // Pausa: congela el reloj (turno, voto, tienda...) y a los enemigos; cualquiera puede pausar o reanudar.
+  if(a.type==='pause'){
+    if(['lobby','over'].includes(s.phase))fail('No hay nada que pausar.');
+    if(!s.paused){
+      s.paused={by:player.name,at:Date.now(),left:Math.max(0,s.deadline-Date.now())};
+      note(s,player.name+' pausa la partida.');
+    }else{
+      const gone=Date.now()-s.paused.at;
+      s.deadline=Date.now()+s.paused.left;
+      if(s.turnStarted)s.turnStarted+=gone;
+      note(s,player.name+' reanuda la partida.');
+      s.paused=null;
+    }
+    return;
+  }
+  if(s.paused)fail('La partida está en pausa.');
   const calm=['reward','shop','forge','map','event'].includes(s.phase);
   if(a.type==='give'){
     if(!calm)fail('Solo podéis intercambiar fuera del combate.');

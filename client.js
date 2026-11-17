@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=54';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=54';
-import {setupSfx} from './music.js?v=54';
-import {icon} from './icons.js?v=54';
+  glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=57';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=57';
+import {setupSfx} from './music.js?v=57';
+import {icon} from './icons.js?v=57';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -24,11 +24,36 @@ function lootReady(){
 const onPages=location.hostname.endsWith('.github.io');
 el('server').value=localStorage.getItem('amber-server')||(onPages?'https://cripta-del-tusi.onrender.com':location.origin);
 const error=message=>{el('error').textContent=message;};
-const iconName={expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',weak:'Maldito',haste:'Prisa',shield:'Escudo'};
-const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',weak:v=>'−'+v+' PA',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo'};
+const iconName={expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',burn:'Quemadura',weak:'Maldito',haste:'Prisa',shield:'Escudo'};
+const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo'};
 const specs={guardia:'Primera línea · debilita al enemigo',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
 const roles={guardia:'Tanque',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
 const sfx=setupSfx(el('field-sfx'));
+// Pausa: botón en el tablero y tecla P.
+const pauseButton=el('field-pause');
+pauseButton.onclick=()=>send({type:'pause'});
+document.addEventListener('keydown',event=>{
+  if(event.key.toLowerCase()!=='p'||event.ctrlKey||event.metaKey||event.altKey)return;
+  if(/input|textarea|select/i.test(document.activeElement?.tagName||''))return;
+  if(state&&!['lobby','over'].includes(state.phase)&&!el('game').hidden){event.preventDefault();send({type:'pause'});}
+});
+function renderPause(){
+  const paused=!!state?.paused;
+  pauseButton.replaceChildren(icon(paused?'play':'pause'));
+  pauseButton.title=paused?'Reanudar (P)':'Pausa (P)';
+  pauseButton.setAttribute('aria-pressed',String(paused));
+  let veil=el('pause-veil');
+  if(paused&&!veil){
+    veil=h('div','pause-veil',h('div','pause-card',icon('pause'),h('strong',null,'Pausa'),h('p',null,''),h('button','primary','Reanudar')));
+    veil.id='pause-veil';
+    veil.querySelector('button').onclick=()=>send({type:'pause'});
+    document.body.append(veil);
+  }
+  if(veil){
+    veil.hidden=!paused;
+    if(paused)veil.querySelector('p').textContent=state.paused.by+' ha pausado la partida. Pulsa P o «Reanudar» para seguir.';
+  }
+}
 sfx.attach(el('entry-sfx'));
 /** Crea un elemento con clase y contenido (texto o nodos). */
 function h(tag,className,...children){
@@ -96,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=54').then(({createIso})=>{
+import('./isometric.js?v=57').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -305,7 +330,7 @@ function btn(label,action,pressed){
 const actionButton=(label,type,data={})=>btn(label,()=>send({type,...data}));
 function paintClock(){
   const clock=el('clock');
-  const remaining=Math.max(0,state.deadline-Date.now());
+  const remaining=state.paused?state.paused.left:Math.max(0,state.deadline-Date.now());
   const seconds=Math.ceil(remaining/1000);
   const duration=state.deadline-state.turnStarted;
   el('seconds').textContent=seconds;
@@ -335,6 +360,19 @@ function resourceText(element,text){
 function placeTip(anchor){
   const tooltip=el('unit-tooltip');
   tooltip.hidden=false;
+  tooltip.classList.remove('docked');tooltip.style.width='';
+  // Fichas de unidades del tablero: ancladas en la columna izquierda (sobre el registro), sin tapar el combate.
+  if(anchor?.dock){
+    const log=document.querySelector('.side-left .combat-log');
+    const rect=log?.getBoundingClientRect();
+    if(rect&&rect.width>120&&rect.bottom>0){
+      tooltip.classList.add('docked');
+      tooltip.style.width=rect.width+'px';
+      tooltip.style.left=rect.left+'px';
+      tooltip.style.top=Math.max(6,Math.min(rect.top,window.innerHeight-tooltip.offsetHeight-6))+'px';
+      return;
+    }
+  }
   const left=Math.max(6,Math.min(anchor.left,window.innerWidth-tooltip.offsetWidth-6));
   const above=anchor.top-tooltip.offsetHeight-9;
   tooltip.style.left=left+'px';
@@ -402,7 +440,9 @@ function terrainNodes(pos){
   return [];
 }
 function inspectCell(unit,cell,pos,glyph,source,skill,aim){
-  const anchor=iso?.active?iso.anchor(pos):cell.getBoundingClientRect();
+  const near=iso?.active?iso.anchor(pos):cell.getBoundingClientRect();
+  // Las fichas de unidades se anclan a un lado; las de terreno siguen junto a la casilla.
+  const anchor=unit?{left:near.left,top:near.top,bottom:near.bottom,dock:true}:near;
   if(!unit){
     const nodes=[...(glyph?glyphNodes(glyph):[]),...terrainNodes(pos)];
     if(nodes.length)showTip(nodes,anchor,'tip-compact');
@@ -450,14 +490,57 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
 window.addEventListener('scroll',hideUnit,{passive:true});
 const areaNames={cross:'cruz',circle:'círculo',cone:'cono',line:'línea'};
 /** Texto del efecto de una habilidad, con sus valores reales (rango y bonificaciones incluidos). */
+/** Qué hace cada habilidad, en una frase (los números exactos van en la ficha). */
+const skillLore={
+  'Tajo':'Un tajo directo con el arma contra un enemigo pegado a ti.',
+  'Quebrar armadura':'Golpeas las juntas de la armadura: el enemigo queda vulnerable y todos le hacen más daño.',
+  'Segundo aliento':'Recuperas el aliento y te curas a ti mismo.',
+  'Empujón de escudo':'Embistes con el escudo y lanzas al enemigo hacia atrás; si choca contra algo, se hace daño extra.',
+  'Barrido':'Un golpe amplio en cono delante de ti que alcanza a todos los enemigos de esa zona.',
+  'Gancho':'Lanzas una cadena en línea recta y arrastras hasta ti a un enemigo o a un aliado (sin hacerle daño).',
+  'Muralla':'Te pones delante con el escudo: un aliado (o tú) gana armadura durante 2 turnos.',
+  'Golpe de brasas':'Un golpe con el arma envuelta en brasas: hace daño y deja al enemigo ardiendo.',
+  'Flecha precisa':'Un disparo certero a distancia contra un enemigo a la vista.',
+  'Flecha de lastre':'Una flecha helada que entumece al enemigo y le quita PM en su próximo turno.',
+  'Flecha perforante':'Un disparo que atraviesa la armadura y deja al enemigo vulnerable.',
+  'Paso atrás':'Golpeas al enemigo pegado a ti y lo apartas para ganar distancia.',
+  'Lluvia de flechas':'Disparas al aire y cae una lluvia de flechas en cruz sobre la zona elegida.',
+  'Flecha penetrante':'Una flecha que sigue de largo y daña a todos los enemigos en línea detrás del objetivo.',
+  'Flecha de retroceso':'Un disparo tan fuerte que empuja al enemigo hacia atrás.',
+  'Flecha ígnea':'Una flecha en llamas: hace daño y deja al enemigo ardiendo.',
+  'Luz ardiente':'Un haz de luz sagrada que quema a un enemigo cercano.',
+  'Restaurar':'Cierras las heridas de un aliado (o las tuyas) y recupera vida.',
+  'Sello de fragilidad':'Marcas a un enemigo con un sello: queda vulnerable y todos le hacen más daño.',
+  'Purificar':'Limpias a un aliado de veneno, quemadura, maldiciones, lentitud y vulnerabilidad, y lo curas un poco.',
+  'Escudo sagrado':'Rodeas a un aliado de luz: gana armadura durante 2 turnos.',
+  'Celeridad divina':'Bendices a un aliado: tendrá más PM en su próximo turno.',
+  'Juicio':'Fuego sagrado cae en cruz sobre la zona: daña y prende a los enemigos que alcance.',
+  'Alba radiante':'Una luz cálida en cruz que cura a todos los aliados de la zona.',
+  'Descarga arcana':'Un proyectil de magia pura contra un enemigo a la vista.',
+  'Bola de fuego':'Una bola de fuego que estalla en cruz: daña y prende a todos los enemigos de la zona.',
+  'Escarcha':'Congelas los pies del enemigo: le quitas PM en su próximo turno.',
+  'Cono de hielo':'Un soplo helado en cono delante de ti: daña y ralentiza a los enemigos alcanzados.',
+  'Relámpago':'Un rayo en línea recta desde ti que alcanza a todos los enemigos de la línea.',
+  'Onda de choque':'Una onda mágica que golpea y aleja al enemigo.',
+  'Teletransporte':'Desapareces y reapareces en otra casilla libre, sin necesidad de verla.',
+  'Rayo umbrío':'Un rayo de energía oscura (caótica) contra un enemigo a la vista.',
+  'Shuriken':'Lanzas una estrella arrojadiza contra un enemigo a la vista.',
+  'Cuchilla envenenada':'Un corte con hoja envenenada: el enemigo pierde vida al empezar sus próximos turnos.',
+  'Paso de sombra':'Te deslizas entre las sombras hasta otra casilla sin gastar PM.',
+  'Puñalada trasera':'Una puñalada letal a un enemigo pegado a ti; muy probable que sea crítica.',
+  'Bomba de humo':'Una bomba que estalla en cruz: daña y deja a los enemigos aturdidos y más lentos.',
+  'Kunai con cadena':'Lanzas un kunai atado a una cadena y tiras del enemigo hacia ti.',
+  'Sustitución':'Intercambias tu posición con la de otra unidad, aliada o enemiga.',
+  'Corte glacial':'Un corte con hoja helada: daña y quita PM al enemigo en su próximo turno.'
+};
 function skillEffectText(skill){
   const kind=skill[5],o=skillOptions(skill);
-  const area=o.area?' · Área en '+areaNames[o.area]+(o.size>1?' ('+o.size+')':''):'';
+  const area='';   // el área ya se ve en su fila con el croquis
   const text={
     expose:'Vulnerable 2 turnos: los ataques contra el objetivo hacen +'+(o.value||3),
     slow:'Ralentiza: −'+(o.value||2)+' PM en el próximo turno del objetivo',
     venom:'Veneno: '+(o.value||3)+' PV por turno durante 2 turnos',
-    blast:'Daño en área',
+    blast:'',
     push:'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' en línea (si choca, recibe daño extra)',
     pull:o.pull==='melee'?'Atrae al objetivo (aliado o enemigo) hasta el cuerpo a cuerpo; a los aliados no les hace daño':'Atrae '+(o.pull||1)+(o.pull>1?' casillas':' casilla')+' hacia ti',
     cleanse:'Elimina todos los efectos negativos del aliado',
@@ -467,7 +550,8 @@ function skillEffectText(skill){
     swap:'Intercambia tu posición con la del objetivo',
     dash:o.teleport?'Teletransporte (sin línea de visión)':'Desplazamiento por una ruta libre sin gastar PM'
   }[kind]||'';
-  return (text+area).replace(/^ · /,'');
+  const burn=o.element==='fire'?' · Quemadura: arde 2 turnos y pierde ¼ del daño al empezar cada uno':'';
+  return (text+area+burn).replace(/^ · /,'');
 }
 /** Datos calculados de una habilidad para un personaje (con su equipo, si lo tiene). */
 function skillFacts(unit,skill){
@@ -526,11 +610,13 @@ function areaSketch(skill){
 function skillRows(unit,skill){
   const f=skillFacts(unit,skill),o=skillOptions(skill);
   const rows=[statRow('ap','Coste',f.cost+' PA')];
-  if(f.healing)rows.push(statRow('heal','Curación',f.low+'–'+f.high+(f.bonus?' (+'+f.bonus+' nivel)':'')));
+  if(f.healing)rows.push(h('div','tip-damage heal',icon('heal'),h('b',null,String(f.low)),' a ',h('b',null,String(f.high)),' de curación',f.bonus?h('small',null,' (+'+f.bonus+' nivel)'):null));
   else if(!f.utility){
     rows.push(statRow(f.school==='magic'?'magic':'physical','Tipo',f.school==='magic'?'Hechizo':'Físico','school-'+f.school));
     if(f.element!=='physical'&&!(f.school==='magic'&&f.element==='magic'))rows.push(statRow(f.element,'Elemento',elements[f.element],'element-'+f.element));
-    rows.push(statRow(f.element,'Daño',f.low+'–'+f.high+(f.bonus?' (+'+f.bonus+' '+bonusSource(unit,f)+')':'')));
+    rows.push(h('div','tip-damage element-'+f.element,icon(f.element),
+      h('b',null,String(f.low)),' a ',h('b',null,String(f.high)),' de daño '+(f.element==='physical'?'físico':f.element==='magic'?'mágico':f.element==='chaos'?'caótico':'de '+elements[f.element].toLowerCase()),
+      f.bonus?h('small',null,' (+'+f.bonus+' '+bonusSource(unit,f)+')'):null));
     rows.push(statRow('critical','Crítico',f.crit+' % · ×1,5'));
   }
   const sketch=areaSketch(skill);
@@ -554,6 +640,7 @@ function skillTipNodes(unit,index,skill,rank,hotkey=null){
   const base=classes[unit.classId]?.skills[index??classes[unit.classId].skills.findIndex(s=>s[0]===name)];
   const bonus=maxBonusText(base||skill);
   return [tipHead(spellIcon(kind,symbol),name,rank?'Nivel '+rank+' de 3':'Sin aprender',hotkey?String(hotkey):null),
+    skillLore[name]?h('p','tip-lore',skillLore[name]):null,
     h('div','tip-stats',...skillRows(unit,skill)),
     effect?h('p','tip-note',effect):null,
     bonus?h('p','tip-note max-bonus'+(rank>=3?' active':''),icon('xp'),(rank>=3?'Rango máximo: ':'Al rango 3: ')+bonus):null].filter(Boolean);
@@ -610,8 +697,8 @@ function affixList(item,className='stat-list'){
   return h('ul',className+' affix-list',...sorted.map(mod=>{
     const line=statLine(mod.stat,mod.value);
     line.classList.add('affix',mod.type);
-    const tier=h('span','tier tier-'+mod.tier+(mod.tier===mod.tiers?' top':''),'T'+mod.tier);
-    tier.title=(mod.type==='prefix'?'Afijo':'Sufijo')+' «'+mod.label+'» · tier '+mod.tier+' de '+mod.tiers;
+    const tier=h('span','tier tier-'+mod.tier+(mod.tier===mod.tiers?' top':'')+(mod.ascended?' ascended':''),(mod.ascended?'▲':'')+'T'+mod.tier);
+    tier.title=(mod.type==='prefix'?'Afijo':'Sufijo')+' «'+mod.label+'» · tier '+mod.tier+' de '+mod.tiers+(mod.ascended?' · ascendido: de un nivel superior al del objeto':'');
     line.append(tier);
     return line;
   }));
@@ -628,15 +715,24 @@ function itemRow(item,title,actions=[]){
   row.append(heading);
   if(item){
     row.append(affixList(item));
-    if(item.socket)row.append(h('div','item-socket',equipmentIcon('rune'),h('span',null,item.socket.name),statList(item.socket.stats,'stat-list compact')));
+    row.append(...socketNodes(item));
   }
   if(actions.length)row.append(h('div','item-actions',...actions));
   return row;
 }
+/** Runas engarzadas y huecos libres de un objeto (◆ ocupado · ◇ libre). */
+function socketNodes(item,prefix=''){
+  if(item?.kind!=='gear')return [];
+  const runes=runesOf(item),total=socketsOf(item);
+  const nodes=runes.map(r=>h('div','item-socket',equipmentIcon('rune'),h('span',null,prefix+r.name),statList(r.stats,'stat-list compact')));
+  nodes.push(h('div','item-holes',total?h('span',null,'Huecos de runa: '):h('span',null,'Sin huecos de runa'),
+    ...Array.from({length:total},(_,i)=>h('b',i<runes.length?'hole full':'hole',i<runes.length?'◆':'◇'))));
+  return nodes;
+}
 function itemTip(item,anchor){
   const nodes=[tipHead(h('span','tip-item-art '+rarityTone(item),equipmentIcon(item.kind==='rune'?'rune':item.slot)),item.name,
     itemSubtitle(item),null),affixList(item,'stat-list tip-stats')];
-  if(item.socket)nodes.push(h('div','item-socket',equipmentIcon('rune'),h('span',null,'Engarzada: '+item.socket.name),statList(item.socket.stats,'stat-list compact')));
+  nodes.push(...socketNodes(item,'Engarzada: '));
   showTip(nodes,anchor,'tip-item '+rarityTone(item));
 }
 function comparison(item,player){
@@ -649,7 +745,7 @@ function comparison(item,player){
   const delta=document.createElement('div');
   delta.className='loot-deltas';
   for(const [key,label] of Object.entries(statNames)){
-    const change=(item.stats[key]||0)-(old?.stats[key]||0)-(old?.socket?.stats[key]||0);
+    const change=(item.stats[key]||0)-(old?.stats[key]||0)-runesOf(old).reduce((sum,r)=>sum+(r.stats?.[key]||0),0);
     if(!change)continue;
     const stat=h('span',change>0?'gain':'loss',icon(key),statValue(key,change)+' ');
     const name=h('span',null);
@@ -673,6 +769,7 @@ function lootCard(item,player){
   type.textContent=itemSubtitle(item);
   const stats=affixList(item);
   card.append(visual,title,type,stats);
+  if(item.kind==='rune')card.append(h('p','rune-help',icon('rune'),'Runa: se engarza en un hueco libre de cualquier pieza de equipo y suma su bonificación mientras la lleves. Es permanente: una vez engarzada no se puede quitar ni cambiar.'));
   if(item.kind==='gear')card.append(comparison(item,player));
   const take=actionButton('A la mochila','reward',{item:item.id});
   if(item.kind==='gear'){
@@ -764,10 +861,10 @@ function inventorySlot(item,label,actions=[],fallback=''){
     face.addEventListener('pointerleave',hideUnit);
     face.addEventListener('focus',inspect);
     face.addEventListener('blur',hideUnit);
-    if(item.socket){
+    if(runesOf(item).length){
       const rune=equipmentIcon('rune');
       rune.classList.add('socket-icon');
-      rune.title=item.socket.name;
+      rune.title=runesOf(item).map(r=>r.name).join(' · ');
       face.append(rune);
     }
   }
@@ -802,7 +899,7 @@ function renderInventory(player){
     const tile=inventorySlot(item,label,actions,slot);
     if(trading){
       if(item)draggable(tile,{from:'gear',slot});
-      dropZone(tile,p=>p.from==='bag'&&(p.slot===slot||(p.kind==='rune'&&!!item&&!item.socket)),
+      dropZone(tile,p=>p.from==='bag'&&(p.slot===slot||(p.kind==='rune'&&!!item&&runesOf(item).length<socketsOf(item))),
         p=>send({type:p.kind==='rune'?'socket':'equip',slot,item:p.item}));
     }
     gearGrid.append(tile);
@@ -816,9 +913,9 @@ function renderInventory(player){
     if(trading){
       if(item.kind==='gear')actions.push(actionButton('Equipar','equip',{item:item.id}));
       else for(const [slot,label] of Object.entries(slots)){
-        if(player.equipment[slot]&&!player.equipment[slot].socket)actions.push(actionButton('Engarzar en '+label.toLowerCase()+' (permanente)','socket',{item:item.id,slot}));
+        if(player.equipment[slot]&&runesOf(player.equipment[slot]).length<socketsOf(player.equipment[slot]))actions.push(actionButton('Engarzar en '+label.toLowerCase()+' (permanente)','socket',{item:item.id,slot}));
       }
-      if(shopping)actions.push(actionButton('Vender · '+(Math.floor(item.price/2)+(item.socket?Math.floor(item.socket.price/2):0))+' tusi','sell',{item:item.id}));
+      if(shopping)actions.push(actionButton('Vender · '+(Math.floor(item.price/2)+runesOf(item).reduce((sum,r)=>sum+Math.floor(r.price/2),0))+' tusi','sell',{item:item.id}));
       for(const other of others){
         const gift=actionButton('','give',{to:other.id,item:item.id});
         gift.className='give-button';
@@ -1247,11 +1344,12 @@ function eventSound(event){
     if(actor?.boss&&event.effect!=='slash')sfx('v_boss',{volume:.8,delay:.1});
     return;
   }
-  if(['damage','glyph','trap','poison'].includes(event.kind)&&event.amount>0){
+  if(['damage','glyph','trap','poison','burn'].includes(event.kind)&&event.amount>0){
     const target=unitOf(event.unit);
     if(event.kind==='glyph')sfx('glyph',{volume:.8});
     else if(event.kind==='trap')sfx('trap',{volume:.8});
     else if(event.kind==='poison')sfx('venom',{volume:.5});
+    else if(event.kind==='burn')sfx('el_fire',{volume:.45,rate:1.15});
     sfx('hit',{volume:.75});
     if(target&&(target.classId==='guardia'||target.look==='skeleton'||target.look==='skeletonking'))sfx('armor',{volume:.5});
     if(target?.hp<=0){
@@ -1461,7 +1559,7 @@ function drawBoard(turn,walking,skill){
     }
     if(unit){
       const pawn=document.createElement('span');
-      pawn.className=['pawn','look-'+(unit.look||unit.classId),unit.enemy&&'foe',turn===unit&&'active',hidePawn(unit.id)&&'in-motion'].filter(Boolean).join(' ');
+      pawn.className=['pawn','look-'+(unit.look||unit.classId),unit.enemy&&'foe',turn===unit&&'active',hidePawn(unit.id)&&'in-motion',unit.effects?.burn&&'burning'].filter(Boolean).join(' ');
       pawn.dataset.unit=unit.id;
       cell.title=unitLabel(unit);
       const hp=document.createElement('span');
@@ -1492,6 +1590,7 @@ function render(){
   el('entry').hidden=!!state;
   el('game').hidden=!state;
   document.body.classList.toggle('in-expedition',!!state);
+  renderPause();
   if(!state){if(trainingDialog.open)trainingDialog.close();if(gameoverDialog.open)gameoverDialog.close();return;}
   const turn=state.units[state.turn];
   const mine=state.phase==='combat'&&turn?.id===session.id;

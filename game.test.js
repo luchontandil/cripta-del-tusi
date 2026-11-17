@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -20,13 +20,13 @@ function battle(...classes) {
   return s;
 }
 /** Vota en el mapa un nodo de combate normal para entrar a pelear. */
-function enterCombat(s){
+function enterCombat(s,r=rng){
   for(let i=0;i<8&&s.phase!=='combat';i++){
     if(s.phase==='map'){
       const option=Math.max(0,s.vote.options.findIndex(id=>s.route.rows.flat().find(n=>n.id===id).kind==='combat'));
-      for(const p of s.players)if(s.phase==='map')act(s,p.id,{type:'vote',option},rng);
+      for(const p of s.players)if(s.phase==='map')act(s,p.id,{type:'vote',option},r);
     }else if(s.phase==='event'){
-      for(const p of s.players)if(s.phase==='event')act(s,p.id,{type:'vote',option:0},rng);
+      for(const p of s.players)if(s.phase==='event')act(s,p.id,{type:'vote',option:0},r);
     }
   }
   if(s.phase==='combat'){s.water=[];s.traps=[];}
@@ -52,9 +52,10 @@ test('valida turno, ruta, puntos, visibilidad y escalado',()=>{
   assert.equal(hasRange(s,archer,enemy.pos,classes.tirador.skills[0]),true);
   assert.equal(inRange(s,archer,enemy.pos,classes.tirador.skills[0]),false);
   assert.throws(()=>act(s,'p0',{type:'skill',skill:0,pos:enemy.pos}),/visión/);
-  assert.equal(s.ap,4);
+  assert.equal(s.ap,6);
   s.walls=[];
   act(s,'p0',{type:'skill',skill:0,pos:enemy.pos},rng);
+  s.ap=1;
   assert.throws(()=>act(s,'p0',{type:'skill',skill:2,pos:enemy.pos}),/puntos/);
   assert.ok(encounter(3,4).length>encounter(3,1).length);
   assert.ok(encounter(5,1)[0].hp>encounter(1,1)[0].hp);
@@ -87,6 +88,7 @@ test('el jefe anuncia un glifo amplio y, al activarla en su turno, las cadenas d
   s.phase='reward';
   s.picks=['p0'];
   act(s,'p0',{type:'next'},rng);
+  enterCombat(s);
   assert.equal(s.units.find(u=>u.boss).look,'umbralking');
   const boss=s.units[s.turn];
   assert.equal(boss.boss,true);
@@ -131,16 +133,18 @@ test('genera botín con afijos y permite equipar y engarzar runas permanentes',(
   act(s,'p0',{type:'unequip',slot:gear.slot},rng);
   assert.ok(p.bag.includes(gear));
   act(s,'p0',{type:'equip',item:gear.id},rng);
+  // Un hueco: se engarza una runa y ya no cabe otra (son permanentes).
+  gear.sockets=1;gear.runes=[];
   const rune={kind:'rune',id:999,stats:{power:2},price:10};
   p.bag.push(rune);
   act(s,'p0',{type:'socket',item:rune.id,slot:gear.slot},rng);
-  assert.equal(p.equipment[gear.slot].socket,rune);
+  assert.deepEqual(p.equipment[gear.slot].runes,[rune]);
   // Las runas son permanentes: ni se extraen ni se reemplazan.
   assert.throws(()=>act(s,'p0',{type:'unsocket',slot:gear.slot},rng),/permanentes/);
   const other={kind:'rune',id:998,stats:{power:1},price:10};
   p.bag.push(other);
   assert.throws(()=>act(s,'p0',{type:'socket',item:other.id,slot:gear.slot},rng),/permanente/);
-  assert.equal(p.equipment[gear.slot].socket,rune);
+  assert.deepEqual(p.equipment[gear.slot].runes,[rune]);
   assert.throws(()=>act(s,'p0',{type:'sell',item:other.id},rng),/tienda/);
   assert.equal(s.stock.length,0);
   assert.throws(()=>act(s,'p0',{type:'next'},rng),/habilidades/);
@@ -238,7 +242,7 @@ test('el Mago puede lanzar a una casilla vacía y dañar a dos enemigos en cruz'
   assert.ok(spellArea(s,center,skill).includes(first.pos));
   assert.ok(spellArea(s,center,skill).includes(second.pos));
   act(s,'p0',{type:'skill',skill:1,pos:center},rng);
-  assert.equal(s.ap,1);
+  assert.equal(s.ap,3);
   assert.equal(first.max-first.hp,7);
   assert.equal(second.max-second.hp,7);
   assert.equal(ally.hp,ally.max);
@@ -267,8 +271,9 @@ test('los pisos alternan diseños y todas las casillas libres están conectadas'
       const previousSize=[s.width,s.height];
       s.phase='reward';
       s.picks=s.players.map(p=>p.id);
-      act(s,'p0',{type:'next'},()=>((size*17+floor*13)%97)/97);
-      enterCombat(s);
+      const varied=()=>((size*17+floor*13)%97)/97;
+      act(s,'p0',{type:'next'},varied);
+      enterCombat(s,varied);
       assert.notEqual(s.layoutName,previous);
       assert.notDeepEqual([s.width,s.height],previousSize);
     }
@@ -332,7 +337,7 @@ test('dos clientes reciben la misma trayectoria completa y el cambio de turno', 
   assert.equal((await request(path+'/action',{type:'start'},peer.key)).status,400);
   const map=await request(path+'/action',{type:'start'},host.key);
   assert.equal(map.state.phase,'map');
-  assert.equal(map.state.deadline-map.state.turnStarted,15000);
+  assert.equal(map.state.deadline-map.state.turnStarted,45000);
   const option=map.state.vote.options.findIndex(id=>map.state.route.rows[0].find(n=>n.id===id).kind==='combat');
   assert.equal((await request(path+'/action',{type:'vote',option},host.key)).state.phase,'map');
   const started=await request(path+'/action',{type:'vote',option},peer.key);
@@ -388,14 +393,14 @@ test('los eventos se votan, el empate lo decide el anfitrión y aplican efectos 
   enterCombat(s);
   const hero=s.units.find(u=>u.id===s.units[s.turn].id&&!u.enemy)||s.units.find(u=>!u.enemy);
   assert.equal(s.mods.ap,1);
-  if(!s.units[s.turn].enemy)assert.equal(s.ap,5+(s.units[s.turn].stats.action||0));
+  if(!s.units[s.turn].enemy)assert.equal(s.ap,7+(s.units[s.turn].stats.action||0));
   assert.ok(hero.hp<=Math.ceil(hero.max*.8));
 });
-test('el voto se resuelve al acabarse los 15 segundos',()=>{
+test('el voto se resuelve al acabarse los 45 segundos',()=>{
   const s=create();
   join(s,'p0','Uno','guardia');join(s,'p1','Dos','mago');
   act(s,'p0',{type:'start'},rng);
-  assert.equal(s.deadline-s.turnStarted,15000);
+  assert.equal(s.deadline-s.turnStarted,45000);
   act(s,'p1',{type:'vote',option:s.vote.options.length-1},rng);
   timeout(s);
   assert.notEqual(s.phase,'map');
@@ -720,7 +725,7 @@ test('cada acto tiene su ambientación, su fauna y salas generadas al azar',()=>
     for(let k=0;k<8&&s.phase!=='combat';k++){
       if(s.phase==='map'){const o=Math.max(0,s.vote.options.findIndex(id=>s.route.rows.flat().find(n=>n.id===id).kind==='combat'));act(s,'p0',{type:'vote',option:o},seq);}
       else if(s.phase==='event')act(s,'p0',{type:'vote',option:0},seq);
-      else if(s.phase==='shop')act(s,'p0',{type:'ready'},seq);
+      else if(s.phase==='shop'||s.phase==='forge')act(s,'p0',{type:'ready'},seq);
     }
     assert.equal(s.phase,'combat');
     assert.equal(s.biome,actBiomes[s.act-1]);
@@ -960,4 +965,74 @@ test('la forja aparece en el mapa de cada acto',()=>{
     const route=makeRoute(rng,actNo);
     assert.ok(route.rows[4].some(n=>n.kind==='forge'),'piso 5 del acto '+actNo);
   }
+});
+
+test('huecos de runa: 0, 1 o 2 (2 es raro), dos runas caben en dos huecos y la forja abre hasta 2',()=>{
+  let seed=321;const random=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+  const s=battle('guardia');
+  const counts=[0,0,0];
+  for(let i=0;i<3000;i++){const it=rollItem(s,random,{gear:true,ilvl:6});counts[it.sockets]++;}
+  assert.ok(counts[0]>0&&counts[1]>0&&counts[2]>0);
+  assert.ok(counts[2]<counts[1]&&counts[2]<counts[0],'2 huecos es lo más raro: '+counts);
+  const p=s.players[0];
+  const gear=rollItem(s,random,{gear:true,ilvl:5});
+  gear.sockets=0;gear.runes=[];
+  p.equipment[gear.slot]=gear;
+  const r1={kind:'rune',id:9001,stats:{physical:1},price:8},r2={kind:'rune',id:9002,stats:{fire:1},price:8};
+  p.bag.push(r1,r2);
+  s.phase='shop';
+  assert.throws(()=>act(s,'p0',{type:'socket',item:r1.id,slot:gear.slot},random),/huecos/);
+  s.phase='forge';p.gold=999;
+  act(s,'p0',{type:'forge',item:gear.id,mode:'socket'},random);
+  act(s,'p0',{type:'forge',item:gear.id,mode:'socket'},random);
+  assert.equal(socketsOf(gear),2);
+  assert.throws(()=>act(s,'p0',{type:'forge',item:gear.id,mode:'socket'},random),/máximo/);
+  s.phase='shop';
+  act(s,'p0',{type:'socket',item:r1.id,slot:gear.slot},random);
+  act(s,'p0',{type:'socket',item:r2.id,slot:gear.slot},random);
+  assert.deepEqual(runesOf(gear).map(r=>r.id),[9001,9002]);
+});
+test('legendarios de nivel bajo pueden traer (muy rara vez) afijos de nivel superior',()=>{
+  let seed=77;const random=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+  const s=battle('guardia');
+  let legend=0,ascended=0;
+  for(let i=0;i<4000;i++){
+    const it=rollItem(s,random,{gear:true,ilvl:2,minGrade:3});
+    legend++;ascended+=it.affixes.filter(m=>m.ascended).length?1:0;
+  }
+  assert.ok(ascended>0,'aparece alguno');
+  assert.ok(ascended/legend<.4,'pero es poco frecuente: '+ascended+'/'+legend);
+});
+test('todos empiezan con '+6+' PA y 3 PM',()=>{
+  assert.equal(BASE_AP,6);assert.equal(BASE_MP,3);
+});
+test('quemadura: un golpe de fuego prende, quema al empezar el turno y el hielo la apaga',()=>{
+  const s=battle('mago');
+  const hero=s.units.find(u=>!u.enemy);
+  const foe=s.units.find(u=>u.enemy);
+  s.walls=[];s.water=[];s.traps=[];
+  for(const u of s.units.filter(u=>u.enemy&&u!==foe))u.hp=0;
+  foe.hp=foe.max=200;foe.stats.ward=0;foe.resist={};foe.effects={};
+  foe.pos=hero.pos-3;
+  s.turn=s.units.indexOf(hero);s.ap=6;
+  const fireball=classes.mago.skills.findIndex(sk=>sk[0]==='Bola de fuego');
+  hero.skillRanks[fireball]=Math.max(1,hero.skillRanks[fireball]||0);
+  act(s,'p0',{type:'skill',skill:fireball,pos:foe.pos},()=>.5);
+  assert.ok(foe.effects.burn,'arde');
+  const before=foe.hp;
+  act(s,'p0',{type:'end'},rng);          // empieza el turno del enemigo: le quema
+  assert.ok(s.events.some(e=>e.kind==='burn'&&e.unit===foe.id));
+  assert.ok(foe.hp<before);
+});
+test('pausa: congela el reloj, bloquea acciones y devuelve el tiempo al reanudar',()=>{
+  const s=battle('guardia');
+  const left=s.deadline-Date.now();
+  act(s,'p0',{type:'pause'},rng);
+  assert.ok(s.paused);
+  assert.throws(()=>act(s,'p0',{type:'end'},rng),/pausa/);
+  s.deadline=0;                          // aunque se agote el reloj, no avanza
+  assert.equal(tick(s,rng),false);
+  act(s,'p0',{type:'pause'},rng);
+  assert.ok(!s.paused);
+  assert.ok(Math.abs((s.deadline-Date.now())-left)<1500);
 });

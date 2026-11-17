@@ -1024,3 +1024,42 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 .forge-button .icon{width:12px;height:12px}
 .icon-forge{color:#ffb070}
 .route-node.kind-forge{color:#ffb070;border-color:#7a4a2a}
+/* Ficha de habilidad: descripción y daño destacado (estilo Dofus) */
+.tip-lore{margin:4px 0 6px;font-size:.8rem;line-height:1.35;color:#e8dcc0;font-style:italic}
+.tip-damage{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:4px 0 2px;font-size:.92rem;color:#e8dcc0}
+.tip-damage b{font-size:1.35rem;font-weight:800;color:#fff;line-height:1}
+.tip-damage .icon{width:20px;height:20px}
+.tip-damage small{font-size:.72rem;color:#e8dcc0aa}
+.tip-damage.element-fire b{color:var(--fire)}.tip-damage.element-ice b{color:var(--ice)}.tip-damage.element-lightning b{color:var(--lightning)}
+.tip-damage.element-chaos b{color:var(--chaos)}.tip-damage.element-magic b{color:var(--magic)}.tip-damage.heal b{color:#9bf2a5}
+.tip-damage.element-fire .icon{color:var(--fire)}.tip-damage.element-ice .icon{color:var(--ice)}.tip-damage.element-lightning .icon{color:var(--lightning)}
+.tip-damage.element-chaos .icon{color:var(--chaos)}.tip-damage.element-magic .icon{color:var(--magic)}
+/* Números de daño flotantes más grandes */
+.impact.damage-number{font-size:clamp(1.75rem,3.9vw,2.6rem)}
+.impact.damage-number.critical{font-size:clamp(2.1rem,4.7vw,3.2rem)}
+.impact.damage-number.burn{color:#ff9a4a}
+/* Quemadura en 2D: llamas que parpadean sobre la ficha */
+.pawn.burning::after{content:'';position:absolute;inset:-10% 8% 40% 8%;border-radius:50% 50% 40% 40%;
+  background:radial-gradient(ellipse at 50% 90%,#ffd36bcc 0 22%,#ff7a2ecc 40%,#ff3d1a66 62%,transparent 72%);
+  mix-blend-mode:screen;pointer-events:none;animation:burn-flicker .38s ease-in-out infinite alternate}
+@keyframes burn-flicker{from{transform:scaleY(.85) translateY(4%);opacity:.75}to{transform:scaleY(1.12) translateY(-4%);opacity:1}}
+@media (prefers-reduced-motion:reduce){.pawn.burning::after{animation:none}}
+.effect-chip.effect-burn .icon{color:var(--fire)}
+#unit-tooltip.docked{max-width:none;box-shadow:0 0 0 1px #f2cd8a55,0 10px 30px #000c}
+/* Pausa */
+.pause-veil{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:#0b0910b8;backdrop-filter:blur(2px)}
+.pause-veil[hidden]{display:none}
+.pause-card{display:grid;justify-items:center;gap:8px;padding:22px 28px;border:2px solid #4a3a2a;background:#17131c;border-radius:10px;box-shadow:0 12px 40px #000c;text-align:center;max-width:340px}
+.pause-card .icon{width:34px;height:34px;color:var(--gold)}
+.pause-card strong{font-size:1.4rem;color:var(--gold)}
+.pause-card p{margin:0;font-size:.85rem;color:#e8dcc0}
+#field-pause[aria-pressed="true"]{color:var(--gold);border-color:var(--gold)}
+/* Runas en el botín */
+.rune-help{display:flex;gap:6px;align-items:flex-start;font-size:.74rem;line-height:1.35;color:#e8dcc0cc;margin:6px 0}
+.rune-help .icon{flex:none;width:15px;height:15px;color:#c9a6ff}
+/* Huecos de runa y afijos ascendidos */
+.item-holes{display:flex;align-items:center;gap:3px;font-size:.72rem;color:#e8dcc0aa;margin-top:3px}
+.item-holes .hole{color:#c9a6ff88;font-size:.85rem}
+.item-holes .hole.full{color:#c9a6ff}
+.tier.ascended{color:#ff9a4a;border-color:#ff9a4a;box-shadow:0 0 6px #ff9a4a66}
+#unit-tooltip.docked .effect-chip{white-space:normal;text-align:left;justify-content:flex-start;flex-wrap:wrap}

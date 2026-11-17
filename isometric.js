@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=54';
-import {playerColors} from './engine.js?v=54';
+import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=57';
+import {playerColors} from './engine.js?v=57';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -648,18 +648,18 @@ export function createIso(mount,onCell){
   function impact(event){
     if(!active)return;
     const palette={heal:'#9bf2a5',cleanse:'#fff2ba',blast:'#ff884b',slow:'#9be8ff',venom:'#b9e574',expose:'#d9a3ff',
-      arcane:'#bfb4ff',arrow:'#f6d18b',push:'#faf1a9',slash:'#ffdaa8',dash:'#bc91ee',poison:'#b9e574',glyph:'#ff8e66'};
+      arcane:'#bfb4ff',arrow:'#f6d18b',push:'#faf1a9',slash:'#ffdaa8',dash:'#bc91ee',poison:'#b9e574',glyph:'#ff8e66',burn:'#ff7a2e'};
     const color=palette[event.effect||event.kind]||'#f4c18e';
     const time=performance.now();
     const target=logical(state,event.pos);
     if(event.kind!=='spell'){
       const victim=event.unit&&models.get(event.unit);
-      if(victim&&event.amount>0&&['damage','glyph','poison','trap'].includes(event.kind)){
+      if(victim&&event.amount>0&&['damage','glyph','poison','trap','burn'].includes(event.kind)){
         const from=event.from!==undefined?logical(state,event.from):null;
         victim.hurt={start:time,dx:from?victim.root.position.x-from.x:0,dz:from?victim.root.position.z-from.z:0,crit:!!event.critical};
         if(state.units.find(u=>u.id===event.unit)?.hp<=0&&!victim.dying)victim.deathAt=time+240;
       }
-      if(event.kind==='glyph'||event.kind==='poison'){
+      if(event.kind==='glyph'||event.kind==='poison'||event.kind==='burn'){
         const pulse=piece(transient,'disc',color,target.x,.045,target.z,.45,.025,.45,true);
         effects.push({mesh:pulse,start:time,duration:330,pop:true});
       }
@@ -782,6 +782,37 @@ export function createIso(mount,onCell){
         const s=1+Math.sin(now*.005)*.05;
         model.ring.scale.set(1.22*s,1.39,1.36*s);
       }
+      // Quemadura: lenguas de fuego que parpadean alrededor del cuerpo y ascuas que suben.
+      const burning=!!model.unit.effects?.burn&&model.unit.hp>0;
+      if(burning&&!model.flames){
+        model.flames=new T.Group();
+        const tongues=[];
+        for(let i=0;i<6;i++){
+          const a=i/6*Math.PI*2,r=.2+(i%2)*.07;
+          const outer=piece(model.flames,'cone',i%2?'#ff5a1f':'#ff8a2e',Math.sin(a)*r,.18,Math.cos(a)*r,.13,.38,.13,true);
+          const inner=piece(model.flames,'cone','#ffd36b',Math.sin(a)*r*.8,.13,Math.cos(a)*r*.8,.07,.22,.07,true);
+          tongues.push({outer,inner,seed:i*1.7});
+        }
+        model.flames.userData.tongues=tongues;
+        model.root.add(model.flames);
+      }
+      if(model.flames){
+        model.flames.visible=burning;
+        if(burning){
+          for(const t of model.flames.userData.tongues){
+            const f=reduced?1:.75+.35*Math.abs(Math.sin(now*.013+t.seed))+.15*Math.sin(now*.031+t.seed*3);
+            t.outer.scale.set(.13,.38*f,.13);t.outer.position.y=.18*f;
+            t.inner.scale.set(.07,.22*f,.07);t.inner.position.y=.12*f;
+          }
+          model.flames.rotation.y=reduced?0:now*.0015;
+          if(!reduced&&now-(model.lastEmber||0)>110){
+            model.lastEmber=now;
+            const p=model.root.position,a=Math.random()*Math.PI*2;
+            const ember=piece(transient,'gem',Math.random()<.5?'#ffb347':'#ff6a2a',p.x+Math.sin(a)*.25,.35,p.z+Math.cos(a)*.25,.06,.06,.06,true);
+            effects.push({mesh:ember,start:now,duration:700,ember:true,size:.06});
+          }
+        }
+      }
       model.shadow.position.x=model.root.position.x;
       model.shadow.position.z=model.root.position.z;
       const pos=projected(model.root.position.x,model.head+.15+model.figure.position.y,model.root.position.z);
@@ -801,6 +832,9 @@ export function createIso(mount,onCell){
       }else if(fx.ring){
         fx.mesh.scale.setScalar(.25+Math.sin(t*Math.PI*.76)*.86);
         fx.mesh.position.y=.04+t*.08;
+      }else if(fx.ember){
+        fx.mesh.position.y+=.012;
+        fx.mesh.scale.setScalar(fx.size*(1-t));
       }else if(fx.fade){
         fx.mesh.scale.setScalar(fx.size*(1-t));
         fx.mesh.position.y-=.002;

@@ -1140,3 +1140,10 @@ body:not(.in-expedition) .tagline{margin:0 0 8px;font-size:.72rem}
   .gateway-main .class-preview .preview-skills li{font-size:.78rem}
   .class-preview{margin:6px 0 8px}
 }
+/* Estadísticas del héroe: valores más grandes y renglones finos entre stats */
+.hero-sheet,.tip-stats{gap:0}
+.hero-sheet .tip-row,.tip-stats .tip-row{padding:4px 2px;border-bottom:1px solid #ffffff12}
+.hero-sheet .tip-row:nth-child(even),.tip-stats .tip-row:nth-child(even){background:#ffffff05}
+.hero-sheet .tip-row:last-child,.tip-stats .tip-row:last-child{border-bottom:0}
+.hero-sheet .tip-value,.tip-stats .tip-value{font-size:.98rem;font-weight:700;color:#f3e6c8}
+.hero-sheet .tip-label{font-size:.8rem}

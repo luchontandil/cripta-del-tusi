@@ -377,6 +377,18 @@ function startForge(s){
   note(s,'Piso '+s.floor+' · Forja del herrero.');
 }
 const legacyStat={arcane:'magic',shadow:'chaos'};
+/** Estadísticas de un héroe a partir de su equipo, maestrías y nivel (también fuera de combate). */
+export function heroStats(p,level=p.level||1){
+  const stats=sumStats(p.equipment);
+  const m=p.mastery||{};
+  for(const key of damageKeys)stats[key]+=Math.floor(level/2)+(m.fuerza||0);
+  stats.vitality+=4*(m.vigor||0);
+  stats.critical+=3*(m.precision||0);
+  stats.ward+=m.coraza||0;
+  stats.movement+=m.celeridad||0;
+  const max=classes[p.classId].hp+stats.vitality+(level-1)*4;
+  return {stats,max,initiative:classes[p.classId].initiative};
+}
 function sumStats(equipment) {
   const totals=Object.fromEntries(Object.keys(statNames).map(key=>[key,0]));
   for (const gear of Object.values(equipment)) {
@@ -933,14 +945,7 @@ function openFloor(s,rng,elite=false,boss=null) {
     p.level=level;
     p.xp=0;
     p.trained=true;
-    const stats=sumStats(p.equipment);
-    const m=p.mastery||{};
-    for(const key of damageKeys)stats[key]+=Math.floor(level/2)+(m.fuerza||0);
-    stats.vitality+=4*(m.vigor||0);
-    stats.critical+=3*(m.precision||0);
-    stats.ward+=m.coraza||0;
-    stats.movement+=m.celeridad||0;
-    const max=classes[p.classId].hp+stats.vitality+(level-1)*4;
+    const {stats,max}=heroStats(p,level);
     return {id:p.id,name:p.name,classId:p.classId,color:p.color,level,skillRanks:[...p.skillRanks],initiative:classes[p.classId].initiative,stats,max,
       hp:previous?Math.min(max,Math.max(previous.hp,0)+Math.ceil(max*.45)):max,
       pos:heroPositions[i],effects:{}};

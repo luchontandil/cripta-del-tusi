@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=57';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=57';
-import {setupSfx} from './music.js?v=57';
-import {icon} from './icons.js?v=57';
+  BASE_AP,BASE_MP,heroStats,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=59';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=59';
+import {setupSfx} from './music.js?v=59';
+import {icon} from './icons.js?v=59';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=57').then(({createIso})=>{
+import('./isometric.js?v=59').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -346,6 +346,7 @@ function unitLabel(u){
 }
 function hideUnit(){
   el('unit-tooltip').hidden=true;
+  if(document.querySelector('#board .foe-reach'))paintFoeReach(null);
 }
 function resourceText(element,text){
   element.replaceChildren(...text.split(/(\b(?:PA|PM)\b)/g).map(word=>{
@@ -439,7 +440,33 @@ function terrainNodes(pos){
   }
   return [];
 }
+/** Estadísticas completas de un héroe: PV, PA, PM, armadura, iniciativa, crítico, alcance y daños. */
+function heroStatRows(u){
+  const st=u.stats||{};
+  const rows=[
+    statRow('heal','Vida',(u.hp??u.max??'—')+(u.max?' / '+u.max:'')+' PV'),
+    statRow('ap','Acción',(BASE_AP+(st.action||0))+' PA'),
+    statRow('mp','Movimiento',(BASE_MP+(st.movement||0))+' PM'),
+    statRow('ward','Armadura',st.ward||0),
+    statRow('initiative','Iniciativa',u.initiative??'—'),
+    statRow('critical','Crítico',Math.round(critChance(u)*100)+' % · ×1,5'),
+    statRow('reach','Alcance extra',st.reach?'+'+st.reach:'0')
+  ];
+  for(const key of Object.keys(elements))if(st[key])rows.push(statRow(key,'Daño '+elements[key].toLowerCase(),'+'+st[key],'element-'+key));
+  return rows;
+}
+/** Casillas a las que puede llegar un enemigo en su turno (al pasarle el ratón). */
+function paintFoeReach(unit){
+  const board=el('board');
+  for(const cell of board.querySelectorAll('.foe-reach'))cell.classList.remove('foe-reach');
+  if(unit?.enemy&&unit.hp>0&&state?.phase==='combat'){
+    const mp=Math.max(0,3+(unit.stats?.movement||0)-(unit.effects?.slow?.value||0));
+    for(const pos of paths(state,unit,mp).keys())board.children[pos]?.classList.add('foe-reach');
+  }
+  if(iso?.active)iso.highlight(board.children);
+}
 function inspectCell(unit,cell,pos,glyph,source,skill,aim){
+  paintFoeReach(unit?.enemy?unit:null);
   const near=iso?.active?iso.anchor(pos):cell.getBoundingClientRect();
   // Las fichas de unidades se anclan a un lado; las de terreno siguen junto a la casilla.
   const anchor=unit?{left:near.left,top:near.top,bottom:near.bottom,dock:true}:near;
@@ -458,20 +485,16 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
     }else if(preview)nodes.push(h('div','tip-warning',icon('info'),'Fuera de alcance o sin línea de visión'));
   }
   const stats=h('div','tip-stats');
-  stats.append(
-    statRow('ward','Armadura',unit.stats?.ward||0),
-    statRow('initiative','Iniciativa',unit.initiative),
-    statRow('mp','Movimiento',(3+(unit.stats?.movement||0))+' PM'));
   if(unit.enemy){
-    stats.append(statRow('attack','Ataque',unit.damage+'–'+(unit.damage+2)),statRow('range','Alcance',unit.range+(unit.range===1?' casilla':' casillas')));
-  }else{
-    for(const [key,value] of Object.entries(unit.stats||{})){
-      if(!value||['ward','movement','vitality'].includes(key))continue;
-      stats.append(statRow(key,statNames[key],'+'+value+(key==='critical'?' %':'')));
-    }
-  }
+    stats.append(
+      statRow('ward','Armadura',unit.stats?.ward||0),
+      statRow('initiative','Iniciativa',unit.initiative),
+      statRow('mp','Movimiento',Math.max(0,3+(unit.stats?.movement||0)-(unit.effects?.slow?.value||0))+' PM'),
+      statRow('attack','Ataque',unit.damage+'–'+(unit.damage+2)),statRow('range','Alcance',unit.range+(unit.range===1?' casilla':' casillas')));
+  }else stats.append(...heroStatRows(unit));
   nodes.push(stats);
   const note=unit.boss?bosses[unit.look]?.powers:traitNote(monsterTraits[unit.look]);
+  if(unit.enemy&&unit.hp>0)nodes.push(h('p','tip-note foe-reach-note','Las casillas en rojo muestran hasta dónde puede moverse en su turno.'));
   if(unit.enemy&&note)nodes.push(h('p','tip-note',note));
   if(unit.enemy&&unit.variant)nodes.push(h('p','tip-note tip-variant',h('strong',null,'Variante '+monsterVariants[unit.variant].name+': '),monsterVariants[unit.variant].text+'.'));
   const resist=Object.entries(unit.resist||{}).filter(([,v])=>v);
@@ -936,7 +959,13 @@ function renderInventory(player){
   gold.replaceChildren(icon('gold'),h('b',null,String(player.gold)),' tusi');
   bag.append(gold);
   if(trading&&others.length&&player.gold>0)bag.append(giveTusi(player,others));
-  holder.replaceChildren(gear,bag);
+  const sheet=panel('Estadísticas','info');
+  // En combate, la unidad real (con su vida actual); fuera, lo que daría su equipo ahora mismo.
+  const unitNow=state.units.find(u=>u.id===player.id&&!u.enemy);
+  const me=unitNow&&state.phase==='combat'?unitNow:{...heroStats(player),hp:unitNow?.hp,level:player.level};
+  if(me.hp===undefined)me.hp=me.max;
+  sheet.append(h('div','tip-stats hero-sheet',...heroStatRows(me)));
+  holder.replaceChildren(gear,bag,sheet);
   if(rewards.hidden){rewards.replaceChildren();return;}
   const loot=panel('Botín · Elige una recompensa','xp');
   loot.classList.add('loot-panel');

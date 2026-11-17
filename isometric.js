@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=57';
-import {playerColors} from './engine.js?v=57';
+import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=59';
+import {playerColors} from './engine.js?v=59';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -13,7 +13,7 @@ const tilesets={
 };
 const biomeLight={crypt:'#ffa45a',jungle:'#e8ff8a',roots:'#c1f195',bones:'#9dffb8',hell:'#ff8a3a'};
 const biomeFog={crypt:'#07060d',jungle:'#0c1a0e',roots:'#0d1412',bones:'#12110e',hell:'#0e0b0a'};
-const overlayColors={walk:'#448ead',cast:'#725298',aim:'#f1bf71',route:'#b3efff',area:'#ed8855',blocked:'#b34255',damage:'#ea6a50',poison:'#9abe56',slow:'#719add'};
+const overlayColors={walk:'#6aa3bb',cast:'#9484b8',aim:'#e9c48a',route:'#bfe6f2',area:'#e09a72',blocked:'#b06070',damage:'#ea6a50',poison:'#9abe56',slow:'#719add',foe:'#c97a6e'};
 const ink='#121423';
 const flatTile=new T.PlaneGeometry(1,1).rotateX(-Math.PI/2);
 const waterGeometry=new T.PlaneGeometry(1,1,6,6).rotateX(-Math.PI/2);
@@ -89,12 +89,10 @@ function overlayMaterial(color,strength=1){
       void main(){
         vec2 q=min(vUv,1.-vUv);
         float d=min(q.x,q.y);
-        float edge=smoothstep(.16,.0,d);
-        float corner=smoothstep(.30,.0,max(q.x,q.y))*.0;
-        float pulse=.82+.18*sin(time*3.2+(vWorld.x+vWorld.z)*.55);
-        float alpha=(.30+edge*.70)*pulse*strength;
-        vec3 color=mix(tint,vec3(1.),edge*.35);
-        gl_FragColor=vec4(color*(1.+edge*.6),alpha);
+        float edge=smoothstep(.045,.0,d);
+        float pulse=.94+.06*sin(time*2.4+(vWorld.x+vWorld.z)*.55);
+        float alpha=(.20+edge*.32)*pulse*strength;
+        gl_FragColor=vec4(tint*(1.+edge*.25),alpha);
       }`,
     transparent:true,depthWrite:false,toneMapped:false
   });
@@ -547,10 +545,11 @@ export function createIso(mount,onCell){
       const c=cell.classList;
       const glyph=['damage','poison','slow'].find(kind=>c.contains('glyph-'+kind));
       const type=c.contains('area-preview')?'area':c.contains('route')?'route':c.contains('no-sight')?'blocked':glyph||(
-        c.contains('aim')?'aim':c.contains('cast-range')?'cast':c.contains('walk')?'walk':null);
+        c.contains('aim')?'aim':c.contains('cast-range')?'cast':c.contains('walk')?'walk':c.contains('foe-reach')?'foe':null);
       o.visible=!!type;
       if(type)o.material=overlayMaterial(overlayColors[type],type==='route'||type==='area'?1.25:glyph?1.1:1);
-      const size=c.contains('route')?.94:glyph?.92:.9;
+      // La casilla entera (los glifos un pelín menos, para que se distingan del suelo resaltado).
+      const size=glyph?.96:1;
       o.scale.set(size,1,size);
       if(c.contains('route'))route.push([Number(cell.dataset.step),i]);
     }

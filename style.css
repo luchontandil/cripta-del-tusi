@@ -1063,3 +1063,16 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 .item-holes .hole.full{color:#c9a6ff}
 .tier.ascended{color:#ff9a4a;border-color:#ff9a4a;box-shadow:0 0 6px #ff9a4a66}
 #unit-tooltip.docked .effect-chip{white-space:normal;text-align:left;justify-content:flex-start;flex-wrap:wrap}
+
+/* Casillas resaltadas (2D) más sutiles y a casilla completa */
+.cell.walk{background:#2c4f61;box-shadow:inset 0 0 0 1px #6aa3bb88}
+.cell.walk:hover,.cell.walk:focus-visible,.cell.walk.route{background:#35627a;box-shadow:inset 0 0 0 1px #bfe6f2}
+.cell.cast-range{background:#3d3452;box-shadow:inset 0 0 0 1px #9484b888}
+.cell.aim{box-shadow:inset 0 0 0 1px #e9c48a,0 0 6px #e9c48a44}
+/* Movimiento posible de un enemigo (al pasar el ratón por él) */
+.cell.foe-reach{background:#4a2f30;box-shadow:inset 0 0 0 1px #c97a6e88}
+/* Panel de estadísticas bajo la mochila */
+.hero-sheet{font-size:.8rem;display:grid;gap:2px}
+.hero-sheet .tip-row{padding:2px 0}
+.hero-sheet .icon{width:14px;height:14px}
+.foe-reach-note{color:#e0a59b}

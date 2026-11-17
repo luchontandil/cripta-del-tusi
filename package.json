@@ -1,1 +1,1 @@
-{"name":"cripta-del-tusi","version":"0.1.0","private":true,"type":"module","scripts":{"start":"node server.js","test":"node game.test.js"},"engines":{"node":">=20"}}
+{"name":"cripta-del-tusi","version":"0.1.0","private":true,"type":"module","scripts":{"start":"node server.js","test":"CRIPTA_TEST=1 node game.test.js"},"engines":{"node":">=20"}}

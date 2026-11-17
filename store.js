@@ -4,7 +4,8 @@
 const url=process.env.UPSTASH_REDIS_REST_URL;
 const secret=process.env.UPSTASH_REDIS_REST_TOKEN;
 const memory=new Map();
-export const persistent=!!(url&&secret);
+// Los tests (también los del build de Render) nunca tocan la base real.
+export const persistent=!!(url&&secret)&&!process.env.CRIPTA_TEST;
 
 async function command(...args){
   const response=await fetch(url,{

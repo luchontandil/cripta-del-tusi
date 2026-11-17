@@ -1816,7 +1816,9 @@ function gearAction(s,p,a,rng) {
     }else if(a.type==='sell'){
       if(s.phase!=='shop')fail('Solo puedes vender en la tienda.');
       p.bag.splice(bagIndex,1);
-      p.gold+=Math.floor(item.price/2)+(item.socket?Math.floor(item.socket.price/2):0);
+      const earned=Math.floor(item.price/2)+(item.socket?Math.floor(item.socket.price/2):0);
+      p.gold+=earned;
+      note(s,p.name+' vende '+item.name+' por '+earned+' tusi.');
     }else fail('Acción de inventario inválida.');
   }
 }

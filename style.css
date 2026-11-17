@@ -998,3 +998,7 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 .resist-chip.element-physical .icon{color:var(--physical)}.resist-chip.element-magic .icon{color:var(--magic)}.resist-chip.element-fire .icon{color:var(--fire)}
 .resist-chip.element-ice .icon{color:var(--ice)}.resist-chip.element-lightning .icon{color:var(--lightning)}.resist-chip.element-chaos .icon{color:var(--chaos)}
 .tip-variant strong{color:#ff9a5c}
+/* Vender arrastrando a la tienda */
+.shop-sell-hint{display:flex;align-items:center;justify-content:center;gap:6px;margin:6px 0 10px;padding:8px;border:1px dashed #f2cd8a55;border-radius:6px;font-size:.8rem;color:#e8dcc0aa}
+[data-drop].drop-valid .shop-sell-hint{color:#f2cd8a;border-color:#f2cd8a}
+[data-drop].drop-target{outline:2px solid var(--gold);outline-offset:-2px;box-shadow:0 0 14px var(--gold-glow)}

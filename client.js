@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,glyphText,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=48';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=48';
-import {setupSfx} from './music.js?v=48';
-import {icon} from './icons.js?v=48';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=49';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=49';
+import {setupSfx} from './music.js?v=49';
+import {icon} from './icons.js?v=49';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -96,7 +96,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=48').then(({createIso})=>{
+import('./isometric.js?v=49').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -650,7 +650,7 @@ function dropZone(tile,accept,drop){
 }
 function inventoryTarget(event){
   let node=document.elementFromPoint(event.clientX,event.clientY);
-  while(node&&node!==el('inventory')){
+  while(node&&node!==document.body){
     if(dropTargets.get(node)?.accept(drag.payload))return node;
     node=node.parentElement;
   }
@@ -666,7 +666,7 @@ document.addEventListener('pointermove',event=>{
     document.body.append(drag.ghost);
     el('inventory').classList.add('dragging');
     // Ilumina las casillas donde se puede soltar el objeto (su ranura de equipo, la mochila...).
-    for(const tile of el('inventory').querySelectorAll('.inventory-slot, .bag-zone, [data-drop]'))
+    for(const tile of document.querySelectorAll('.inventory-slot, .bag-zone, [data-drop]'))
       if(dropTargets.get(tile)?.accept(drag.payload))tile.classList.add('drop-valid');
   }
   drag.ghost.style.left=event.clientX+'px';
@@ -685,7 +685,7 @@ function finishDrag(event){
   dropTarget=null;
   active.ghost?.remove();
   el('inventory').classList.remove('dragging');
-  for(const tile of el('inventory').querySelectorAll('.drop-valid'))tile.classList.remove('drop-valid');
+  for(const tile of document.querySelectorAll('.drop-valid'))tile.classList.remove('drop-valid');
   if(active.ghost)suppressInventoryClick=performance.now()+310;
   if(target)dropTargets.get(target).drop(active.payload);
 }
@@ -854,9 +854,14 @@ function renderShop(box){
     const chip=h('span','ready-chip'+(ready.includes(p.id)?' on':''),unitArt(p),p.name);
     return chip;
   }));
+  const sellHint=h('div','shop-sell-hint',icon('gold'),'Arrastra aquí un objeto de tu mochila para venderlo');
+  dropZone(box,p=>p.from==='bag'&&state?.phase==='shop',p=>{
+    send({type:'sell',item:p.item});
+  });
   box.replaceChildren(
     h('div','journey-head',h('h3',null,icon('shop'),'Tienda del mercader'),
-      h('p',null,'Compra aquí; vende desde tu mochila. Podéis pasaros objetos y tusi.')),
+      h('p',null,'Compra aquí; vende arrastrando objetos de tu mochila hasta la tienda (o con «Vender»). Podéis pasaros objetos y tusi.')),
+    sellHint,
     h('div','shop-wallet',icon('gold'),h('b',null,String(player.gold)),' tusi disponibles'),
     cards.length?h('div','loot-cards shop-cards',...cards):h('p','event-text','El mercader no tiene nada más que vender.'),
     h('div','shop-footer',party,readyButton));

@@ -423,6 +423,10 @@ export const monsterSkills={
   imp:{name:'Bola de fuego',cd:3,text:'Cada 3 turnos su ataque estalla en cruz alrededor del objetivo.'},
   succubus:{name:'Beso',cd:3,text:'Cada 3 turnos atrae al objetivo 2 casillas hacia ella.'}
 };
+/** Segundas habilidades (con su propia recarga). */
+export const monsterExtraSkills={
+  plant:{name:'Liana devoradora',cd:3,text:'Atrapa a un héroe en línea recta, a cualquier distancia, y lo arrastra hasta ella; necesita visión y el camino totalmente libre (sin muros, líquidos ni unidades). Lista desde su primer turno, luego cada 3.'}
+};
 const skillReady=unit=>!unit.boss&&monsterSkills[unit.look]&&(unit.cd??1)<=0;
 function useSkill(s,unit){
   unit.cd=monsterSkills[unit.look].cd;
@@ -1392,6 +1396,16 @@ export function tick(s,rng=Math.random) {
         if(consumed||!heroes.some(alive)){advance(s,rng);return true;}
       }
       if(!unit.boss&&monsterSkills[unit.look])unit.cd=(unit.cd??2)-1;
+      // Planta carnívora: liana que arrastra y luego muerde.
+      if(unit.look==='plant'){
+        const caught=plantVine(s,unit,heroes);
+        unit.vineCd=Math.max(0,(unit.vineCd??0)-(caught?0:1));
+        if(caught){
+          if(alive(unit)&&alive(caught))monsterAttack(s,unit,caught,rng);
+          advance(s,rng);
+          return true;
+        }
+      }
       const canAttack=[[unit.pos],...paths(s,unit,s.mp)].some(([pos])=>attackOptions(s,unit,heroes,pos).length);
       const leapt=!unit.boss&&monsterLeap(s,unit,heroes,canAttack);
       if(leapt){
@@ -1514,6 +1528,33 @@ function drag(s,puller,target,n){
     steps.push(next);pos=next;
   }
   if(steps.length)move(s,target,steps,false);
+}
+/**
+ * Liana devoradora: si hay un héroe en la misma fila o columna con el camino totalmente libre
+ * (sin muros, líquidos ni unidades entre ambos) y a la vista, lo arrastra hasta el cuerpo a cuerpo.
+ */
+function plantVine(s,unit,heroes){
+  if(unit.look!=='plant'||(unit.vineCd??0)>0)return null;
+  const options=[];
+  for(const hero of heroes.filter(alive)){
+    const sameRow=Math.floor(hero.pos/s.width)===Math.floor(unit.pos/s.width),sameCol=hero.pos%s.width===unit.pos%s.width;
+    if(!sameRow&&!sameCol)continue;
+    const d=distance(s,unit.pos,hero.pos);
+    if(d<2)continue;
+    const step=sameRow?Math.sign(hero.pos-unit.pos):Math.sign(hero.pos-unit.pos)*s.width;
+    const between=[];
+    for(let pos=unit.pos+step;pos!==hero.pos;pos+=step)between.push(pos);
+    if(!between.every(pos=>freeCell(s,pos)))continue;
+    if(!lineOfSight(s,unit.pos,hero.pos,unit.id))continue;
+    options.push({hero,path:[...between].reverse()});
+  }
+  if(!options.length)return null;
+  const {hero,path}=options.sort((a,b)=>priority(s,unit,b.hero,unit.pos)-priority(s,unit,a.hero,unit.pos))[0];
+  unit.vineCd=monsterExtraSkills.plant.cd;
+  emit(s,{kind:'spell',effect:'pull',actor:unit.id,from:unit.pos,pos:hero.pos,element:'chaos'});
+  note(s,unit.name+' usa liana devoradora y arrastra a '+hero.name+'.');
+  move(s,hero,path,false);
+  return hero;
 }
 /**
  * Habilidades de movimiento (salto, excavar, niebla). Devuelve el objetivo junto al que cae, o null.

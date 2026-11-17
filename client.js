@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,glyphText,monsterSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=47';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=47';
-import {setupSfx} from './music.js?v=47';
-import {icon} from './icons.js?v=47';
+  glyphInfo,glyphText,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=48';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=48';
+import {setupSfx} from './music.js?v=48';
+import {icon} from './icons.js?v=48';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -96,7 +96,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=47').then(({createIso})=>{
+import('./isometric.js?v=48').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -431,6 +431,8 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
   if(unit.enemy&&resist.length)nodes.push(h('div','tip-resists',...resist.sort((a,b)=>b[1]-a[1]).map(([key,v])=>
     h('span','resist-chip '+(v>0?'resist':'weak')+' element-'+key,icon(key),(v>0?'Resiste ':'Débil al ')+elements[key].toLowerCase()+' '+Math.abs(v)+' %'))));
   const special=unit.enemy&&!unit.boss&&monsterSkills[unit.look];
+  const extra=unit.enemy&&!unit.boss&&monsterExtraSkills[unit.look];
+  if(extra)nodes.push(h('p','tip-note tip-skill',h('strong',null,extra.name+': '),extra.text+((unit.vineCd??0)<=0?' · ¡Lista!':'')));
   if(special)nodes.push(h('p','tip-note tip-skill',h('strong',null,special.name+': '),special.text+(special.cd&&(unit.cd??1)<=0?' · ¡Lista!':'')));
   const chips=effectChips(unit);
   if(chips)nodes.push(chips);

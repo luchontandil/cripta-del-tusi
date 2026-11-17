@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,skillSchool,monsterTraits,monsterVariants} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -879,4 +879,40 @@ test('hay más tipos de sala y cada acto tiene los suyos',()=>{
   }
   assert.ok(seen.size>=10,'estilos: '+[...seen].join(','));
   assert.ok(byBiome.crypt.size&&byBiome.jungle.size&&byBiome.hell.size,JSON.stringify(Object.fromEntries(Object.entries(byBiome).map(([k,v])=>[k,[...v]]))));
+});
+
+test('planta carnívora: liana en línea recta, alcance infinito, con visión y camino libre',()=>{
+  const setup=()=>{
+    const t=battle('guardia');
+    const h=t.units.find(u=>!u.enemy);
+    for(const u of t.units.filter(u=>u.enemy))u.hp=0;
+    const m=t.units.find(u=>u.enemy);
+    Object.assign(m,{hp:30,max:30,look:'plant',name:'Planta',range:4,cd:5,vineCd:0,damage:2,effects:{},resist:{},stats:{ward:0,movement:-2}});
+    t.walls=[];t.water=[];t.traps=[];t.voids=[];
+    const row=2*t.width;
+    m.pos=row+1;h.pos=row+t.width-2;      // misma fila, lejos (más allá de su alcance normal)
+    t.turn=t.units.indexOf(m);t.enemyPlan=null;t.mp=0;t.ap=4;
+    return {t,h,m};
+  };
+  // Camino libre: lo arrastra hasta pegarlo a la planta.
+  let {t,h,m}=setup();
+  timeout(t);while(t.units[t.turn]===m)timeout(t);
+  assert.equal(distance(t,m.pos,h.pos),1);
+  assert.equal(m.vineCd,monsterExtraSkills.plant.cd);
+  // Un muro, líquido o unidad en medio lo impide.
+  for(const block of ['wall','water','unit']){
+    ({t,h,m}=setup());
+    const mid=m.pos+3;
+    if(block==='wall')t.walls=[mid];
+    if(block==='water')t.water=[mid];
+    if(block==='unit')t.units.push({...h,id:'ally',pos:mid,enemy:false});
+    const start=h.pos;
+    timeout(t);while(t.units[t.turn]===m)timeout(t);
+    assert.equal(h.pos,start,block);
+  }
+  // Fuera de línea recta no la usa.
+  ({t,h,m}=setup());
+  h.pos+=t.width;const start=h.pos;
+  timeout(t);while(t.units[t.turn]===m)timeout(t);
+  assert.equal(h.pos,start);
 });

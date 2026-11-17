@@ -1,11 +1,11 @@
 // Short, synthesized effects. This module never starts a soundtrack.
-import {icon} from './icons.js?v=34';
+import {icon} from './icons.js?v=35';
 export function setupSfx(button){
   let context,master;
   let muted=false;
   // Volúmenes guardados en el navegador (0–1): efectos y ambiente.
   const stored=(key,fallback)=>{try{const v=parseFloat(localStorage.getItem(key));return Number.isFinite(v)?Math.min(1,Math.max(0,v)):fallback;}catch{return fallback;}};
-  let volumeSfx=stored('cripta-sfx-volume',.6),volumeAmbience=stored('cripta-amb-volume',.5);
+  let volumeSfx=stored('cripta-sfx-volume',.7),volumeAmbience=stored('cripta-amb-volume',.6);
   let ambienceBus=null;
   try{muted=localStorage.getItem('cripta-sfx-muted')==='yes';}catch{}
   function ready(){
@@ -16,10 +16,10 @@ export function setupSfx(button){
         if(!Audio)return false;
         context=new Audio();
         master=context.createGain();
-        master.gain.value=.34*volumeSfx;          // volumen base más bajo que antes
+        master.gain.value=.6*volumeSfx;          // volumen base (algo más bajo que el original)
         master.connect(context.destination);
         ambienceBus=context.createGain();
-        ambienceBus.gain.value=.34*volumeAmbience;
+        ambienceBus.gain.value=.75*volumeAmbience;
         ambienceBus.connect(context.destination);
       }
       if(context.state!=='running')context.resume().catch(()=>{});
@@ -96,7 +96,7 @@ export function setupSfx(button){
     ambienceKey=key;
     if(ambience){const old=ambience;old.gain.gain.setTargetAtTime(0,context.currentTime,.6);setTimeout(()=>old.source.stop(),3000);ambience=null;}
     if(!key||!ready()||!bank?.[key])return;
-    const file=pickFile(key),level=.6*(mix[key]?.volume??1);
+    const file=pickFile(key),level=.8*(mix[key]?.volume??1);
     buffer(file).then(data=>{
       if(!data||ambienceKey!==key||muted)return;
       const source=context.createBufferSource(),gain=context.createGain();
@@ -152,10 +152,10 @@ export function setupSfx(button){
   }
   muteBox.addEventListener('change',()=>setMuted(!muteBox.checked));
   sfxRange.addEventListener('input',()=>{volumeSfx=sfxRange.value/100;try{localStorage.setItem('cripta-sfx-volume',volumeSfx);}catch{}
-    if(master)master.gain.value=.34*volumeSfx;reflect();});
+    if(master)master.gain.value=.6*volumeSfx;reflect();});
   sfxRange.addEventListener('change',()=>play('hit'));
   ambRange.addEventListener('input',()=>{volumeAmbience=ambRange.value/100;try{localStorage.setItem('cripta-amb-volume',volumeAmbience);}catch{}
-    if(ambienceBus)ambienceBus.gain.value=.34*volumeAmbience;reflect();});
+    if(ambienceBus)ambienceBus.gain.value=.75*volumeAmbience;reflect();});
   reflect();
   button.addEventListener('click',()=>{menu.hidden=!menu.hidden;if(!menu.hidden){place();ready();}reflect();});
   document.addEventListener('pointerdown',event=>{if(!menu.hidden&&!menu.contains(event.target)&&!button.contains(event.target)){menu.hidden=true;reflect();}});

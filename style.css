@@ -990,3 +990,11 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 .tip-row.element-magic .tip-value{color:var(--magic)}.tip-row.element-lightning .tip-value{color:var(--lightning)}.tip-row.element-chaos .tip-value{color:var(--chaos)}
 .ability-element.element-magic{color:var(--magic)}.ability-element.element-lightning{color:var(--lightning)}.ability-element.element-chaos{color:var(--chaos)}
 .tip-row.school-physical .tip-value{color:var(--physical)}.tip-row.school-magic .tip-value{color:var(--magic)}
+.tip-resists{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.resist-chip{display:inline-flex;align-items:center;gap:3px;font-size:.72rem;padding:1px 6px;border-radius:4px;border:1px solid #ffffff22}
+.resist-chip .icon{width:13px;height:13px}
+.resist-chip.resist{background:#ffffff0d}
+.resist-chip.weak{background:#ff6a4a1f;border-color:#ff6a4a55;color:#ffb3a0}
+.resist-chip.element-physical .icon{color:var(--physical)}.resist-chip.element-magic .icon{color:var(--magic)}.resist-chip.element-fire .icon{color:var(--fire)}
+.resist-chip.element-ice .icon{color:var(--ice)}.resist-chip.element-lightning .icon{color:var(--lightning)}.resist-chip.element-chaos .icon{color:var(--chaos)}
+.tip-variant strong{color:#ff9a5c}

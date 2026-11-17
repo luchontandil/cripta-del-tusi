@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,skillSchool} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,skillSchool,monsterTraits,monsterVariants} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -10,6 +10,13 @@ function battle(...classes) {
   classes.forEach((kind,i)=>join(s,'p'+i,'Jugador '+i,kind));
   act(s,'p0',{type:'start'},rng);
   enterCombat(s);
+  // Enemigos «neutros» para las pruebas de daño exacto: sin resistencias ni variantes.
+  for(const u of s.units.filter(u=>u.enemy&&!u.boss)){
+    const fresh=monsterTraits[u.look]||{};
+    if(u.variant){u.variant=null;u.drain=u.hamstring=false;u.lifesteal=0;}
+    u.resist={};
+    u.stats.ward=(fresh.ward||0)+(u.elite?2:0);u.stats.movement=fresh.movement||0;
+  }
   return s;
 }
 /** Vota en el mapa un nodo de combate normal para entrar a pelear. */
@@ -823,4 +830,53 @@ test('daño: físicas suman solo el físico; hechizos suman mágico + su element
   const magic=damagePreview(mage,target,skill('mago','Bola de fuego')).normal[0];
   assert.equal(phys,skill('tirador','Flecha ígnea')[3]+3-4);
   assert.equal(magic,skill('mago','Bola de fuego')[3]+12);
+});
+
+test('resistencias, debilidades, drenaje de PA/PM y variantes',()=>{
+  const s=battle('mago');
+  const hero=s.units.find(u=>!u.enemy);
+  const foe=s.units.find(u=>u.enemy);
+  foe.stats.ward=0;
+  const fireball=classes.mago.skills.find(sk=>sk[0]==='Bola de fuego');
+  const base=damagePreview(hero,foe,fireball).normal;
+  foe.resist={fire:50};
+  assert.deepEqual(damagePreview(hero,foe,fireball).normal,base.map(v=>Math.floor(v*.5)));
+  foe.resist={fire:-50};
+  assert.deepEqual(damagePreview(hero,foe,fireball).normal,base.map(v=>Math.floor(v*1.5)));
+  // Cada especie normal tiene al menos una resistencia o debilidad.
+  for(const [species,t] of Object.entries(monsterTraits))assert.ok(Object.keys(t.resist||{}).length,species);
+  assert.ok(Object.keys(monsterVariants).length>=8);
+  // Un vampiro drena PA y un murciélago quita PM.
+  for(const [look,key] of [['vampire','weak'],['bat','slow']]){
+    const t=battle('guardia');
+    const h=t.units.find(u=>!u.enemy);
+    for(const u of t.units.filter(u=>u.enemy))u.hp=0;
+    const m=t.units.find(u=>u.enemy);
+    Object.assign(m,{hp:30,max:30,look,range:1,cd:5,damage:2,effects:{},resist:{},stats:{ward:0,movement:0}});
+    t.walls=[];t.water=[];t.traps=[];
+    m.pos=h.pos-1;h.effects={};
+    t.turn=t.units.indexOf(m);t.enemyPlan=null;t.mp=0;t.ap=4;
+    timeout(t);while(t.units[t.turn]===m)timeout(t);
+    assert.ok(h.effects[key],look+' → '+key);
+  }
+});
+test('hay más tipos de sala y cada acto tiene los suyos',()=>{
+  const seen=new Set(),byBiome={crypt:new Set(),jungle:new Set(),hell:new Set()};
+  let seed=12345;const rng=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+  for(let actNo=1;actNo<=3;actNo++)for(let i=0;i<25;i++){
+    const s=battle('guardia');
+    s.route=makeRoute(rng,actNo);
+    s.floor=(actNo-1)*8+1+(i%3);
+    s.phase='reward';s.picks=['p0'];
+    act(s,'p0',{type:'next'},rng);
+    for(let k=0;k<6&&s.phase!=='combat';k++){
+      if(s.phase==='map')act(s,'p0',{type:'vote',option:0},rng);
+      else if(s.phase==='event')act(s,'p0',{type:'vote',option:0},rng);
+      else timeout(s);
+    }
+    if(s.phase!=='combat')continue;
+    seen.add(s.layoutStyle);byBiome[s.biome]?.add(s.layoutStyle);
+  }
+  assert.ok(seen.size>=10,'estilos: '+[...seen].join(','));
+  assert.ok(byBiome.crypt.size&&byBiome.jungle.size&&byBiome.hell.size,JSON.stringify(Object.fromEntries(Object.entries(byBiome).map(([k,v])=>[k,[...v]]))));
 });

@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  glyphInfo,glyphText,monsterSkills,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=45';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=45';
-import {setupSfx} from './music.js?v=45';
-import {icon} from './icons.js?v=45';
+  glyphInfo,glyphText,monsterSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=46';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=46';
+import {setupSfx} from './music.js?v=46';
+import {icon} from './icons.js?v=46';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -96,7 +96,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=45').then(({createIso})=>{
+import('./isometric.js?v=46').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -376,6 +376,8 @@ function traitNote(trait={}){
   if(trait.lifesteal)parts.push('roba vida');
   if(trait.charm)parts.push('encanta (−1 PM)');
   if(trait.slime)parts.push('su baba resta 1 PM');
+  if(trait.drain)parts.push('sus golpes quitan 1 PA');
+  if(trait.hamstring)parts.push('sus golpes quitan 1 PM');
   if(trait.poison)parts.push('envenena');
   if(trait.movement<0)parts.push('casi no se mueve');
   if(trait.movement>0)parts.push('muy rápido');
@@ -424,6 +426,10 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
   nodes.push(stats);
   const note=unit.boss?bosses[unit.look]?.powers:traitNote(monsterTraits[unit.look]);
   if(unit.enemy&&note)nodes.push(h('p','tip-note',note));
+  if(unit.enemy&&unit.variant)nodes.push(h('p','tip-note tip-variant',h('strong',null,'Variante '+monsterVariants[unit.variant].name+': '),monsterVariants[unit.variant].text+'.'));
+  const resist=Object.entries(unit.resist||{}).filter(([,v])=>v);
+  if(unit.enemy&&resist.length)nodes.push(h('div','tip-resists',...resist.sort((a,b)=>b[1]-a[1]).map(([key,v])=>
+    h('span','resist-chip '+(v>0?'resist':'weak')+' element-'+key,icon(key),(v>0?'Resiste ':'Débil al ')+elements[key].toLowerCase()+' '+Math.abs(v)+' %'))));
   const special=unit.enemy&&!unit.boss&&monsterSkills[unit.look];
   if(special)nodes.push(h('p','tip-note tip-skill',h('strong',null,special.name+': '),special.text+(special.cd&&(unit.cd??1)<=0?' · ¡Lista!':'')));
   const chips=effectChips(unit);
@@ -1534,7 +1540,7 @@ async function request(base,path,body,key){
   return result;
 }
 /** Sonido de cada acción del jugador fuera del combate (equipo, tienda, botín, mejora). */
-const actionSounds={equip:'equip',unequip:'equip',socket:'equip',unsocket:'equip',buy:'coins',sell:'coins',give:'coins',reward:'loot',train:'levelup',vote:'page',ready:'door',next:'door'};
+const actionSounds={equip:'equip',unequip:'equip',socket:'equip',unsocket:'equip',buy:'coins',sell:'coins',give:'coins',vote:'page',ready:'door',next:'door'};
 async function send(action){
   if(busy)return;
   if(actionSounds[action.type])sfx(actionSounds[action.type],{volume:action.type==='train'?.7:.8});

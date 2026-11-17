@@ -366,18 +366,48 @@ export const bosses={
 const actBosses=[[['skeletonking'],['umbralking']],[['cerberus'],['sporemother']],[['oracle','vampqueen'],['firedemon']]];
 /** Rasgos de cada monstruo: elemento de su ataque, robo de vida, encanto, armadura, movimiento. */
 export const monsterTraits={
-  bat:{movement:1,initiative:9},
-  skull:{element:'magic'},
-  skeleton:{ward:2,initiative:7},
-  succubus:{element:'chaos',charm:true,range:5,initiative:12},
-  vampire:{lifesteal:.5,element:'chaos',initiative:10},
-  imp:{element:'fire',range:6,initiative:13},
-  worm:{ward:2},
-  slimeking:{ward:1},
-  slug:{ward:1,slime:true,initiative:5},
-  plant:{range:4,movement:-2,poison:true,initiative:8},
-  lavaslime:{element:'fire',ward:1,initiative:7}
+  bat:{movement:1,initiative:9,hamstring:true,resist:{lightning:-30,physical:-15}},
+  skull:{element:'magic',drain:true,resist:{chaos:60,magic:30,physical:20}},
+  skeleton:{ward:2,initiative:7,resist:{chaos:50,ice:30,fire:-25}},
+  succubus:{element:'chaos',charm:true,range:5,initiative:12,resist:{chaos:40,magic:25,ice:-25}},
+  vampire:{lifesteal:.5,element:'chaos',initiative:10,drain:true,resist:{chaos:50,fire:-30}},
+  imp:{element:'fire',range:6,initiative:13,resist:{fire:75,ice:-30}},
+  worm:{ward:2,resist:{physical:15,ice:-25}},
+  slimeking:{ward:1,resist:{physical:30,lightning:-30}},
+  slime:{resist:{physical:25,fire:-25}},
+  slug:{ward:1,slime:true,initiative:5,resist:{chaos:30,ice:-30}},
+  plant:{range:4,movement:-2,poison:true,initiative:8,resist:{chaos:50,fire:-50}},
+  lavaslime:{element:'fire',ward:1,initiative:7,resist:{fire:80,ice:-50}}
 };
+/** Resistencias de los jefes. */
+export const bossResist={skeletonking:{chaos:50,fire:-20},umbralking:{magic:30,lightning:-20},cerberus:{fire:30,ice:-20},
+  sporemother:{chaos:50,fire:-40},oracle:{fire:50,ice:-25},vampqueen:{chaos:50,fire:-25},firedemon:{fire:80,ice:-40}};
+/**
+ * Variantes de monstruo (campeones): aparecen más a menudo en actos avanzados.
+ * Suman armadura, velocidad, daño, resistencias o efectos al golpear (−PA, −PM, robo de vida).
+ */
+export const monsterVariants={
+  acorazado:{name:'acorazado',text:'+3 de armadura',apply:u=>{u.stats.ward+=3;}},
+  veloz:{name:'veloz',text:'+1 PM y más iniciativa',apply:u=>{u.stats.movement+=1;u.initiative+=4;}},
+  furioso:{name:'furioso',text:'+25 % de daño',apply:u=>{u.damage=Math.ceil(u.damage*1.25);}},
+  ignifugo:{name:'ignífugo',text:'Resiste el fuego (+50 %)',apply:u=>{u.resist.fire=(u.resist.fire||0)+50;}},
+  escarchado:{name:'escarchado',text:'Resiste el hielo (+50 %)',apply:u=>{u.resist.ice=(u.resist.ice||0)+50;}},
+  aislado:{name:'aislado',text:'Resiste el rayo y la magia (+40 %)',apply:u=>{u.resist.lightning=(u.resist.lightning||0)+40;u.resist.magic=(u.resist.magic||0)+40;}},
+  maldito:{name:'maldito',text:'Sus golpes quitan 1 PA',apply:u=>{u.drain=true;}},
+  pegajoso:{name:'pegajoso',text:'Sus golpes quitan 1 PM',apply:u=>{u.hamstring=true;}},
+  sanguinario:{name:'sanguinario',text:'Roba un 30 % del daño',apply:u=>{u.lifesteal=Math.max(u.lifesteal||0,.3);}}
+};
+/** Convierte a un monstruo en una variante (o no) según el acto. */
+function maybeVariant(u,act,rng){
+  if(!rng||u.boss||rng()>=.12+.1*act)return u;
+  const keys=Object.keys(monsterVariants);
+  const key=keys[Math.floor(rng()*keys.length)];
+  monsterVariants[key].apply(u);
+  u.variant=key;
+  u.name=u.name+' '+monsterVariants[key].name;
+  u.hp=Math.round(u.hp*1.15);
+  return u;
+}
 /** Habilidad propia de cada monstruo (con recarga en turnos del propio monstruo). */
 export const monsterSkills={
   skeleton:{name:'Golpe de escudo',cd:3,text:'Cada 3 turnos golpea con el escudo: empuja 1 casilla y resta 1 PM.'},
@@ -402,14 +432,14 @@ function monster(species,id,floor,{ranged=false,elite=false,solo=false}={}){
   const trait=monsterTraits[species]||{};
   const factor=(ranged?.75:elite?1.15:1)*(solo?.85:1);
   const hp=Math.round((16+4*floor)*factor);
-  return {id,name:monsterNames[species],look:species,boss:false,elite,enemy:true,
+  return {id,name:monsterNames[species],look:species,boss:false,elite,enemy:true,resist:{...(trait.resist||{})},
     initiative:trait.initiative||(ranged?11:6),range:trait.range||(ranged?8:1),hp,
     damage:Math.max(1,Math.round((ranged?2+floor:3+floor)*(solo?.85:1))),
     stats:{ward:(trait.ward||0)+(elite?2:0),movement:trait.movement||0},effects:{}};
 }
 export function encounter(floor,size,options={}) {
   if(typeof options==='boolean')options={elite:options};
-  const {elite=false,boss=null}=options;
+  const {elite=false,boss=null,rng=null}=options;
   const act=actOf(floor),local=actFloor(floor);
   const solo=size===1;
   const life=fauna[act-1];
@@ -420,14 +450,14 @@ export function encounter(floor,size,options={}) {
       const info=bosses[boss];
       lineup.push({id:'enemy0',name:info.name,look:boss,boss:true,elite:false,enemy:true,initiative:info.initiative,range:info.range,
         hp:Math.round((48+floor*6+8*(size-1))*info.hp*(solo?.9:1)),damage:4+floor,element:info.element,
-        stats:{ward:3,movement:0},effects:{},cycle:0});
+        stats:{ward:3,movement:0},effects:{},cycle:0,resist:{...(bossResist[boss]||{})}});
       continue;
     }
     const ranged=i%2===1&&local+(act-1)*8>1;
     const isElite=!ranged&&(elite&&i===0||(local>=5&&i===2));
     const pool=ranged?life.ranged:life.melee;
-    const species=isElite?life.elite:pool[(i+floor)%pool.length];
-    lineup.push(monster(species,'enemy'+i,floor,{ranged,elite:isElite,solo}));
+    const species=isElite?life.elite:pool[rng?Math.floor(rng()*pool.length):(i+floor)%pool.length];
+    lineup.push(maybeVariant(monster(species,'enemy'+i,floor,{ranged,elite:isElite,solo}),act,rng));
   }
   if(!elite)return lineup;
   // Combate de élite: enemigos reforzados; en grupo, además, un refuerzo extra.
@@ -528,17 +558,83 @@ const roomStyles={
   columnata(cells,area,rng){
     const ox=roll(0,1,rng),oy=roll(0,1,rng);
     for(let y=area.y0+oy;y<=area.y1;y+=2)for(let x=area.x0+ox;x<=area.x1;x+=2)if(rng()<.55)cells.push([x,y]);
+  },
+  // Anillo alrededor del centro con 2-3 entradas: se pelea dentro y fuera.
+  anillo(cells,area,rng){
+    const cx=Math.round((area.x0+area.x1)/2),cy=Math.round((area.y0+area.y1)/2),r=Math.max(1,Math.min(2,Math.floor((area.y1-area.y0)/2)));
+    const ring=[];
+    for(let x=cx-r-1;x<=cx+r+1;x++)for(let y=cy-r;y<=cy+r;y++){
+      const edge=x===cx-r-1||x===cx+r+1||y===cy-r||y===cy+r;
+      if(edge)ring.push([x,y]);
+    }
+    const gaps=roll(2,3,rng);
+    for(let i=0;i<gaps;i++)ring.splice(roll(0,ring.length-1,rng),2);
+    cells.push(...ring);
+  },
+  // Línea diagonal de obstáculos con algún hueco: divide la sala en dos triángulos.
+  diagonal(cells,area,rng){
+    const up=rng()<.5,len=area.x1-area.x0;
+    for(let i=0;i<=len;i++){
+      if(rng()<.22)continue;
+      const y=Math.round(area.y0+(area.y1-area.y0)*(up?i/len:1-i/len));
+      cells.push([area.x0+i,y]);
+    }
+  },
+  // Islas: bloques de 2×2 separados por pasillos anchos.
+  islas(cells,area,rng){
+    for(let i=roll(2,3,rng);i>0;i--){
+      const x=roll(area.x0,area.x1-1,rng),y=roll(area.y0,area.y1-1,rng);
+      cells.push([x,y],[x+1,y],[x,y+1],[x+1,y+1]);
+    }
+  },
+  // Muros escalonados en zigzag: hay que rodearlos para avanzar.
+  zigzag(cells,area,rng){
+    let top=rng()<.5;
+    for(let x=area.x0+1;x<=area.x1;x+=2){
+      const len=roll(2,3,rng);
+      for(let j=0;j<len;j++)cells.push([x,top?area.y0+j:area.y1-j]);
+      top=!top;
+    }
+  },
+  // Cruz central: cuatro brazos cortos que forman cuatro cuadrantes.
+  cruz(cells,area,rng){
+    const cx=Math.round((area.x0+area.x1)/2),cy=Math.round((area.y0+area.y1)/2),arm=roll(1,2,rng);
+    cells.push([cx,cy]);
+    for(let j=1;j<=arm;j++)cells.push([cx+j,cy],[cx-j,cy],[cx,cy+j],[cx,cy-j]);
+  }
+};
+/** Estilos propios de cada acto (se suman a los comunes). */
+const biomeStyles={
+  crypt:{
+    // Hileras de sarcófagos con pasillos entre ellas.
+    nichos(cells,area,rng){
+      for(let y=area.y0+roll(0,1,rng);y<=area.y1;y+=3)for(let x=area.x0;x<=area.x1;x++)if(rng()<.6&&(x-area.x0)%4!==3)cells.push([x,y]);
+    }
+  },
+  jungle:{
+    // Arboleda densa: muchos troncos sueltos.
+    arboleda(cells,area,rng){
+      for(let i=roll(7,10,rng);i>0;i--)cells.push([roll(area.x0,area.x1,rng),roll(area.y0,area.y1,rng)]);
+    }
+  },
+  hell:{
+    // Picos de obsidiana en dos frentes enfrentados.
+    frentes(cells,area,rng){
+      const a=area.x0+1,b=area.x1-1;
+      for(let y=area.y0;y<=area.y1;y++){if(rng()<.5)cells.push([a,y]);if(rng()<.5)cells.push([b,y]);}
+    }
   }
 };
 function makeLayout(s,rng){
   const w=s.width;
   const h=s.height;
   const biome=s.biome||'crypt';
-  const style=pick(Object.keys(roomStyles).filter(key=>key!==s.layoutStyle),rng);
+  const styles={...roomStyles,...(biomeStyles[biome]||{})};
+  const style=pick(Object.keys(styles).filter(key=>key!==s.layoutStyle),rng);
   // Los obstáculos van en el centro: las columnas de salida de cada bando quedan libres.
   const area={x0:4,x1:w-5,y0:rng()<.5?0:1,y1:h-1-(rng()<.5?0:1)};
   const cells=[];
-  roomStyles[style](cells,area,rng);
+  styles[style](cells,area,rng);
   // A veces la sala sale simétrica (en espejo arriba/abajo).
   if(rng()<.4)for(const [x,y] of [...cells])cells.push([x,h-1-y]);
   const walls=[];
@@ -573,6 +669,17 @@ function makeLayout(s,rng){
   const water=[];
   const open=candidates.filter(pos=>!boundary.has(pos));
   // Charcas en la mazmorra, ciénagas grandes en la jungla y ríos de lava en el infierno.
+  // Infierno: a veces un río de lava vertical con uno o dos puentes.
+  if(biome==='hell'&&s.floor>1&&rng()<.45){
+    const x=roll(area.x0+1,Math.max(area.x0+1,area.x1-1),rng);
+    const bridges=new Set([roll(0,h-1,rng),roll(0,h-1,rng)]);
+    for(let y=0;y<h;y++){
+      const pos=y*w+x;
+      if(bridges.has(y)||!open.includes(pos)||boundary.has(pos))continue;
+      boundary.add(pos);
+      if(connected())water.push(pos);else boundary.delete(pos);
+    }
+  }
   const pools=s.floor===1?1:biome==='jungle'?roll(2,4,rng):biome==='hell'?roll(1,3,rng):roll(0,2,rng);
   for(let i=0;i<pools&&open.length;i++){
     let pos=open[roll(0,open.length-1,rng)];
@@ -699,7 +806,7 @@ function openFloor(s,rng,elite=false,boss=null) {
       hp:previous?Math.min(max,Math.max(previous.hp,0)+Math.ceil(max*.45)):max,
       pos:heroPositions[i],effects:{}};
   });
-  const lineup=encounter(s.floor,s.players.length,{elite,boss});
+  const lineup=encounter(s.floor,s.players.length,{elite,boss,rng:floorRandom((s.mapSeed^0x9e3779b9)>>>0)});
   const scale=enemyScaling(s.floor,heroes);
   s.scaling=scale;
   if(s.mods.startHpPct)for(const hero of heroes)hero.hp=Math.max(1,Math.min(hero.hp,Math.ceil(hero.max*s.mods.startHpPct)));
@@ -754,7 +861,10 @@ export function paths(s,unit,limit) {
 export const reachable=(s,unit,limit)=>new Map([...paths(s,unit,limit)].map(([pos,path])=>[pos,path.length]));
 function netDamage(target,raw,element,critical,extra=0){
   const ward=(target.stats?.ward||0)+(target.effects?.shield?.value||0);
-  return Math.max(0,Math.floor((raw+extra)*(critical?1.5:1))-(element==='physical'?ward:Math.floor((target.effects?.shield?.value||0)/2)));
+  // Resistencia (o debilidad, si es negativa) al tipo de daño, en %.
+  const resist=Math.max(-100,Math.min(90,target.resist?.[element]||0));
+  const base=Math.floor((raw+extra)*(critical?1.5:1)*(1-resist/100));
+  return Math.max(0,base-(element==='physical'?ward:Math.floor((target.effects?.shield?.value||0)/2)));
 }
 export const critChance=unit=>Math.min(1,.12+(unit.stats?.critical||0)/100);
 export function damagePreview(unit,target,skill){
@@ -1344,7 +1454,7 @@ function monsterAttack(s,unit,target,rng){
     if(special==='plant'){effect(target,'slow',3,1);note(s,target.name+' queda atrapado por raíces.');}
     if(special==='succubus')drag(s,unit,target,2);
   }
-  const steal=unit.look==='vampqueen'?1:trait.lifesteal||0;
+  const steal=unit.look==='vampqueen'?1:Math.max(trait.lifesteal||0,unit.lifesteal||0);
   if(steal&&dealt){
     const amount=Math.min(unit.max-unit.hp,Math.ceil(dealt*steal));
     if(amount>0){
@@ -1360,6 +1470,14 @@ function monsterAttack(s,unit,target,rng){
   if(trait.poison&&alive(target)){
     effect(target,'poison',1+Math.floor(s.floor/4),2);
     note(s,unit.name+' envenena a '+target.name+'.');
+  }
+  if((trait.drain||unit.drain)&&alive(target)&&!target.effects.weak){
+    effect(target,'weak',1,1);
+    note(s,unit.name+' drena la voluntad de '+target.name+': −1 PA en su próximo turno.');
+  }
+  if((trait.hamstring||unit.hamstring)&&alive(target)){
+    effect(target,'slow',1,1);
+    note(s,unit.name+' entorpece a '+target.name+': −1 PM en su próximo turno.');
   }
   if(trait.charm&&alive(target)){
     effect(target,'slow',1,1);

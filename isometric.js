@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=69';
-import {playerColors} from './engine.js?v=69';
+import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=70';
+import {playerColors} from './engine.js?v=70';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -140,7 +140,8 @@ export function createIso(mount,onCell){
   fill.position.set(5,6,-7);
   scene.add(fill);
   const camera=new T.OrthographicCamera(-1,1,1,-1,.1,100);
-  const pixels=new T.WebGLRenderTarget(1,1,{minFilter:T.NearestFilter,magFilter:T.NearestFilter});
+  // Render a resolución completa con antialiasing (MSAA ×4): bordes suaves, sin el granulado de antes.
+  const pixels=new T.WebGLRenderTarget(1,1,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,samples:4});
   const screen=new T.Scene();
   const screenCamera=new T.OrthographicCamera(-1,1,1,-1,0,2);
   screenCamera.position.z=1;
@@ -149,14 +150,14 @@ export function createIso(mount,onCell){
     vertexShader:`varying vec2 tex; void main(){tex=uv;gl_Position=vec4(position.xy,0.,1.);}`,
     fragmentShader:`uniform sampler2D image; uniform vec2 resolution; uniform float time; varying vec2 tex;
       void main(){
-        vec2 p=floor(tex*resolution);
-        vec4 base=texture2D(image,(p+.5)/resolution);
+        vec2 p=tex*resolution;
+        vec4 base=texture2D(image,tex);
         // Brillo suave: muestras vecinas de las zonas más luminosas.
         vec3 glow=vec3(0.);
         for(int i=0;i<8;i++){
           float a=float(i)*.785398;
           vec2 o=vec2(cos(a),sin(a))*3.5/resolution;
-          vec3 c=texture2D(image,(p+.5)/resolution+o).rgb;
+          vec3 c=texture2D(image,tex+o).rgb;
           glow+=max(c-.62,0.);
         }
         gl_FragColor=vec4(base.rgb+glow*.08,base.a);
@@ -167,13 +168,12 @@ export function createIso(mount,onCell){
         float l=dot(c,vec3(.299,.587,.114));
         c=mix(c,c*vec3(.92,.95,1.12),1.-smoothstep(.0,.45,l));
         c=mix(c,c*vec3(1.07,1.0,.9),smoothstep(.5,1.,l));
-        c=mix(vec3(l),c,1.12);
-        c=(c-.5)*1.12+.5;
-        // Viñeta.
+        c=mix(vec3(l),c,1.06);
+        c=(c-.5)*1.05+.5;
+        // Viñeta suave (sin tramado ni reducción de colores: cansaban la vista).
         vec2 v=tex-.5;
-        c*=1.-dot(v,v)*.42;
-        float threshold=mod(p.x+p.y*2.,4.)/4.-.375;
-        gl_FragColor.rgb=clamp(floor(clamp(c,0.,1.)*14.+.5+threshold)/14.,0.,1.);
+        c*=1.-dot(v,v)*.3;
+        gl_FragColor.rgb=clamp(c,0.,1.);
       }`,
     transparent:true,depthTest:false
   });
@@ -198,6 +198,8 @@ export function createIso(mount,onCell){
   let routeSignature='';
   let previousFrame=0;
   let magnification=1.13;
+  // Desplazamiento de la cámara (para hacer zoom hacia donde apunta el ratón).
+  const pan={x:0,z:0};
   const routeGroup=new T.Group();
   stage.add(routeGroup);
 
@@ -208,13 +210,18 @@ export function createIso(mount,onCell){
     if(lastRect.width!==viewWidth||lastRect.height!==viewHeight){
       viewWidth=lastRect.width;
       viewHeight=lastRect.height;
+      const density=Math.min(2,window.devicePixelRatio||1);
+      renderer.setPixelRatio(density);
       renderer.setSize(viewWidth,viewHeight,false);
-      const density=.5;
       pixels.setSize(Math.max(1,Math.round(viewWidth*density)),Math.max(1,Math.round(viewHeight*density)));
       pixelMaterial.uniforms.resolution.value.set(pixels.width,pixels.height);
     }
-    camera.position.set(17,17.5,18);
-    camera.lookAt(0,.25,0);
+    // Con poco zoom la cámara vuelve al centro; con más zoom puede desplazarse hasta los bordes del tablero.
+    const room=Math.max(0,(magnification-.95)/(1.45-.95));
+    pan.x=clamp(pan.x,-state.width/2*room,state.width/2*room);
+    pan.z=clamp(pan.z,-state.height/2*room,state.height/2*room);
+    camera.position.set(17+pan.x,17.5,18+pan.z);
+    camera.lookAt(pan.x,.25,pan.z);
     camera.updateMatrixWorld();
     const halfW=state.width/2+.55,halfH=state.height/2+.55;
     let sizeX=0,sizeY=0;
@@ -352,6 +359,7 @@ export function createIso(mount,onCell){
     torches.length=0;
     torchLights.length=0;
     gasPuffs.length=0;
+    pan.x=pan.z=0;
     const mode=state.biome||'crypt';
     scene.fog.color.set(biomeFog[mode]||'#100d1a');
     // Luz de cada acto: mazmorra fría y oscura, jungla verde y húmeda, infierno rojo.
@@ -398,11 +406,20 @@ export function createIso(mount,onCell){
         for(const [dx,dz] of [[-.17,-.17],[.17,-.17],[-.17,.17],[.17,.17],[0,0]])
           piece(stage,'cone','#c9c3d6',coord.x+dx,.11,coord.z+dz,.1,.2,.1).castShadow=true;
       }else if(trap?.kind==='gas'){
-        piece(stage,'disc','#1b1622',coord.x,.006,coord.z,.6,.02,.6);
-        for(const d of [-.12,0,.12])piece(stage,'cube','#3a3346',coord.x+d,.02,coord.z,.04,.02,.5);
-        const puff=piece(stage,'orb','#b9e574',coord.x,.22,coord.z,.38,.26,.38,true);
-        puff.material=new T.MeshBasicMaterial({color:'#b9e574',transparent:true,opacity:.22,depthWrite:false});
-        gasPuffs.push(puff);
+        // Respiradero de piedra: aro, rejilla y un brillo verde por debajo; de él salen volutas pequeñas.
+        piece(stage,'disc','#2b2632',coord.x,.008,coord.z,.62,.03,.62);
+        const glow=piece(stage,'disc','#7fbf3a',coord.x,.012,coord.z,.44,.012,.44,true);
+        glow.material=new T.MeshBasicMaterial({color:'#8fd14a',transparent:true,opacity:.55,depthWrite:false});
+        for(const d of [-.13,0,.13]){
+          piece(stage,'cube','#4a4352',coord.x+d,.03,coord.z,.045,.03,.46);
+          piece(stage,'cube','#4a4352',coord.x,.031,coord.z+d,.46,.03,.045);
+        }
+        for(let i=0;i<4;i++){
+          const wisp=piece(stage,'orb','#c6ec8a',coord.x,.1,coord.z,.12,.12,.12,true);
+          wisp.material=new T.MeshBasicMaterial({color:'#c6ec8a',transparent:true,opacity:0,depthWrite:false});
+          wisp.userData={x:coord.x,z:coord.z,phase:i/4,angle:i*1.9+pos};
+          gasPuffs.push(wisp);
+        }
       }
       const overlay=new T.Mesh(flatTile,overlayMaterial(overlayColors.walk));
       overlay.position.set(coord.x,.012,coord.z);
@@ -603,7 +620,7 @@ export function createIso(mount,onCell){
     if(!active||e.ctrlKey||e.deltaY===0)return;
     e.preventDefault();
     const pixels=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?viewHeight:1);
-    zoom(clamp(-pixels*.0012,-.16,.16));
+    zoom(clamp(-pixels*.0012,-.16,.16),e);
   },{passive:false});
   renderer.domElement.addEventListener('webglcontextlost',e=>{
     e.preventDefault();
@@ -628,6 +645,19 @@ export function createIso(mount,onCell){
     const model=models.get(event.unit);
     if(!model)return Promise.resolve();
     const points=[event.from,...event.path].map(pos=>logical(state,pos));
+    if(event.blink){
+      // Teletransporte: nube de sombra en el origen, aparece de golpe en el destino.
+      const time=performance.now(),end=points.at(-1);
+      for(const [p,delay] of [[points[0],0],[end,140]])for(let j=0;j<(reduced?3:7);j++){
+        const angle=j/7*Math.PI*2,r=.12+(j%3)*.07;
+        const puff=piece(transient,'orb',j%2?'#2a1838':'#7d4fb0',p.x+Math.cos(angle)*r,.25+(j%3)*.18,p.z+Math.sin(angle)*r,.22,.22,.22,j%2===0);
+        puff.visible=!delay;
+        effects.push({mesh:puff,start:time+delay,duration:460,fade:true,size:.24});
+      }
+      model.root.position.copy(points[0]);
+      model.root.visible=false;
+      return new Promise(resolve=>setTimeout(()=>{model.root.position.copy(end);model.root.visible=true;model.hurt=null;resolve();},170));
+    }
     model.root.position.copy(points[0]);
     return new Promise(resolve=>steps.set(event.unit,{points,elapsed:0,first:true,resolve}));
   }
@@ -712,11 +742,14 @@ export function createIso(mount,onCell){
     for(const [index,light] of torchLights.entries()){
       light.intensity=reduced?14:12.5+Math.sin(now*.011+index*2.1)*1.6+Math.sin(now*.027+index)*1.1;
     }
-    for(const [index,puff] of gasPuffs.entries()){
-      const k=reduced?0:now*.0015+index*1.7;
-      puff.position.y=.2+Math.sin(k)*.05;
-      puff.scale.set(.36+Math.sin(k*1.3)*.05,.24+Math.sin(k)*.04,.36+Math.cos(k*1.1)*.05);
-      puff.material.opacity=.16+Math.sin(k*2)*.06;
+    for(const puff of gasPuffs){
+      // Cada voluta sube despacio, se ensancha y se desvanece; luego vuelve a nacer en la rejilla.
+      const {x,z,phase,angle}=puff.userData;
+      const t=reduced?phase:((now*.00035+phase)%1);
+      const drift=t*.16;
+      puff.position.set(x+Math.cos(angle+t*2)*drift,.06+t*.62,z+Math.sin(angle+t*2)*drift);
+      puff.scale.setScalar(.08+t*.2);
+      puff.material.opacity=Math.sin(t*Math.PI)*.38;
     }
     for(const [index,flame] of torches.entries()){
       const t=reduced?0:now*.007+index;
@@ -862,9 +895,21 @@ export function createIso(mount,onCell){
     renderer.render(screen,screenCamera);
     frame=requestAnimationFrame(draw);
   }
-  function zoom(delta){
+  /** Punto del suelo bajo el ratón (o el centro de la vista). */
+  function groundAt(event){
+    const rect=mount.getBoundingClientRect();
+    mouse.set(event?(event.clientX-rect.left)/rect.width*2-1:0,event?1-(event.clientY-rect.top)/rect.height*2:0);
+    ray.setFromCamera(mouse,camera);
+    return ray.ray.intersectPlane(plane,world)?{x:world.x,z:world.z}:null;
+  }
+  /** Zoom hacia el punto que señala el ratón: ese punto se queda quieto bajo el puntero. */
+  function zoom(delta,event=null){
+    if(!state)return;
+    const before=groundAt(event);
     magnification=clamp(magnification+delta,.85,1.45);
     fit();
+    const after=groundAt(event);
+    if(before&&after){pan.x+=before.x-after.x;pan.z+=before.z-after.z;fit();}
   }
   return {show,sync,anchor,highlight,move,impact,zoom,resetHover(){hover=null;},get active(){return active;}};
 }

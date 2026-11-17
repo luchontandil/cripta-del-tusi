@@ -51,7 +51,7 @@ export async function login(nick,password){
   if(!timingSafeEqual(Buffer.from(hash,'hex'),Buffer.from(user.hash,'hex')))fail('Nick o contraseña incorrectos.');
   return {token:await newSession(user.nick),user:publicUser(user)};
 }
-export async function logout(token){if(token)await remove('session:'+token);}
+export async function logout(token){if(token){sessionCache.delete(token);await remove('session:'+token);}}
 /** Usuario de una sesión; marca la hora de última conexión. */
 export async function userFromToken(token,touch=true){
   if(!token)return null;
@@ -126,16 +126,34 @@ export async function friendList(user){
   }));
   return list.filter(Boolean);
 }
+// Invitaciones en vivo: además de guardarse en la cuenta, quedan en memoria para que el aviso
+// llegue en segundos sin gastar consultas a la base de datos (ruta /api/account/ping).
+const liveInvites=new Map();
+const sessionCache=new Map();
+const fresh=list=>(list||[]).filter(i=>Date.now()-i.at<600000);
+export function pendingInvites(nick){return nick?fresh(liveInvites.get(String(nick).toLowerCase())):[];}
+/** Nick de una sesión, con caché en memoria (para consultas frecuentes y baratas). */
+export async function nickFromToken(token){
+  if(!token)return null;
+  const hit=sessionCache.get(token);
+  if(hit&&hit.until>Date.now())return hit.nick;
+  const session=await getJSON('session:'+token);
+  if(sessionCache.size>5000)sessionCache.clear();
+  sessionCache.set(token,{nick:session?.nick||null,until:Date.now()+(session?600000:30000)});
+  return session?.nick||null;
+}
 export async function invite(user,nick,code){
   if(!user.friends.some(f=>f.toLowerCase()===String(nick).toLowerCase()))fail('Solo puedes invitar a tus amigos.');
   const other=await getJSON(nickKey(nick));
   if(!other)fail('Jugador no encontrado.');
   other.invites=(other.invites||[]).filter(i=>i.from!==user.nick&&Date.now()-i.at<600000);
   other.invites.push({from:user.nick,code,at:Date.now()});
+  liveInvites.set(other.nick.toLowerCase(),other.invites.slice());
   await save(other);
 }
 export async function dismissInvite(user,from){
   user.invites=(user.invites||[]).filter(i=>i.from!==from);
+  liveInvites.set(user.nick.toLowerCase(),fresh(liveInvites.get(user.nick.toLowerCase())).filter(i=>i.from!==from));
   await save(user);
   return publicUser(user);
 }

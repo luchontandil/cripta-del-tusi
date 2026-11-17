@@ -48,7 +48,7 @@ export const classes = {
   sombra: {name:'Ninja', hp:35, initiative:15, skills:[
     ['Shuriken',2,5,5,8,'damage','✧',1,{element:'physical',max:{crit:15}}],
     ['Cuchilla envenenada',2,4,3,5,'venom','✧',0,{element:'chaos',value:3,max:{value:2}}],
-    ['Paso de sombra',2,3,0,0,'dash','↢',1,{max:{range:1}}],
+    ['Paso de sombra',2,3,0,0,'dash','↢',1,{teleport:true,max:{range:1}}],
     ['Puñalada trasera',3,1,12,16,'damage','⚔',0,{element:'chaos',max:{crit:20}}],
     ['Bomba de humo',2,4,3,5,'slow','❄',0,{element:'chaos',area:'cross',value:1,max:{value:1}}],
     ['Kunai con cadena',2,5,4,6,'pull','↢',2,{element:'physical',pull:3,max:{range:1}}],
@@ -312,23 +312,25 @@ export function rollItem(s,rng,{bonus=0,gear=false,ilvl,minGrade=0}={}) {
 // ───────────── Forja ─────────────
 /** Operaciones de la forja y su multiplicador de precio. */
 export const forgeModes={
-  reroll:{name:'Re-tirar todo',text:'Vuelve a tirar todos sus afijos y sufijos (misma rareza y nivel).',factor:1},
-  prefix:{name:'Re-tirar afijos',text:'Vuelve a tirar solo los afijos (prefijos).',factor:1.35},
-  suffix:{name:'Re-tirar sufijos',text:'Vuelve a tirar solo los sufijos.',factor:1.35},
-  upgrade:{name:'Mejorar rareza',text:'Sube un grado de rareza y añade el afijo o sufijo que le corresponde.',factor:2.6},
+  reroll:{name:'Re-tirar todo',text:'Vuelve a tirar todos sus PREFIJOS y SUFIJOS (misma rareza y nivel).',factor:1},
+  prefix:{name:'Re-tirar prefijos',text:'Vuelve a tirar solo los PREFIJOS; los sufijos se quedan igual.',factor:1.35},
+  suffix:{name:'Re-tirar sufijos',text:'Vuelve a tirar solo los SUFIJOS; los prefijos se quedan igual.',factor:1.35},
+  upgrade:{name:'Mejorar rareza',text:'Sube un grado de rareza y añade el prefijo o sufijo que le corresponde.',factor:2.6},
   socket:{name:'Añadir hueco',text:'Abre un hueco de runa más (máximo 2).',factor:1.8}
 };
 /** Precio de una operación de forja: crece con el nivel y la rareza del objeto. */
 export function forgeCost(item,mode){
   const base=12+item.ilvl*3+item.grade*10;
-  return Math.round(base*(forgeModes[mode]?.factor||1));
+  // Mejorar rareza: subir un objeto normal es barato; cada grado siguiente cuesta bastante más.
+  const factor=mode==='upgrade'?[1.1,2.2,3.2][item.grade]??3.2:forgeModes[mode]?.factor||1;
+  return Math.round(base*factor);
 }
 /** ¿Se puede hacer esta operación sobre este objeto? Devuelve el motivo si no. */
 export function forgeBlock(item,mode){
   if(!item||item.kind!=='gear')return 'Solo se forja equipo.';
   if(mode==='upgrade'&&item.grade>=3)return 'Ya es legendario.';
   if(mode==='socket'&&socketsOf(item)>=MAX_SOCKETS)return 'Ya tiene el máximo de huecos ('+MAX_SOCKETS+').';
-  if(mode==='prefix'&&!item.affixes.some(m=>m.type==='prefix'))return 'No tiene afijos.';
+  if(mode==='prefix'&&!item.affixes.some(m=>m.type==='prefix'))return 'No tiene prefijos.';
   if(mode==='suffix'&&!item.affixes.some(m=>m.type==='suffix'))return 'No tiene sufijos.';
   return null;
 }
@@ -796,7 +798,7 @@ function makeLayout(s,rng){
   // Densidad: cada sala tiene un tope de obstáculos (de arena diáfana a sala con cobertura).
   // Tope sobre el mapa entero (≈5–14 %): de arena casi diáfana a sala con bastante cobertura.
   const boardCells=Array.from({length:w*h},(_,pos)=>pos).filter(pos=>onBoard(s,pos)).length;
-  const density=pick([.05,.07,.09,.11,.14],rng);
+  const density=pick([.03,.05,.06,.08,.10],rng);
   const budget=Math.max(2,Math.round(boardCells*density));
   const walls=[];
   const shuffled=[...cells].map(c=>[rng(),c]).sort((a,b)=>a[0]-b[0]).map(([,c])=>c);
@@ -818,14 +820,46 @@ function makeLayout(s,rng){
     }
     return visited.size+boundary.size===ground.length;
   }
+  // Además de estar conectada, la sala debe dejar varios caminos de un bando al otro:
+  // al menos 4 rutas que no compartan casillas (nunca un único pasillo).
+  const MIN_ROUTES=4;
+  function routes(){
+    // Flujo máximo con capacidad 1 por casilla (cada casilla partida en entrada 2c y salida 2c+1).
+    const free=pos=>onBoard(s,pos)&&!boundary.has(pos);
+    const S=-1,T=-2,cap=new Map(),links=new Map();
+    const edge=(u,v)=>{
+      cap.set(u+','+v,(cap.get(u+','+v)||0)+1);if(!cap.has(v+','+u))cap.set(v+','+u,0);
+      for(const [a,b] of [[u,v],[v,u]]){if(!links.has(a))links.set(a,[]);links.get(a).push(b);}
+    };
+    for(const pos of ground){
+      if(!free(pos))continue;
+      edge(2*pos,2*pos+1);
+      if(pos%w<3)edge(S,2*pos);
+      if(pos%w>w-4)edge(2*pos+1,T);
+      for(const next of adjacent(s,pos))if(free(next))edge(2*pos+1,2*next);
+    }
+    let flow=0;
+    while(flow<MIN_ROUTES){
+      const prev=new Map([[S,null]]),queue=[S];
+      for(let i=0;i<queue.length&&!prev.has(T);i++){
+        const u=queue[i];
+        for(const v of links.get(u)||[])if(!prev.has(v)&&cap.get(u+','+v)>0){prev.set(v,u);queue.push(v);}
+      }
+      if(!prev.has(T))break;
+      for(let v=T;v!==S;v=prev.get(v)){const u=prev.get(v);cap.set(u+','+v,cap.get(u+','+v)-1);cap.set(v+','+u,cap.get(v+','+u)+1);}
+      flow++;
+    }
+    return flow;
+  }
+  const passable=()=>connected()&&routes()>=MIN_ROUTES;
   for(const pos of walls){
     boundary.add(pos);
-    if(!connected())boundary.delete(pos);
+    if(!passable())boundary.delete(pos);
   }
   for(let i=0;i<Math.min(3,Math.floor(budget/6))&&candidates.length;i++){
     const pos=candidates.splice(roll(0,candidates.length-1,rng),1)[0];
     boundary.add(pos);
-    if(!connected())boundary.delete(pos);
+    if(!passable())boundary.delete(pos);
   }
   const blocks=[...boundary];
   // Agua: charcas que bloquean el paso pero no la visión. El mapa sigue conectado.
@@ -840,19 +874,19 @@ function makeLayout(s,rng){
       const pos=y*w+x;
       if(bridges.has(y)||!open.includes(pos)||boundary.has(pos))continue;
       boundary.add(pos);
-      if(connected())water.push(pos);else boundary.delete(pos);
+      if(passable())water.push(pos);else boundary.delete(pos);
     }
   }
   const pools=s.floor===1?1:biome==='jungle'?roll(1,3,rng):biome==='hell'?roll(1,2,rng):roll(0,2,rng);
   // El agua (o lava) tampoco puede comerse la sala: como mucho ≈8 % del mapa.
-  const waterCap=Math.max(3,Math.round(boardCells*.08))+water.length;
+  const waterCap=Math.max(3,Math.round(boardCells*.06))+water.length;
   for(let i=0;i<pools&&open.length&&water.length<waterCap;i++){
     let pos=open[roll(0,open.length-1,rng)];
     const size=biome==='jungle'?roll(3,5,rng):roll(2,4,rng);
     for(let j=0;j<size&&pos!==undefined&&water.length<waterCap;j++){
       if(!boundary.has(pos)){
         boundary.add(pos);
-        if(connected())water.push(pos);else boundary.delete(pos);
+        if(passable())water.push(pos);else boundary.delete(pos);
       }
       const next=adjacent(s,pos).filter(n=>open.includes(n)&&!boundary.has(n));
       pos=next.length?pick(next,rng):undefined;
@@ -987,12 +1021,15 @@ export function lineOfSight(s,from,to,ignoreId) {
   const tx=to%s.width,ty=Math.floor(to/s.width);
   const dx=Math.abs(tx-x),dy=Math.abs(ty-y);
   const sx=Math.sign(tx-x),sy=Math.sign(ty-y);
-  const blocked=new Set([...s.walls,...(s.voids||[]),...s.units.filter(u=>alive(u)&&u.id!==ignoreId&&u.pos!==from&&u.pos!==to).map(u=>u.pos)]);
+  // Los aliados de quien lanza no tapan la visión; los rivales sí.
+  const caster=s.units.find(u=>u.id===ignoreId)||s.units.find(u=>alive(u)&&u.pos===from);
+  const screens=s.units.filter(u=>alive(u)&&u.id!==ignoreId&&u.pos!==from&&u.pos!==to&&(!caster||!!u.enemy!==!!caster.enemy));
+  const blocked=new Set([...s.walls,...(s.voids||[]),...screens.map(u=>u.pos)]);
   let ix=0,iy=0;
   while(ix<dx||iy<dy) {
     const cross=(1+2*ix)*dy-(1+2*iy)*dx;
     if(cross===0) {
-      if(blocked.has(y*s.width+x+sx)&&blocked.has((y+sy)*s.width+x))return false;
+      // La línea pasa justo por la esquina: dos bloques en diagonal no la tapan.
       x+=sx;y+=sy;ix++;iy++;
     } else if(cross<0){x+=sx;ix++;}
     else {y+=sy;iy++;}
@@ -1111,11 +1148,11 @@ function applyGlyphs(s,unit,oldPos) {
     triggerGlyph(s,g,unit);
   }
 }
-function move(s,unit,path,voluntary=true) {
+function move(s,unit,path,voluntary=true,blink=false) {
   const from=unit.pos;
   const traveled=[];
   if(!path.length||!alive(unit)||(voluntary&&s.mp===0))return;
-  emit(s,{kind:'move',unit:unit.id,look:unit.look||unit.classId,from,path:traveled});
+  emit(s,{kind:'move',unit:unit.id,look:unit.look||unit.classId,from,path:traveled,...(blink?{blink:true}:{})});
   for(const pos of path) {
     if(!alive(unit)||(voluntary&&s.mp===0))break;
     if(voluntary)s.mp--;
@@ -2139,8 +2176,9 @@ export function act(s,id,a,rng=Math.random) {
     if(!castableCell(s,unit,a.pos,skill))fail('No hay una ruta libre a esa casilla.');
     s.ap-=cost;
     spellCue(s,unit,a.pos,kind);
-    const route=skillOptions(skill).teleport?[a.pos]:paths(s,unit,skill[2]).get(a.pos);
-    move(s,unit,route,false);
+    const teleport=!!skillOptions(skill).teleport;
+    const route=teleport?[a.pos]:paths(s,unit,skill[2]).get(a.pos);
+    move(s,unit,route,false,teleport);
     if(!alive(unit))advance(s,rng);
     return;
   }

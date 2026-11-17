@@ -152,6 +152,8 @@ async function accountRoute(operation,method,body,tokenValue){
   if(method==='POST'&&operation==='register')return accounts.register(body.nick,body.password);
   if(method==='POST'&&operation==='login')return accounts.login(body.nick,body.password);
   if(method==='GET'&&operation==='status')return {persistent,...liveVersion};
+  // Ping de invitaciones: sin tocar la base de datos (sesión en caché, invitaciones en memoria).
+  if(method==='GET'&&operation==='ping')return {invites:accounts.pendingInvites(await accounts.nickFromToken(tokenValue))};
   const user=await accounts.userFromToken(tokenValue);
   if(!user)throw Object.assign(new Error('Sesión de cuenta caducada. Vuelve a entrar.'),{status:401});
   if(method==='POST'&&operation==='logout'){await accounts.logout(tokenValue);return {ok:true};}

@@ -1124,7 +1124,7 @@ const ps1Builders={
       const dagger=fuse(dp,'dagger');dagger.rotation.x=.3;
       arm.getObjectByName('held').add(dagger);
     });
-    return {height:1.36,lean:.12};
+    return {height:1.36,lean:0};   // erguido (antes iba inclinado hacia delante)
   }
 };
 function ps1Hero(kind,tint){

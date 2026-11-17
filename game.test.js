@@ -1100,3 +1100,47 @@ test('sala: cambiar de clase, maestrías desde la cuenta, salir y no duplicar al
   const after=await call('/api/'+room.code,null,null,room.key);
   assert.equal(after.state.players.length,1);
 });
+test('visión: los aliados no tapan, los enemigos sí, y dos bloques en diagonal no tapan',()=>{
+  const s=battle('tirador','guardia');
+  s.walls=[];s.water=[];s.voids=[];
+  const [archer,guard]=s.units.filter(u=>!u.enemy);
+  const enemy=s.units.find(u=>u.enemy);
+  const others=s.units.filter(u=>u.enemy&&u!==enemy);
+  for(const o of others)o.pos=s.width*s.height-1-others.indexOf(o);
+  const w=s.width;
+  archer.pos=2*w+1;enemy.pos=2*w+6;guard.pos=2*w+3;
+  assert.equal(lineOfSight(s,archer.pos,enemy.pos),true,'el aliado en medio no tapa');
+  const blocker=others[0];blocker.pos=2*w+4;
+  assert.equal(lineOfSight(s,archer.pos,enemy.pos),false,'otro enemigo en medio sí tapa');
+  blocker.pos=s.width*s.height-1;
+  // Diagonal exacta pasando entre dos bloques que se tocan por la esquina.
+  archer.pos=1*w+1;enemy.pos=3*w+3;guard.pos=7*w+7;
+  s.walls=[1*w+2,2*w+1];
+  assert.equal(lineOfSight(s,archer.pos,enemy.pos),true);
+  s.walls=[2*w+2];
+  assert.equal(lineOfSight(s,archer.pos,enemy.pos),false,'un muro en la propia diagonal sí tapa');
+});
+test('paso de sombra: se teletransporta (sin camino) y la forja sube rarezas normales barato',()=>{
+  const s=battle('sombra');
+  s.walls=[];s.water=[];s.traps=[];
+  const ninja=s.units.find(u=>!u.enemy);
+  s.turn=s.units.indexOf(ninja);s.ap=6;s.mp=3;
+  const w=s.width;
+  for(const u of s.units.filter(u=>u.enemy))u.pos=7*w+11-s.units.indexOf(u);
+  ninja.pos=3*w+3;
+  // Una trampa en medio: andando la pisaría; teletransportado, no.
+  s.traps=[{pos:3*w+4,kind:'spikes'}];
+  const hp=ninja.hp;
+  const index=classes.sombra.skills.findIndex(k=>k[0]==='Paso de sombra');
+  const target=3*w+5;
+  act(s,'p0',{type:'skill',skill:index,pos:target});
+  assert.equal(ninja.pos,target);
+  assert.equal(ninja.hp,hp);
+  const moveEvent=s.events.filter(e=>e.kind==='move').at(-1);
+  assert.equal(moveEvent.blink,true);
+  assert.deepEqual(moveEvent.path,[target]);
+  const item=rollItem(s,()=>.4,{gear:true,ilvl:3});
+  const normal=forgeCost({...item,grade:0},'upgrade'),uncommon=forgeCost({...item,grade:1},'upgrade'),rare=forgeCost({...item,grade:2},'upgrade');
+  assert.ok(normal<uncommon&&uncommon<rare);
+  assert.ok(normal<=forgeCost({...item,grade:0},'reroll')*1.2);
+});

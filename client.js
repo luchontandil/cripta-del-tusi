@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=69';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=69';
-import {setupSfx} from './music.js?v=69';
-import {icon} from './icons.js?v=69';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=70';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=70';
+import {setupSfx} from './music.js?v=70';
+import {icon} from './icons.js?v=70';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=69').then(({createIso})=>{
+import('./isometric.js?v=70').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -182,6 +182,16 @@ function paintVersion(data){
 let savedMix={};
 fetch(serverBase()+'/api/sfx/mix',{signal:AbortSignal.timeout(12000)}).then(r=>r.json()).then(d=>{savedMix=d.mix||{};sfx.setMix(savedMix,serverBase());}).catch(()=>{});
 setInterval(refreshAccount,10000);
+// Invitaciones casi en tiempo real: consulta ligera cada 2,5 s mientras estás en la portada.
+setInterval(async()=>{
+  if(!account.token||!account.user||state||document.hidden)return;
+  try{
+    const data=await accountCall('ping');
+    const known=new Set((account.user.invites||[]).map(i=>i.from+i.code+i.at));
+    const fresh=(data.invites||[]).filter(i=>!known.has(i.from+i.code+i.at));
+    if(fresh.length){account.user.invites=[...fresh,...(account.user.invites||[])];showInvites();renderAccount();}
+  }catch{}
+},2500);
 function field(label,input){return h('label','field',label,input);}
 /** El campo «Nombre» solo hace falta sin cuenta: con sesión, el nombre es el nick. */
 function syncNameField(){
@@ -587,7 +597,7 @@ const skillLore={
   'Rayo umbrío':'Un rayo de energía oscura (caótica) contra un enemigo a la vista.',
   'Shuriken':'Lanzas una estrella arrojadiza contra un enemigo a la vista.',
   'Cuchilla envenenada':'Un corte con hoja envenenada: el enemigo pierde vida al empezar sus próximos turnos.',
-  'Paso de sombra':'Te deslizas entre las sombras hasta otra casilla sin gastar PM.',
+  'Paso de sombra':'Te fundes en las sombras y reapareces en otra casilla que tengas a la vista, sin gastar PM ni pisar lo que haya en medio.',
   'Puñalada trasera':'Una puñalada letal a un enemigo pegado a ti; muy probable que sea crítica.',
   'Bomba de humo':'Una bomba que estalla en cruz: daña y deja a los enemigos aturdidos y más lentos.',
   'Kunai con cadena':'Lanzas un kunai atado a una cadena y tiras del enemigo hacia ti.',
@@ -609,7 +619,7 @@ function skillEffectText(skill){
     shield:'+'+(o.value||3)+' de armadura durante 2 turnos',
     haste:'+'+(o.value||2)+' PM en el próximo turno del aliado',
     swap:'Intercambia tu posición con la del objetivo',
-    dash:o.teleport?'Teletransporte (sin línea de visión)':'Desplazamiento por una ruta libre sin gastar PM'
+    dash:o.teleport?(o.los===false?'Teletransporte (sin necesitar línea de visión)':'Teletransporte a una casilla libre que veas, sin gastar PM'):'Desplazamiento por una ruta libre sin gastar PM'
   }[kind]||'';
   const burn=o.element==='fire'?' · Quemadura: arde 2 turnos y pierde ¼ del daño al empezar cada uno':'';
   return (text+area+burn).replace(/^ · /,'');
@@ -752,14 +762,21 @@ function statLine(key,value,tag='li'){
 }
 const statList=(stats,className='stat-list')=>h('ul',className,...Object.entries(stats).map(([key,value])=>statLine(key,value)));
 /** Modificadores al estilo ARPG: afijos primero, luego sufijos, con su tier. */
-function affixList(item,className='stat-list'){
+function affixList(item,className='stat-list',grouped=false){
   if(!item.affixes)return statList(item.stats,className);
   const sorted=[...item.affixes].sort((a,b)=>a.type===b.type?0:a.type==='prefix'?-1:1);
-  return h('ul',className+' affix-list',...sorted.map(mod=>{
+  const lines=[];
+  let group=null;
+  for(const mod of sorted){
+    if(grouped&&mod.type!==group){group=mod.type;lines.push(h('li','affix-group '+group,group==='prefix'?'Prefijos':'Sufijos'));}
+    lines.push(mod);
+  }
+  return h('ul',className+' affix-list'+(grouped?' grouped':''),...lines.map(mod=>{
+    if(mod instanceof Node)return mod;
     const line=statLine(mod.stat,mod.value);
     line.classList.add('affix',mod.type);
     const tier=h('span','tier tier-'+mod.tier+(mod.tier===mod.tiers?' top':'')+(mod.ascended?' ascended':''),(mod.ascended?'▲':'')+'T'+mod.tier);
-    tier.title=(mod.type==='prefix'?'Afijo':'Sufijo')+' «'+mod.label+'» · tier '+mod.tier+' de '+mod.tiers+(mod.ascended?' · ascendido: de un nivel superior al del objeto':'');
+    tier.title=(mod.type==='prefix'?'Prefijo':'Sufijo')+' «'+mod.label+'» · tier '+mod.tier+' de '+mod.tiers+(mod.ascended?' · ascendido: de un nivel superior al del objeto':'');
     line.append(tier);
     return line;
   }));
@@ -789,6 +806,13 @@ function socketNodes(item,prefix=''){
   nodes.push(h('div','item-holes',total?h('span',null,'Huecos de runa: '):h('span',null,'Sin huecos de runa'),
     ...Array.from({length:total},(_,i)=>h('b',i<runes.length?'hole full':'hole',i<runes.length?'◆':'◇'))));
   return nodes;
+}
+/** Huecos de runa en miniatura sobre el icono del objeto: ◆ ocupado, ◇ vacío. */
+function socketPips(item){
+  const runes=runesOf(item).length,total=socketsOf(item);
+  const box=h('span','socket-pips',...Array.from({length:total},(_,i)=>h('i',i<runes?'full':null)));
+  box.title=total-runes?(total-runes)+(total-runes===1?' hueco de runa libre':' huecos de runa libres'):'Huecos de runa ocupados';
+  return box;
 }
 function itemTip(item,anchor){
   const nodes=[tipHead(h('span','tip-item-art '+rarityTone(item),equipmentIcon(item.kind==='rune'?'rune':item.slot)),item.name,
@@ -830,6 +854,7 @@ function lootCard(item,player){
   type.textContent=itemSubtitle(item);
   const stats=affixList(item);
   card.append(visual,title,type,stats);
+  if(item.kind==='gear')card.append(...socketNodes(item,'Engarzada: '));
   if(item.kind==='rune')card.append(h('p','rune-help',icon('rune'),'Runa: se engarza en un hueco libre de cualquier pieza de equipo y suma su bonificación mientras la lleves. Es permanente: una vez engarzada no se puede quitar ni cambiar.'));
   if(item.kind==='gear')card.append(comparison(item,player));
   const take=actionButton('A la mochila','reward',{item:item.id});
@@ -905,6 +930,7 @@ function inventorySlot(item,label,actions=[],fallback=''){
   tile.className='inventory-slot '+(item?'filled grade'+(item.grade||0):'empty');
   const face=document.createElement(item?'summary':'span');
   if(item||fallback)face.append(equipmentIcon(item?.kind==='rune'?'rune':item?.slot||fallback));
+  if(item?.kind==='gear'&&socketsOf(item))face.append(socketPips(item));
   if(label){
     const name=document.createElement('small');
     name.textContent=label;
@@ -1023,29 +1049,27 @@ function renderInventory(player){
   }
   rewards.replaceChildren(loot);
 }
-/** Formulario compacto para dar tusi a otro jugador. */
+/** Dar tusi a otro jugador: en línea, con la cantidad máxima (todo tu tusi) por defecto. */
 let giveDraft=null;
 function giveTusi(player,others){
-  const box=h('details','give-tusi');
-  box.open=giveDraft!==null;
-  box.addEventListener('toggle',()=>{giveDraft=box.open?(giveDraft??''):null;});
-  const summary=h('summary',null,icon('users'),'Dar tusi');
   const amount=document.createElement('input');
   amount.type='number';amount.min='1';amount.max=String(player.gold);amount.placeholder='Cantidad';
-  amount.value=giveDraft||'';
+  amount.title='Cantidad de tusi a enviar';
+  amount.value=String(Math.min(player.gold,Number(giveDraft)||player.gold));
   amount.oninput=()=>{giveDraft=amount.value;};
+  const max=btn('MAX',()=>{amount.value=String(player.gold);giveDraft=null;});max.className='ghost give-max';
   const buttons=others.map(other=>{
     const b=btn('',()=>{
-      const value=Math.floor(Number(amount.value));
+      const value=Math.min(player.gold,Math.floor(Number(amount.value)));
       if(!value||value<1)return error('Escribe una cantidad.');
       giveDraft=null;
       send({type:'give',to:other.id,gold:value});
     });
     b.append(unitArt(other),'A '+other.name);
+    b.disabled=player.gold<1;
     return b;
   });
-  box.append(summary,h('div','give-row',amount,...buttons));
-  return box;
+  return h('div','give-tusi inline',h('span','give-label',icon('users'),'Enviar tusi'),h('div','give-row',amount,max,...buttons));
 }
 /** Tienda: sala del mapa con el género del mercader, venta y "Listo". */
 function renderShop(box){
@@ -1089,15 +1113,30 @@ function renderShop(box){
     h('div','shop-footer',party,readyButton,waitNote(ready.length)));
 }
 /** Forja: re-tirar stats o subir la rareza de cualquier objeto (equipado o en la mochila). */
+let forgeTab='equipped';
 function renderForge(box){
   const player=state.players.find(p=>p.id===session.id);
-  const items=[...Object.values(player.equipment),...player.bag].filter(i=>i?.kind==='gear');
+  const worn=Object.values(player.equipment).filter(i=>i?.kind==='gear');
+  const packed=player.bag.filter(i=>i?.kind==='gear');
+  if(forgeTab==='equipped'&&!worn.length&&packed.length)forgeTab='bag';
+  const items=forgeTab==='equipped'?worn:packed;
+  const tab=(id,label,count,iconName)=>{
+    const b=btn('',()=>{forgeTab=id;renderForge(box);});
+    b.className='forge-tab'+(forgeTab===id?' on':'');
+    b.setAttribute('role','tab');b.setAttribute('aria-selected',String(forgeTab===id));
+    b.append(icon(iconName),label,h('small',null,String(count)));
+    return b;
+  };
+  const tabs=h('div','forge-tabs',tab('equipped','Equipado',worn.length,'ward'),tab('bag','Mochila',packed.length,'bag'));
+  tabs.setAttribute('role','tablist');
   const cards=items.map(item=>{
     const card=lootCard(item,player);
     card.querySelectorAll('button').forEach(b=>b.remove());
+    card.classList.add('forge-card');
+    // Prefijos y sufijos agrupados y con título, para ver qué se va a re-tirar.
+    card.querySelector('.affix-list')?.replaceWith(affixList(item,'stat-list',true));
     // Lo equipado no se compara consigo mismo.
-    if(Object.values(player.equipment).includes(item))card.querySelector('.loot-comparison')?.remove();
-    if(Object.values(player.equipment).includes(item))card.prepend(h('span','forge-worn','Equipado'));
+    if(forgeTab==='equipped')card.querySelector('.loot-comparison')?.remove();
     const buttons=Object.entries(forgeModes).map(([mode,info])=>{
       const blocked=forgeBlock(item,mode),cost=forgeCost(item,mode);
       const b=actionButton('','forge',{item:item.id,mode});
@@ -1105,9 +1144,13 @@ function renderForge(box){
       b.append(h('span',null,info.name),h('b',null,icon('gold'),String(cost)));
       b.title=blocked||info.text;
       b.disabled=!!blocked||player.gold<cost;
+      // Al pasar el ratón se ilumina lo que cambiaría.
+      const on=()=>card.classList.add('forge-preview-'+mode),off=()=>card.classList.remove('forge-preview-'+mode);
+      b.addEventListener('pointerenter',on);b.addEventListener('pointerleave',off);
+      b.addEventListener('focus',on);b.addEventListener('blur',off);
       return b;
     });
-    card.append(h('div','forge-actions',...buttons));
+    card.append(h('p','forge-hint',icon('info'),'Pasa el ratón por una opción: se ilumina lo que se va a re-tirar.'),h('div','forge-actions',...buttons));
     return card;
   });
   const ready=state.ready||[];
@@ -1118,9 +1161,10 @@ function renderForge(box){
   const party=h('div','ready-party',...state.players.map(p=>h('span','ready-chip'+(ready.includes(p.id)?' on':''),unitArt(p),p.name)));
   box.replaceChildren(
     h('div','journey-head',h('h3',null,icon('forge'),'Forja del herrero'),
-      h('p',null,'Re-tira los stats de tu equipo o sube su rareza a cambio de tusi. Re-tirar solo afijos o solo sufijos cuesta algo más; mejorar la rareza (añade un afijo o sufijo) es lo más caro.')),
+      h('p',null,'Re-tira los PREFIJOS y SUFIJOS de tu equipo o sube su rareza a cambio de tusi. Re-tirar solo prefijos o solo sufijos cuesta algo más; mejorar un objeto normal es barato y cada rareza siguiente cuesta más.')),
     h('div','shop-wallet',icon('gold'),h('b',null,String(player.gold)),' tusi disponibles'),
-    cards.length?h('div','loot-cards forge-cards',...cards):h('p','event-text','No tienes equipo que forjar.'),
+    tabs,
+    cards.length?h('div','loot-cards forge-cards',...cards):h('p','event-text',forgeTab==='equipped'?'No llevas equipo puesto.':'No tienes equipo en la mochila.'),
     h('div','shop-footer',party,readyButton,waitNote(ready.length)));
 }
 const trainingDialog=el('training');
@@ -1525,7 +1569,7 @@ async function animate(){
     playing=event;
     if(!['combat','reward','won','lost'].includes(state.phase))continue;
     if(event.kind!=='move'){impact(event);continue;}
-    stepSounds(event);
+    if(!event.blink)stepSounds(event);
     if(iso?.active){
       await iso.move(event);
       continue;
@@ -1542,6 +1586,15 @@ async function animate(){
     el('animations').append(pawn);
     updatePawns();
     let from=boardPoint(event.from);
+    if(event.blink){
+      // Teletransporte: se desvanece en sombra y reaparece en el destino, sin caminar.
+      const out=pawn.animate([{opacity:1,filter:'none'},{opacity:0,filter:'brightness(.2) blur(3px)'}],{duration:160,fill:'forwards'});
+      await out.finished.catch(()=>{});
+      const to=boardPoint(event.path.at(-1));Object.assign(pawn.style,to);
+      const back=pawn.animate([{opacity:0,filter:'brightness(.2) blur(3px)'},{opacity:1,filter:'none'}],{duration:180,fill:'forwards'});
+      await back.finished.catch(()=>{});
+      pawn.remove();continue;
+    }
     for(const square of event.path){
       const to=boardPoint(square);
       const motion=pawn.animate([from,to],{duration:event.unit.startsWith('enemy')?140:220,easing:'ease-in-out',fill:'forwards'});
@@ -1577,9 +1630,19 @@ function setState(next,initial=false){
     selected=null;
   }
   if(next.phase!=='reward')shopShown=false;
+  if(previous&&!initial)itemArrivalSound(previous,next);
   state=next;
   render();
   animate();
+}
+/** Sonido suave cuando te llega un objeto nuevo (botín elegido, compra, regalo) o te envían tusi. */
+function itemArrivalSound(previous,next){
+  const ids=p=>new Set([...(p?.bag||[]),...Object.values(p?.equipment||{})].filter(Boolean).map(i=>i.id));
+  const before=previous.players?.find(p=>p.id===session?.id),after=next.players?.find(p=>p.id===session?.id);
+  if(!before||!after)return;
+  const old=ids(before);
+  if([...ids(after)].some(id=>!old.has(id)))sfx('loot',{volume:.55});
+  else if(after.gold>before.gold&&!['combat','reward'].includes(next.phase)&&previous.phase===next.phase)sfx('coins',{volume:.5});
 }
 function pathArrow(a,b){
   if(b-a===state.width)return '↓';
@@ -1606,12 +1669,34 @@ function paintPath(path,origin){
   });
   if(iso?.active)iso.highlight(board.children);
 }
-function paintArea(area=[],center=null){
+function paintArea(area=[],center=null,skill=null,caster=null){
   const board=el('board');
   for(const cell of board.querySelectorAll('.area-preview,.area-center'))cell.classList.remove('area-preview','area-center');
   for(const pos of area)board.children[pos]?.classList.add('area-preview');
   if(center!==null&&area.includes(center))board.children[center]?.classList.add('area-center');
   if(iso?.active)iso.highlight(board.children);
+  aimDamage(skill&&caster?area:[],skill,caster);
+}
+/** Etiquetas sobre cada enemigo afectado con el daño teórico que le harías (mínimo–máximo). */
+function aimDamage(area,skill,caster){
+  let layer=el('aim-damage');
+  if(!layer){layer=h('div','aim-damage-layer');layer.id='aim-damage';document.body.append(layer);}
+  layer.replaceChildren();
+  for(const pos of area){
+    const target=state?.units.find(u=>u.hp>0&&u.pos===pos&&u.enemy);
+    const preview=target&&damagePreview(caster,target,skill);
+    if(!preview)continue;
+    const cell=el('board').children[pos];
+    const near=iso?.active?iso.anchor(pos):cell?.getBoundingClientRect();
+    if(!near)continue;
+    const [lo,hi]=preview.normal;
+    const kill=lo>=target.hp+(target.effects?.shield?.value||0);
+    const tag=h('div','aim-damage'+(kill?' lethal':''),icon(preview.element),h('b',null,lo===hi?String(lo):lo+'–'+hi));
+    tag.style.left=(near.left+(iso?.active?14:(near.width||0)/2))+'px';
+    tag.style.top=(near.top-(iso?.active?30:6))+'px';
+    tag.title='Daño '+elements[preview.element].toLowerCase()+': '+lo+'–'+hi+' · crítico '+preview.critical.join('–')+' ('+Math.round(preview.chance*100)+' %)';
+    layer.append(tag);
+  }
 }
 function drawBoard(turn,walking,skill){
   const board=el('board');
@@ -1620,6 +1705,7 @@ function drawBoard(turn,walking,skill){
   iso?.resetHover();
   field.hidden=!state.units.length;
   board.replaceChildren();
+  aimDamage([]);
   syncViewport();
   if(field.hidden)return;
   board.style.setProperty('--cols',state.width);
@@ -1657,8 +1743,8 @@ function drawBoard(turn,walking,skill){
         paintPath();
         el('path-status').textContent='Haz clic en una casilla azul para moverte.';
       };
-    }else if(aim&&blast){
-      cell.onpointerenter=cell.onfocus=()=>paintArea(spellArea(state,pos,skill,turn),pos);
+    }else if(aim){
+      cell.onpointerenter=cell.onfocus=()=>paintArea(blast?spellArea(state,pos,skill,turn):[pos],pos,skill,turn);
       cell.onpointerleave=cell.onblur=()=>paintArea();
     }
     if(unit){
@@ -1724,8 +1810,10 @@ function render(){
   const controls=el('controls');
   controls.replaceChildren();
   el('end-turn').disabled=!mine;
-  el('pa').textContent=state.phase==='combat'&&!turn.enemy?state.ap:'—';
-  el('pm').textContent=state.phase==='combat'&&!turn.enemy?state.mp:'—';
+  // PA y PM solo en tu turno (no se muestran los de los aliados ni los de los enemigos).
+  el('pa').textContent=mine?state.ap:'—';
+  el('pm').textContent=mine?state.mp:'—';
+  for(const id of ['pa','pm'])el(id).closest('.points').style.visibility=mine?'visible':'hidden';
   if(state.phase==='lobby'&&host)controls.append(actionButton('Iniciar expedición','start'));
   if(rewardReady&&host){
     const next=actionButton('Siguiente piso','next');

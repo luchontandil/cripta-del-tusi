@@ -199,7 +199,7 @@ summary{cursor:pointer}
   box-shadow:inset 0 0 60px #000a,0 14px 30px #0009;
 }
 #iso-world::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;box-shadow:inset 0 0 0 1px #ffffff0a,inset 0 0 120px #0b0712cc}
-#iso-world canvas{display:block;width:100%;height:100%;touch-action:manipulation;cursor:crosshair;image-rendering:pixelated}
+#iso-world canvas{display:block;width:100%;height:100%;touch-action:manipulation;cursor:crosshair;image-rendering:auto}
 .iso-labels{position:absolute;inset:0;pointer-events:none}
 .iso-label{
   position:absolute;top:0;left:0;width:104px;padding:2px 6px 3px;border-radius:5px;
@@ -1175,3 +1175,36 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;bac
 .lobby-class.on{border-color:var(--gold);background:#2a2014;color:var(--gold)}
 .lobby-mastery{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
 .lobby-mastery>span{display:flex;align-items:center;gap:6px}
+.give-tusi.inline{display:grid;gap:4px}
+.give-label{display:inline-flex;align-items:center;gap:5px;color:#ffb3e4;font-weight:700}
+.give-row .give-max{font-weight:700;letter-spacing:.04em}
+/* Huecos de runa sobre el icono del objeto */
+.inventory-slot>summary{position:relative}
+.socket-pips{position:absolute;right:3px;bottom:3px;display:flex;gap:2px;pointer-events:none}
+.socket-pips i{width:7px;height:7px;transform:rotate(45deg);border:1px solid #c9a6ff;background:#0009;box-shadow:0 0 3px #000}
+.socket-pips i.full{background:#b48cff;box-shadow:0 0 5px #b48cffaa}
+.loot-card .item-holes,.loot-card .item-socket{font-size:.74rem}
+/* Daño teórico sobre el enemigo al apuntar */
+.aim-damage-layer{position:fixed;inset:0;pointer-events:none;z-index:40}
+.aim-damage{position:absolute;transform:translate(-50%,-100%);display:flex;align-items:center;gap:4px;padding:2px 7px;background:#120c0ee6;border:2px solid #ffb27a;color:#ffe2c8;font:700 1.05rem var(--font-display);box-shadow:0 3px 0 #0008;white-space:nowrap}
+.aim-damage .icon{width:14px;height:14px}
+.aim-damage.lethal{border-color:#ff5d5d;color:#fff;background:#3a0f12e6}
+.aim-damage.lethal::after{content:'☠';font-size:.85rem}
+/* Forja: pestañas, prefijos/sufijos y resaltado de lo que se re-tira */
+.forge-tabs{display:flex;gap:6px;margin:4px 0 10px;border-bottom:2px solid #3a2d22}
+.forge-tab{display:inline-flex;align-items:center;gap:6px;padding:.45em 1em;background:#1a1418;border:2px solid #2c2228;border-bottom:0;color:#cbbd9f;font:inherit;font-weight:700;cursor:pointer;margin-bottom:-2px}
+.forge-tab small{padding:0 6px;border-radius:8px;background:#ffffff14;font-size:.72rem}
+.forge-tab.on{background:#2a2014;border-color:#6b5638;color:var(--gold)}
+.affix-list.grouped .affix-group{list-style:none;margin:6px 0 2px;font-size:.66rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#a8977a;border-bottom:1px solid #ffffff14;padding-bottom:1px}
+.affix-list.grouped .affix-group.prefix{color:#8fc3ff}
+.affix-list.grouped .affix-group.suffix{color:#f0b37a}
+.forge-card .affix{transition:background .15s,box-shadow .15s}
+.forge-preview-reroll .affix,.forge-preview-prefix .affix.prefix,.forge-preview-suffix .affix.suffix{background:#ffd76a1f;box-shadow:inset 3px 0 0 #ffd76a,0 0 10px #ffd76a33;border-radius:3px}
+.forge-preview-reroll .affix::before,.forge-preview-prefix .affix.prefix::before,.forge-preview-suffix .affix.suffix::before{content:'↻';color:#ffd76a;margin-right:4px;font-weight:700}
+.forge-preview-reroll .affix-group,.forge-preview-prefix .affix-group.prefix,.forge-preview-suffix .affix-group.suffix{color:#ffd76a}
+.forge-preview-upgrade h4{text-shadow:0 0 8px #ffd76a}
+.forge-preview-upgrade .affix-list::after{content:'+ 1 prefijo o sufijo nuevo';display:block;margin-top:4px;color:#ffd76a;font-size:.76rem;font-weight:700}
+.forge-preview-socket .item-holes{color:#ffd76a}
+.forge-preview-socket .item-holes::after{content:'+ ◇';color:#ffd76a;font-weight:700;margin-left:4px}
+.forge-hint{display:flex;align-items:center;gap:5px;font-size:.72rem;color:#a8977a;margin:6px 0 2px}
+.forge-hint .icon{width:12px;height:12px}

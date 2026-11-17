@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,glyphText,monsterSkills,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=39';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=39';
-import {setupSfx} from './music.js?v=39';
-import {icon} from './icons.js?v=39';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=40';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=40';
+import {setupSfx} from './music.js?v=40';
+import {icon} from './icons.js?v=40';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -96,7 +96,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=39').then(({createIso})=>{
+import('./isometric.js?v=40').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1138,10 +1138,16 @@ function eventSound(event){
     if(event.kind==='glyph')sfx('glyph',{volume:.8});
     else if(event.kind==='trap')sfx('trap',{volume:.8});
     else if(event.kind==='poison')sfx('venom',{volume:.5});
-    sfx('hit',{volume:event.critical?1:.75,rate:event.critical?.85:1});
-    if(event.kind==='damage'&&Math.random()<.5)sfx('slash',{volume:.4});
+    sfx('hit',{volume:.75});
     if(target&&(target.classId==='guardia'||target.look==='skeleton'||target.look==='skeletonking'))sfx('armor',{volume:.5});
-    if(target?.hp<=0)sfx(target.enemy?'die_monster':'die_hero',{delay:.12});
+    if(target?.hp<=0){
+      if(!target.enemy)sfx('die_hero',{delay:.12});
+      else{
+        // Cada monstruo muere con su propia voz (más grave) y un golpe al caer; los esqueletos se desarman.
+        if(voices[target.look])sfx(voices[target.look],{volume:target.boss?1:.8,rate:.78,delay:.08});
+        sfx(['skeleton','skeletonking'].includes(target.look)?'bones':'thud',{volume:target.boss?1:.8,delay:.35});
+      }
+    }
     else if(target&&!target.enemy&&Math.random()<.5)sfx('hurt_hero',{volume:.6,delay:.05});
     else if(target?.enemy&&voices[target.look]&&Math.random()<.4)sfx(voices[target.look],{volume:.45,delay:.06});
   }
@@ -1610,7 +1616,7 @@ setInterval(refresh,400);
 
 // ───────────── Editor de SFX (solo administradores) ─────────────
 const sfxLabels={arcane:'Hechizo arcano',armor:'Golpe en armadura',arrow:'Disparo de flecha',arrowhit:'Impacto de flecha',blast:'Explosión y fuego',
-  cleanse:'Purificar',click:'Clic de interfaz',coins:'Monedas',dash:'Salto y teletransporte',die_hero:'Muerte de héroe',die_monster:'Muerte de monstruo',
+  cleanse:'Purificar',click:'Clic de interfaz',coins:'Monedas',dash:'Salto y teletransporte',die_hero:'Muerte de héroe',die_monster:'Muerte de monstruo (sin uso)',thud:'Caída de un cuerpo',bones:'Huesos que caen',
   door:'Puerta y cambio de sala',equip:'Equipar objeto',glyph:'Glifo',heal:'Curación',hit:'Golpe recibido',hurt_hero:'Quejido de héroe',levelup:'Subir de nivel',
   loot:'Botín',lose:'Derrota',page:'Página y menú',push:'Empujón y tirón',shield:'Escudo',slash:'Corte',slow:'Ralentizar y hielo',step:'Pasos',
   step_wet:'Pasos en el barro',swing:'Golpe al aire',trap:'Trampa',venom:'Veneno',win:'Victoria',v_bat:'Voz: murciélago',v_beast:'Voz: bestia',

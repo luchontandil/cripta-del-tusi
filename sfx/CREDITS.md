@@ -202,6 +202,14 @@ Fuente: https://kenney.nl/assets/impact-sounds · https://kenney.nl/assets/inter
 - `page_1.ogg` ← select_001.ogg
 - `page_2.ogg` ← select_002.ogg
 - `page_3.ogg` ← select_003.ogg
+- `thud_1.ogg` ← impactSoft_heavy_000.ogg
+- `thud_2.ogg` ← impactSoft_heavy_001.ogg
+- `thud_3.ogg` ← impactSoft_heavy_002.ogg
+- `thud_4.ogg` ← impactSoft_heavy_003.ogg
+- `bones_1.ogg` ← impactWood_light_000.ogg
+- `bones_2.ogg` ← impactWood_light_001.ogg
+- `bones_3.ogg` ← impactWood_light_002.ogg
+- `bones_4.ogg` ← impactWood_light_003.ogg
 
 ## Dungeon Crawl: RPG Game Sounds — Soundsnap (licencia de Soundsnap del propietario del proyecto)
 Fuente: https://www.soundsnap.com/playlist/dungeon_crawl_rpg_game_sounds

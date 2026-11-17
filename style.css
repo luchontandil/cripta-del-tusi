@@ -1095,3 +1095,48 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 .shop-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
 .reroll-shop{display:inline-flex;align-items:center;gap:5px}
 .reroll-shop .icon{width:15px;height:15px}
+/* ── Portada en tres columnas: cuenta · personaje y jugar · amigos ── */
+.gateway{max-width:1320px}
+.tagline{margin:0 0 10px}
+.brand{margin:2px 0 2px}
+.gateway-grid{grid-template-columns:minmax(240px,290px) minmax(0,1fr) minmax(240px,290px);gap:14px}
+.gateway-account{max-width:none;margin:0;padding:14px 16px;gap:10px;align-self:start;max-height:calc(100vh - 120px);overflow:auto}
+.gateway-account .account-head{flex-direction:column;align-items:flex-start;gap:6px}
+.gateway-account .account-head h2{font-size:1.05rem}
+.gateway-account .account-actions{margin-left:0;flex-wrap:wrap}
+.gateway-account .account-form{grid-template-columns:1fr;gap:8px}
+.gateway-account .add-friend{max-width:none}
+.gateway-account .friend-list{max-height:180px;overflow:auto}
+.gateway-account .invite{flex-wrap:wrap}
+.gateway-main{padding:14px 18px}
+.gateway-main h2{margin-bottom:6px}
+.class-picker legend{margin-bottom:4px}
+.class-preview{margin:8px 0 10px;padding:8px 12px}
+.class-preview p{margin-bottom:4px;font-size:.84rem}
+.gateway-main #solo{width:100%}
+.gateway-online{padding:14px 16px}
+.gateway-online .hint{margin:6px 0 10px}
+/* Pantallas medianas: amigos debajo; móviles: una sola columna */
+@media(max-width:1100px){
+  .gateway-grid{grid-template-columns:minmax(220px,260px) minmax(0,1fr)}
+  .gateway-online{grid-column:2}
+}
+@media(max-width:760px){
+  .gateway-grid{grid-template-columns:1fr}
+  .gateway-online{grid-column:auto}
+  .gateway-account{max-height:none}
+}
+/* Portada compacta: título más bajo y ficha de clase más densa para que «Jugar» quepa sin scroll */
+.gateway-page .brand h1,body:not(.in-expedition) .brand h1{font-size:clamp(2.2rem,4.6vw,3.6rem);line-height:1.05}
+body:not(.in-expedition) .tagline{margin:0 0 8px;font-size:.72rem}
+.gateway-account .account-head{display:grid;gap:4px}
+.gateway-account .account-head .hint{font-size:.78rem}
+.gateway-main .class-preview .preview-skills{gap:2px 14px}
+.gateway-main .class-preview .preview-skills li{padding:2px 0;min-height:0}
+.gateway-main .class-preview .preview-skills .icon,.gateway-main .class-preview .preview-skills svg{width:20px;height:20px}
+.class-card{padding:8px 4px}
+.class-card .class-art{width:44px;height:44px}
+@media(max-height:820px){
+  .gateway-main .class-preview .preview-skills li{font-size:.78rem}
+  .class-preview{margin:6px 0 8px}
+}

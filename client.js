@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=61';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=61';
-import {setupSfx} from './music.js?v=61';
-import {icon} from './icons.js?v=61';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=64';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=64';
+import {setupSfx} from './music.js?v=64';
+import {icon} from './icons.js?v=64';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=61').then(({createIso})=>{
+import('./isometric.js?v=64').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -181,8 +181,12 @@ function renderAccount(){
   if(!account.token||!account.user){
     const nick=document.createElement('input');nick.maxLength=16;nick.autocomplete='username';nick.placeholder='Tu nick';
     const pass=document.createElement('input');pass.type='password';pass.autocomplete=account.mode==='login'?'current-password':'new-password';pass.placeholder='Contraseña';
+    // Al crear cuenta, la contraseña se pide dos veces.
+    const repeat=document.createElement('input');repeat.type='password';repeat.autocomplete='new-password';repeat.placeholder='Repite la contraseña';
     const go=btn('',async()=>{
-      if(account.busy)return;account.busy=true;
+      if(account.busy)return;
+      if(account.mode!=='login'&&pass.value!==repeat.value){error('Las contraseñas no coinciden.');repeat.focus();return;}
+      account.busy=true;
       try{
         const data=await accountCall(account.mode==='login'?'login':'register',{nick:nick.value,password:pass.value});
         setAccountToken(data.token);account.user=data.user;
@@ -193,11 +197,12 @@ function renderAccount(){
     go.append(icon(account.mode==='login'?'play':'users'),account.mode==='login'?'Entrar':'Crear cuenta');
     const swap=btn(account.mode==='login'?'¿No tienes cuenta? Crear una':'¿Ya tienes cuenta? Entrar',()=>{account.mode=account.mode==='login'?'register':'login';renderAccount();});
     swap.className='ghost link-button';
-    pass.onkeydown=e=>{if(e.key==='Enter')go.click();};
+    pass.onkeydown=e=>{if(e.key==='Enter'){if(account.mode==='login')go.click();else repeat.focus();}};
+    repeat.onkeydown=e=>{if(e.key==='Enter')go.click();};
     box.replaceChildren(
       h('div','account-head',h('h2',null,icon('level'),'Tu cuenta'),h('p','hint','Guarda tus puntos y maestrías, agrega amigos e invítalos a tu sala.')),
-      h('div','account-form',field('Nick',nick),field('Contraseña',pass),go,swap),
-      account.persistent?null:h('p','hint warn','Servidor sin base de datos configurada: las cuentas se borrarán al reiniciarlo.'));
+      h('div','account-form',...[field('Nick',nick),field('Contraseña',pass),account.mode==='login'?null:field('Repite la contraseña',repeat),go,swap].filter(Boolean)),
+      ...(account.persistent?[]:[h('p','hint warn','Servidor sin base de datos configurada: las cuentas se borrarán al reiniciarlo.')]));
     return;
   }
   const u=account.user;

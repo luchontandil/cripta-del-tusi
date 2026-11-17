@@ -1,5 +1,5 @@
 // Sonido del juego: efectos, ambiente por acto y música de fondo.
-import {icon} from './icons.js?v=66';
+import {icon} from './icons.js?v=67';
 export function setupSfx(button){
   let context,master;
   let muted=false;
@@ -37,21 +37,36 @@ export function setupSfx(button){
   const track=new Audio();
   track.src=new URL('./sfx/music_dungeon.ogg?v=1',import.meta.url).href;
   track.loop=true;track.preload='auto';track.crossOrigin='anonymous';
-  let music=null;
+  let music=null,routed=false;
+  // El volumen de la música se aplica siempre, pase o no por el mezclador de Web Audio:
+  // en algunos navegadores no se puede conectar el reproductor y sonaba sin control de volumen.
+  // A 0 se pausa del todo, así la barra siempre llega a silencio.
+  function applyMusicVolume(){
+    const level=Math.min(1,Math.max(0,MUSIC_GAIN*volumeMusic));
+    if(musicBus)musicBus.gain.value=MUSIC_GAIN*volumeMusic;
+    try{track.volume=routed?1:level;}catch{}
+    if(volumeMusic<=0)track.pause();
+  }
   function startMusic(){
-    if(music||muted||!context)return;
-    try{
-      const source=context.createMediaElementSource(track),gain=context.createGain();
-      gain.gain.value=0;gain.gain.setTargetAtTime(1,context.currentTime,.25);
-      source.connect(gain).connect(musicBus);
-      music={source,gain};
-    }catch{music={gain:null};}
+    if(muted||!context||volumeMusic<=0)return;
+    if(!music){
+      if(!routed){
+        try{
+          const source=context.createMediaElementSource(track),gain=context.createGain();
+          gain.gain.value=0;gain.gain.setTargetAtTime(1,context.currentTime,.25);
+          source.connect(gain).connect(musicBus);
+          routed=true;
+        }catch{routed=false;}
+      }
+      music={};
+    }
+    applyMusicVolume();
     track.play().catch(()=>{music=null;});
   }
   function stopMusic(){
     track.pause();
   }
-  function resumeMusic(){if(music&&!muted&&track.paused)track.play().catch(()=>{});}
+  function resumeMusic(){if(music&&!muted&&volumeMusic>0&&track.paused){applyMusicVolume();track.play().catch(()=>{});}}
   // Algunos navegadores (Firefox) dejan el audio suspendido: se reintenta con cada gesto.
   const unlock=()=>{if(muted)return;if(!context)ready();else if(context.state!=='running')context.resume().catch(()=>{});startMusic();resumeMusic();};
   for(const type of ['pointerdown','keydown','touchend'])document.addEventListener(type,unlock,true);
@@ -221,7 +236,7 @@ export function setupSfx(button){
   ambRange.addEventListener('input',()=>{volumeAmbience=ambRange.value/100;try{localStorage.setItem(keys.amb,volumeAmbience);}catch{}
     if(ambienceBus)ambienceBus.gain.value=.75*volumeAmbience;reflect();});
   musicRange.addEventListener('input',()=>{volumeMusic=musicRange.value/100;try{localStorage.setItem(keys.music,volumeMusic);}catch{}
-    if(musicBus)musicBus.gain.value=MUSIC_GAIN*volumeMusic;if(ready())startMusic();reflect();});
+    applyMusicVolume();if(ready())startMusic();reflect();});
   reflect();
   function attach(b){
     if(!b)return;

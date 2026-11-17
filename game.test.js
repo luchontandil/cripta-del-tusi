@@ -243,8 +243,9 @@ test('el Mago puede lanzar a una casilla vacía y dañar a dos enemigos en cruz'
   assert.ok(spellArea(s,center,skill).includes(second.pos));
   act(s,'p0',{type:'skill',skill:1,pos:center},rng);
   assert.equal(s.ap,3);
-  assert.equal(first.max-first.hp,7);
-  assert.equal(second.max-second.hp,7);
+  // Bola de fuego 5–8, y los dos están a una casilla del centro: 80 % del daño.
+  assert.equal(first.max-first.hp,4);
+  assert.equal(second.max-second.hp,4);
   assert.equal(ally.hp,ally.max);
   assert.deepEqual(s.events.find(event=>event.kind==='spell').area,spellArea(s,center,skill));
 });
@@ -1143,4 +1144,23 @@ test('paso de sombra: se teletransporta (sin camino) y la forja sube rarezas nor
   const normal=forgeCost({...item,grade:0},'upgrade'),uncommon=forgeCost({...item,grade:1},'upgrade'),rare=forgeCost({...item,grade:2},'upgrade');
   assert.ok(normal<uncommon&&uncommon<rare);
   assert.ok(normal<=forgeCost({...item,grade:0},'reroll')*1.2);
+});
+test('gemas: tipo y calidad según el nivel; el daño en área cae lejos del centro',async()=>{
+  const E=await import('./engine.js');
+  assert.equal(E.gemQuality(1),0);assert.equal(E.gemQuality(11),3);assert.equal(E.gemQuality(30),6);
+  const ruby=E.makeGem(1,'ruby',0),best=E.makeGem(2,'ruby',6),amethyst=E.makeGem(3,'amethyst',3);
+  assert.equal(ruby.name,'Rubí dañado');assert.equal(best.name,'Rubí excelente');assert.equal(amethyst.name,'Amatista completa');
+  assert.ok(best.stats.vitality>ruby.stats.vitality);
+  assert.ok(E.makeGem(4,'tigereye',6).stats.critical<=10,'el crítico de las gemas está acotado');
+  // Las gemas salen del botín normal con su calidad
+  const s=create();join(s,'p0','A','mago');s.floor=12;
+  let gem;for(let i=0;i<400&&!gem;i++){const it=rollItem(s,Math.random);if(it.kind==='rune')gem=it;}
+  assert.ok(gem&&gem.gem&&gem.quality>=2&&gem.quality<=3);
+  // Caída en área: pleno en el centro, menos al lado
+  const b=battle('mago');b.walls=[];
+  const fire=skillFor(b.units.find(u=>!u.enemy),classes.mago.skills.findIndex(k=>k[0]==='Bola de fuego'));
+  const w=b.width;
+  assert.equal(E.areaFalloff(b,3*w+5,3*w+5,fire),1);
+  assert.equal(E.areaFalloff(b,3*w+5,3*w+6,fire),.8);
+  assert.equal(E.areaFalloff(b,3*w+5,3*w+6,classes.mago.skills[0]),1,'un solo objetivo no cae');
 });

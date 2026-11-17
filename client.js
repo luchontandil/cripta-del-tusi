@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  BASE_AP,BASE_MP,heroStats,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=72';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=72';
-import {setupSfx} from './music.js?v=72';
-import {icon} from './icons.js?v=72';
+  BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=73';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=73';
+import {setupSfx} from './music.js?v=73';
+import {icon} from './icons.js?v=73';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=72').then(({createIso})=>{
+import('./isometric.js?v=73').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -781,14 +781,16 @@ function affixList(item,className='stat-list',grouped=false){
     return line;
   }));
 }
-const itemSubtitle=item=>item.kind==='rune'?'Runa · nivel '+(item.ilvl||1):
+const itemSubtitle=item=>item.kind==='rune'?(item.gem?'Gema · calidad '+(item.quality+1)+' de '+gemQualities.length:'Gema'):
   [item.grade>=2?item.base:slots[item.slot],item.rarity,'nivel '+(item.ilvl||1)].filter(Boolean).join(' · ');
+/** Icono de un objeto: equipo por ranura; las gemas con su color y su calidad. */
+const itemIcon=item=>equipmentIcon(item?.kind==='rune'?(item.gem?'gem:'+item.gem+':'+item.quality:'rune'):item?.slot);
 const rarityTone=item=>item?.kind==='rune'?'rune':'grade'+(item?.grade||0);
 function itemRow(item,title,actions=[]){
   const row=h('div','item');
   const name=h('b',rarityTone(item),title+(item?.name||'Vacío'));
   const heading=h('div','item-heading');
-  if(item)heading.append(equipmentIcon(item.kind==='rune'?'rune':item.slot));
+  if(item)heading.append(itemIcon(item));
   heading.append(h('div','item-title',name,item?h('small',null,itemSubtitle(item)):null));
   row.append(heading);
   if(item){
@@ -798,26 +800,26 @@ function itemRow(item,title,actions=[]){
   if(actions.length)row.append(h('div','item-actions',...actions));
   return row;
 }
-/** Runas engarzadas y huecos libres de un objeto (◆ ocupado · ◇ libre). */
+/** Gemas engastadas y huecos libres de un objeto (◆ ocupado · ◇ libre). */
 function socketNodes(item,prefix=''){
   if(item?.kind!=='gear')return [];
   const runes=runesOf(item),total=socketsOf(item);
-  const nodes=runes.map(r=>h('div','item-socket',equipmentIcon('rune'),h('span',null,prefix+r.name),statList(r.stats,'stat-list compact')));
-  nodes.push(h('div','item-holes',total?h('span',null,'Huecos de runa: '):h('span',null,'Sin huecos de runa'),
+  const nodes=runes.map(r=>h('div','item-socket',itemIcon(r),h('span',null,prefix+r.name),statList(r.stats,'stat-list compact')));
+  nodes.push(h('div','item-holes',total?h('span',null,'Huecos para gemas: '):h('span',null,'Sin huecos para gemas'),
     ...Array.from({length:total},(_,i)=>h('b',i<runes.length?'hole full':'hole',i<runes.length?'◆':'◇'))));
   return nodes;
 }
-/** Huecos de runa en miniatura sobre el icono del objeto: ◆ ocupado, ◇ vacío. */
+/** Huecos para gemas en miniatura sobre el icono del objeto: ◆ ocupado, ◇ vacío. */
 function socketPips(item){
   const runes=runesOf(item).length,total=socketsOf(item);
   const box=h('span','socket-pips',...Array.from({length:total},(_,i)=>h('i',i<runes?'full':null)));
-  box.title=total-runes?(total-runes)+(total-runes===1?' hueco de runa libre':' huecos de runa libres'):'Huecos de runa ocupados';
+  box.title=total-runes?(total-runes)+(total-runes===1?' hueco libre para gema':' huecos libres para gemas'):'Huecos para gemas ocupados';
   return box;
 }
 function itemTip(item,anchor){
-  const nodes=[tipHead(h('span','tip-item-art '+rarityTone(item),equipmentIcon(item.kind==='rune'?'rune':item.slot)),item.name,
+  const nodes=[tipHead(h('span','tip-item-art '+rarityTone(item),itemIcon(item)),item.name,
     itemSubtitle(item),null),affixList(item,'stat-list tip-stats')];
-  nodes.push(...socketNodes(item,'Engarzada: '));
+  nodes.push(...socketNodes(item,'Engastada: '));
   showTip(nodes,anchor,'tip-item '+rarityTone(item));
 }
 function comparison(item,player){
@@ -847,15 +849,15 @@ function lootCard(item,player){
   card.className='loot-card '+(item.kind==='rune'?'rune':'grade'+item.grade);
   const visual=document.createElement('div');
   visual.className='loot-icon';
-  visual.append(equipmentIcon(item.kind==='rune'?'rune':item.slot));
+  visual.append(itemIcon(item));
   const title=document.createElement('h4');
   title.textContent=item.name;
   const type=document.createElement('small');
   type.textContent=itemSubtitle(item);
   const stats=affixList(item);
   card.append(visual,title,type,stats);
-  if(item.kind==='gear')card.append(...socketNodes(item,'Engarzada: '));
-  if(item.kind==='rune')card.append(h('p','rune-help',icon('rune'),'Runa: se engarza en un hueco libre de cualquier pieza de equipo y suma su bonificación mientras la lleves. Es permanente: una vez engarzada no se puede quitar ni cambiar.'));
+  if(item.kind==='gear')card.append(...socketNodes(item,'Engastada: '));
+  if(item.kind==='rune')card.append(h('p','rune-help',icon('rune'),'Gema: se engasta en un hueco libre de cualquier pieza de equipo y suma su bonificación mientras la lleves. Cuanto mejor su calidad (de dañada a excelente), más da. Es permanente: una vez engastada no se puede quitar ni cambiar.'));
   if(item.kind==='gear')card.append(comparison(item,player));
   const take=actionButton('A la mochila','reward',{item:item.id});
   if(item.kind==='gear'){
@@ -929,7 +931,7 @@ function inventorySlot(item,label,actions=[],fallback=''){
   const tile=document.createElement(item?'details':'div');
   tile.className='inventory-slot '+(item?'filled grade'+(item.grade||0):'empty');
   const face=document.createElement(item?'summary':'span');
-  if(item||fallback)face.append(equipmentIcon(item?.kind==='rune'?'rune':item?.slot||fallback));
+  if(item||fallback)face.append(item?itemIcon(item):equipmentIcon(fallback));
   if(item?.kind==='gear'&&socketsOf(item))face.append(socketPips(item));
   if(label){
     const name=document.createElement('small');
@@ -949,7 +951,7 @@ function inventorySlot(item,label,actions=[],fallback=''){
     face.addEventListener('focus',inspect);
     face.addEventListener('blur',hideUnit);
     if(runesOf(item).length){
-      const rune=equipmentIcon('rune');
+      const rune=itemIcon(runesOf(item)[0]);
       rune.classList.add('socket-icon');
       rune.title=runesOf(item).map(r=>r.name).join(' · ');
       face.append(rune);
@@ -1000,7 +1002,7 @@ function renderInventory(player){
     if(trading){
       if(item.kind==='gear')actions.push(actionButton('Equipar','equip',{item:item.id}));
       else for(const [slot,label] of Object.entries(slots)){
-        if(player.equipment[slot]&&runesOf(player.equipment[slot]).length<socketsOf(player.equipment[slot]))actions.push(actionButton('Engarzar en '+label.toLowerCase()+' (permanente)','socket',{item:item.id,slot}));
+        if(player.equipment[slot]&&runesOf(player.equipment[slot]).length<socketsOf(player.equipment[slot]))actions.push(actionButton('Engastar en '+label.toLowerCase()+' (permanente)','socket',{item:item.id,slot}));
       }
       if(shopping){
         const sell=actionButton('Vender · ','sell',{item:item.id});
@@ -1680,16 +1682,16 @@ function paintArea(area=[],center=null,skill=null,caster=null){
   for(const pos of area)board.children[pos]?.classList.add('area-preview');
   if(center!==null&&area.includes(center))board.children[center]?.classList.add('area-center');
   if(iso?.active)iso.highlight(board.children);
-  aimDamage(skill&&caster?area:[],skill,caster);
+  aimDamage(skill&&caster?area:[],skill,caster,center);
 }
 /** Etiquetas sobre cada enemigo afectado con el daño teórico que le harías (mínimo–máximo). */
-function aimDamage(area,skill,caster){
+function aimDamage(area,skill,caster,center=null){
   let layer=el('aim-damage');
   if(!layer){layer=h('div','aim-damage-layer');layer.id='aim-damage';document.body.append(layer);}
   layer.replaceChildren();
   for(const pos of area){
     const target=state?.units.find(u=>u.hp>0&&u.pos===pos&&u.enemy);
-    const preview=target&&damagePreview(caster,target,skill);
+    const preview=target&&damagePreview(caster,target,skill,areaFalloff(state,center,pos,skill));
     if(!preview)continue;
     const cell=el('board').children[pos];
     const near=iso?.active?iso.anchor(pos):cell?.getBoundingClientRect();

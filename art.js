@@ -296,12 +296,54 @@ const gearColors={
   charm:['#7ba6a6','#c3f0dc','#456a72'],
   rune:['#8267bb','#e1bbff','#4e3d78']
 };
+/** Colores de cada gema (los mismos que en engine.js). */
+const gemColors={ruby:['#c8213a','#ff8a9a','#6e0f22'],garnet:['#d4561e','#ffb27a','#7a2a10'],sapphire:['#2a5fd0','#9cc4ff','#122e70'],
+  topaz:['#e3b422','#fff1a0','#7a5a0e'],amethyst:['#8a4fd8','#dcb8ff','#43206e'],emerald:['#1f9d55','#8ff0b4','#0c4d28'],
+  onyx:['#4a4a55','#b7b7c4','#16161c'],diamond:['#cfe6ef','#ffffff','#7b98a6'],tigereye:['#b9782a','#ffd28a','#5a3510']};
+/** Gema facetada: más grande y brillante cuanto mejor es su calidad (0 dañada … 6 excelente). */
+function gemIcon(c,kind,quality){
+  const [base,light,shade]=gemColors[kind]||gemColors.ruby;
+  const q=Math.max(0,Math.min(6,quality|0));
+  const r=9+q*1.25,cx=20,cy=21;
+  const outline='#1a1420';
+  const poly=(paint,points,stroke=outline,width=1.6)=>{
+    c.beginPath();points.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath();
+    c.fillStyle=paint;c.fill();if(stroke){c.lineWidth=width;c.strokeStyle=stroke;c.stroke();}
+  };
+  if(q>=5){const g=c.createRadialGradient(cx,cy,2,cx,cy,r+6);g.addColorStop(0,light+'aa');g.addColorStop(1,light+'00');c.fillStyle=g;c.fillRect(0,0,40,40);}
+  // Contorno de talla brillante: corona arriba y pabellón en punta abajo.
+  const top=cy-r*.62,girdle=cy-r*.12,bottom=cy+r;
+  const outer=[[cx-r*.55,top],[cx+r*.55,top],[cx+r,girdle],[cx,bottom],[cx-r,girdle]];
+  poly(base,outer);
+  poly(light,[[cx-r*.55,top],[cx+r*.55,top],[cx+r*.3,girdle],[cx-r*.3,girdle]],null);       // mesa
+  poly(shade,[[cx+r*.3,girdle],[cx+r,girdle],[cx,bottom]],null);                               // faceta en sombra
+  poly(base,[[cx-r*.3,girdle],[cx+r*.3,girdle],[cx,bottom]],null);
+  c.lineWidth=1;c.strokeStyle=shade;c.beginPath();
+  c.moveTo(cx-r,girdle);c.lineTo(cx+r,girdle);c.moveTo(cx-r*.3,girdle);c.lineTo(cx,bottom);c.moveTo(cx+r*.3,girdle);c.lineTo(cx,bottom);c.stroke();
+  poly('transparent',outer);
+  // Calidades bajas: grietas y una esquina rota.
+  if(q<=2){
+    c.strokeStyle='#1a1420';c.lineWidth=1.3;c.beginPath();
+    c.moveTo(cx-r*.2,top+1);c.lineTo(cx+r*.05,girdle);c.lineTo(cx-r*.15,cy+r*.45);
+    if(q===0){c.moveTo(cx+r*.5,girdle);c.lineTo(cx+r*.15,cy+r*.5);}
+    c.stroke();
+    if(q<=1)poly('#1a1420',[[cx+r*.55,top],[cx+r*.85,top+r*.3],[cx+r*.4,top+r*.25]],null);
+  }
+  // Calidades altas: destellos.
+  if(q>=4){
+    c.fillStyle='#ffffff';
+    const spark=(x,y,k)=>{c.fillRect(x-k,y-.6,k*2,1.2);c.fillRect(x-.6,y-k,1.2,k*2);};
+    spark(cx-r*.25,top+r*.2,2+q*.3);
+    if(q>=6)spark(cx+r*.6,girdle+r*.25,2.4);
+  }
+}
 export function equipmentIcon(type){
   const art=document.createElement('canvas');
   art.width=40;art.height=40;
   art.className='equipment-icon';
   art.setAttribute('aria-hidden','true');
   const c=art.getContext('2d');
+  if(String(type).startsWith('gem:')){const [,kind,quality]=String(type).split(':');gemIcon(c,kind,Number(quality));return art;}
   const [base,light,shade]=gearColors[type]||gearColors.charm;
   const outline='#201923';
   const poly=(paint,points,stroke=outline)=>{

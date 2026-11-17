@@ -10,7 +10,7 @@ export const classes = {
     ['Quebrar armadura',2,1,3,5,'expose','✷',0,{element:'physical',value:3,max:{value:2}}],
     ['Segundo aliento',2,0,5,8,'heal','✚',0,{max:{range:2}}],
     ['Empujón de escudo',2,1,4,6,'push','➶',0,{element:'physical',push:3,max:{push:1}}],
-    ['Barrido',3,1,6,9,'damage','⚔',0,{element:'physical',area:'cone',max:{cost:-1}}],
+    ['Barrido',3,1,5,8,'damage','⚔',0,{element:'physical',area:'cone',max:{cost:-1}}],
     ['Gancho',2,4,2,4,'pull','↢',2,{element:'physical',pull:'melee',inLine:true,anyTarget:true,max:{range:1}}],
     ['Muralla',2,3,0,0,'shield','⛨',0,{value:3,max:{value:1}}],
     ['Golpe de brasas',2,2,7,10,'damage','✹',0,{element:'fire',max:{modifiable:true}}]
@@ -20,8 +20,8 @@ export const classes = {
     ['Flecha de lastre',2,6,3,5,'slow','❄',2,{element:'ice',value:2,max:{value:1}}],
     ['Flecha perforante',3,8,9,12,'expose','✷',3,{element:'physical',value:3,max:{range:1}}],
     ['Paso atrás',1,1,2,3,'push','↢',0,{element:'physical',push:2,max:{push:1}}],
-    ['Lluvia de flechas',3,7,4,7,'blast','✹',3,{element:'physical',area:'cross',max:{cost:-1}}],
-    ['Flecha penetrante',3,6,6,9,'damage','➶',2,{element:'physical',area:'line',size:2,max:{size:1}}],
+    ['Lluvia de flechas',3,7,3,6,'blast','✹',3,{element:'physical',area:'cross',max:{cost:-1}}],
+    ['Flecha penetrante',3,6,5,8,'damage','➶',2,{element:'physical',area:'line',size:2,max:{size:1}}],
     ['Flecha de retroceso',2,5,3,5,'push','➶',2,{element:'physical',push:2,max:{push:1}}],
     ['Flecha ígnea',2,6,6,9,'damage','✹',2,{element:'fire',max:{crit:15}}]
   ]},
@@ -32,15 +32,15 @@ export const classes = {
     ['Purificar',2,3,3,6,'cleanse','❖',0,{max:{range:2}}],
     ['Escudo sagrado',2,4,0,0,'shield','⛨',0,{value:3,max:{value:2}}],
     ['Celeridad divina',2,4,0,0,'haste','➝',0,{value:2,max:{range:2}}],
-    ['Juicio',3,5,6,9,'blast','✹',2,{element:'fire',area:'cross',max:{crit:15}}],
+    ['Juicio',3,5,5,8,'blast','✹',2,{element:'fire',area:'cross',max:{crit:15}}],
     ['Alba radiante',3,4,8,12,'heal','✚',0,{area:'cross',max:{cost:-1}}]
   ]},
   mago: {name:'Mago', hp:30, initiative:13, skills:[
     ['Descarga arcana',2,6,6,9,'damage','✦',0,{element:'magic',max:{crit:15}}],
-    ['Bola de fuego',3,5,6,10,'blast','✹',2,{element:'fire',area:'cross',max:{size:1}}],
+    ['Bola de fuego',3,5,5,8,'blast','✹',2,{element:'fire',area:'cross',max:{size:1}}],
     ['Escarcha',2,5,3,6,'slow','❄',0,{element:'ice',value:2,max:{value:1}}],
-    ['Cono de hielo',3,1,6,9,'slow','❄',0,{element:'ice',area:'cone',value:1,max:{size:1}}],
-    ['Relámpago',3,1,6,10,'damage','✦',0,{element:'lightning',area:'line',size:3,max:{size:1}}],
+    ['Cono de hielo',3,1,5,7,'slow','❄',0,{element:'ice',area:'cone',value:1,max:{size:1}}],
+    ['Relámpago',3,1,5,8,'damage','✦',0,{element:'lightning',area:'line',size:3,max:{size:1}}],
     ['Onda de choque',2,3,4,6,'push','✦',0,{element:'magic',push:2,max:{push:1}}],
     ['Teletransporte',3,4,0,0,'dash','↢',1,{teleport:true,los:false,max:{range:1}}],
     ['Rayo umbrío',2,6,7,10,'damage','✦',0,{element:'chaos',max:{modifiable:true}}]
@@ -50,7 +50,7 @@ export const classes = {
     ['Cuchilla envenenada',2,4,3,5,'venom','✧',0,{element:'chaos',value:3,max:{value:2}}],
     ['Paso de sombra',2,3,0,0,'dash','↢',1,{teleport:true,max:{range:1}}],
     ['Puñalada trasera',3,1,12,16,'damage','⚔',0,{element:'chaos',max:{crit:20}}],
-    ['Bomba de humo',2,4,3,5,'slow','❄',0,{element:'chaos',area:'cross',value:1,max:{value:1}}],
+    ['Bomba de humo',2,4,2,4,'slow','❄',0,{element:'chaos',area:'cross',value:1,max:{value:1}}],
     ['Kunai con cadena',2,5,4,6,'pull','↢',2,{element:'physical',pull:3,max:{range:1}}],
     ['Sustitución',2,5,0,0,'swap','↢',1,{max:{cost:-1}}],
     ['Corte glacial',2,2,5,8,'slow','❄',0,{element:'ice',value:2,max:{modifiable:true}}]
@@ -80,7 +80,9 @@ export function skillFor(unit,index,preview=false){
   const skill=[...base];
   const opts={...skillOptions(base)};
   skill[8]=opts;
-  if(rank>1&&skill[5]!=='dash'&&skill[4]>0){skill[3]+=(rank-1)*2;skill[4]+=(rank-1)*2;}
+  // Cada rango suma +2 de daño (+1 en las de área, que ya golpean a varios).
+  const perRank=isAreaDamage(base)?1:2;
+  if(rank>1&&skill[5]!=='dash'&&skill[4]>0){skill[3]+=(rank-1)*perRank;skill[4]+=(rank-1)*perRank;}
   if(rank>1&&skill[5]==='dash')skill[2]+=rank-1;
   if(rank>=3){
     const bonus=opts.max||{};
@@ -188,10 +190,33 @@ const rareFirst=['Lamento','Colmillo','Susurro','Ruina','Presagio','Garra','Aull
 const rareSecond=['sombrío','de hueso','carmesí','del ocaso','funesto','de la cripta','errante','voraz','silente','de ceniza','eterno','roto'];
 const legendaryNames=['La Última Brasa','Juramento del Umbral','El Ojo Insomne','Lágrima de Tusi','Promesa Rota','Corona del Rey Caído',
   'Fauces del Abismo','Canción de Ceniza','El Vigía Eterno','Pacto de Sangre','Aliento del Oráculo','Silencio del Osario'];
-const inscriptions = [
-  ['Brasa','fire',2],['Escarcha','ice',2],['Acero','physical',2],['Éter','magic',2],['Chispa','lightning',2],['Umbría','chaos',2],
-  ['Muralla','ward',1], ['Centella','critical',8], ['Pulso','vitality',5]
+/**
+ * Gemas (al estilo de Diablo II): cada tipo da un stat y su calidad sube con el nivel del objeto.
+ * Calidades: dañada, astillada, defectuosa, completa, pulida, impecable y excelente.
+ */
+export const gemQualities=[
+  {name:['dañado','dañada'],ilvl:1},{name:['astillado','astillada'],ilvl:4},{name:['defectuoso','defectuosa'],ilvl:7},
+  {name:['completo','completa'],ilvl:11},{name:['pulido','pulida'],ilvl:15},{name:['impecable','impecable'],ilvl:19},
+  {name:['excelente','excelente'],ilvl:23}
 ];
+export const gems={
+  ruby:{name:'Rubí',female:false,stat:'vitality',values:[5,8,11,15,20,25,32],colors:['#c8213a','#ff8a9a','#6e0f22']},
+  garnet:{name:'Granate',female:false,stat:'fire',values:[2,3,4,5,7,9,11],colors:['#d4561e','#ffb27a','#7a2a10']},
+  sapphire:{name:'Zafiro',female:false,stat:'ice',values:[2,3,4,5,7,9,11],colors:['#2a5fd0','#9cc4ff','#122e70']},
+  topaz:{name:'Topacio',female:false,stat:'lightning',values:[2,3,4,5,7,9,11],colors:['#e3b422','#fff1a0','#7a5a0e']},
+  amethyst:{name:'Amatista',female:true,stat:'magic',values:[2,3,4,5,7,9,11],colors:['#8a4fd8','#dcb8ff','#43206e']},
+  emerald:{name:'Esmeralda',female:true,stat:'chaos',values:[2,3,4,5,7,9,11],colors:['#1f9d55','#8ff0b4','#0c4d28']},
+  onyx:{name:'Ónice',female:false,stat:'physical',values:[2,3,4,5,7,9,11],colors:['#4a4a55','#b7b7c4','#16161c']},
+  diamond:{name:'Diamante',female:false,stat:'ward',values:[1,1,2,2,3,4,5],colors:['#cfe6ef','#ffffff','#7b98a6']},
+  tigereye:{name:'Ojo de tigre',female:false,stat:'critical',values:[2,3,4,5,6,8,10],colors:['#b9782a','#ffd28a','#5a3510']}
+};
+/** Calidad de gema (0–6) para un nivel de objeto. */
+export const gemQuality=ilvl=>gemQualities.reduce((q,info,i)=>ilvl>=info.ilvl?i:q,0);
+export function makeGem(id,type,quality){
+  const gem=gems[type],q=Math.max(0,Math.min(gemQualities.length-1,quality));
+  return {id,name:gem.name+' '+gemQualities[q].name[gem.female?1:0],kind:'rune',gem:type,quality:q,ilvl:gemQualities[q].ilvl,
+    price:6+5*q,stats:{[gem.stat]:gem.values[q]}};
+}
 const pick = (values,rng) => values[Math.floor(rng()*values.length)];
 const roll = (low,high,rng) => low+Math.floor(rng()*(high-low+1));
 const randomSeed = rng => (rng()*4294967296)>>>0;
@@ -278,9 +303,9 @@ export function rollItem(s,rng,{bonus=0,gear=false,ilvl,minGrade=0}={}) {
   const itemId = ++s.itemId;
   const level=ilvl??itemLevel(s);
   if (!gear&&!minGrade&&rng()<.22) {
-    const [name,key,value]=pick(inscriptions,rng);
-    const power=value*(1+Math.floor((level-1)/3));
-    return {id:itemId,name:'Runa de '+name,kind:'rune',ilvl:level,price:7+2*level,stats:{[key]:power}};
+    // A veces sale una calidad por debajo de la que toca por nivel.
+    const quality=Math.max(0,gemQuality(level)-(rng()<.3?1:0));
+    return makeGem(itemId,pick(Object.keys(gems),rng),quality);
   }
   const slot=pick(Object.keys(slots),rng);
   const base=pick(bases[slot],rng);
@@ -316,7 +341,7 @@ export const forgeModes={
   prefix:{name:'Re-tirar prefijos',text:'Vuelve a tirar solo los PREFIJOS; los sufijos se quedan igual.',factor:1.35},
   suffix:{name:'Re-tirar sufijos',text:'Vuelve a tirar solo los SUFIJOS; los prefijos se quedan igual.',factor:1.35},
   upgrade:{name:'Mejorar rareza',text:'Sube un grado de rareza y añade el prefijo o sufijo que le corresponde.',factor:2.6},
-  socket:{name:'Añadir hueco',text:'Abre un hueco de runa más (máximo 2).',factor:1.8}
+  socket:{name:'Añadir hueco',text:'Abre un hueco más para gemas (máximo 2).',factor:1.8}
 };
 /** Precio de una operación de forja: crece con el nivel y la rareza del objeto. */
 export function forgeCost(item,mode){
@@ -1060,12 +1085,12 @@ function netDamage(target,raw,element,critical,extra=0){
   return Math.max(0,base-(element==='physical'?ward:Math.floor((target.effects?.shield?.value||0)/2)));
 }
 export const critChance=unit=>Math.min(1,.12+(unit.stats?.critical||0)/100);
-export function damagePreview(unit,target,skill){
+export function damagePreview(unit,target,skill,scale=1){
   if([...supportKinds,'dash','swap'].includes(skill[5])||!(skill[4]>0))return null;
   const element=skillElement(unit,skill);
   const bonus=damageBonus(unit,skill),armor=armorType(unit,skill);
   const extra=target.effects?.expose?.value||0;
-  const range=critical=>[skill[3],skill[4]].map(base=>netDamage(target,base+bonus,armor,critical,extra));
+  const range=critical=>[skill[3],skill[4]].map(base=>netDamage(target,Math.max(1,Math.floor((base+bonus)*scale)),armor,critical,extra));
   return {normal:range(false),critical:range(true),chance:Math.min(1,critChance(unit)+(skillOptions(skill).crit||0)/100),element};
 }
 function hit(s,actor,target,raw,kind='damage',critical=false,element='physical') {
@@ -1500,7 +1525,7 @@ const events={
     {label:'Beber',detail:'Todo el grupo se cura por completo, pero tiene −1 PM en el próximo combate.',apply:s=>{healParty(s,1);addMod(s,'mp',-1);}},
     {label:'Llenar los odres',detail:'Todo el grupo recupera un 30 % de su vida.',apply:s=>healParty(s,.3)},
     {label:'Seguir adelante',detail:'Cada jugador recibe 8 de tusi.',apply:s=>{for(const p of s.players)p.gold+=8;}}]},
-  altar:{title:'Altar de sangre',text:'Un altar antiguo exige un tributo. Las runas talladas laten al acercaros.',options:[
+  altar:{title:'Altar de sangre',text:'Un altar antiguo exige un tributo. Las gemas incrustadas laten al acercaros.',options:[
     {label:'Ofrecer sangre',detail:'Todos pierden un 25 % de su vida actual y reciben un objeto raro o mejor.',apply:(s,rng)=>{hurtParty(s,.25);giveAll(s,()=>rollItem(s,rng,{gear:true,minGrade:2,ilvl:itemLevel(s,1)}));}},
     {label:'Rezar',detail:'+1 PA en el próximo combate, pero los enemigos tendrán un 15 % más de vida.',apply:s=>{addMod(s,'ap',1);s.pending.enemyHp=(s.pending.enemyHp||1)*1.15;}},
     {label:'Marcharse',detail:'No ocurre nada.',apply:()=>{}}]},
@@ -1511,7 +1536,7 @@ const events={
     {label:'Descansar',detail:'Todo el grupo recupera un 50 % de su vida.',apply:s=>healParty(s,.5)},
     {label:'Entrenar',detail:'+1 PA y +1 PM en el próximo combate, pero empezáis con el 80 % de la vida.',apply:s=>{addMod(s,'ap',1);addMod(s,'mp',1);s.pending.startHpPct=Math.min(s.pending.startHpPct||1,.8);}}]},
   peddler:{title:'Buhonero errante',text:'Un mercader encapuchado arrastra un carro lleno de baratijas brillantes.',options:[
-    {label:'Comprar runas',detail:'Cada uno paga hasta 10 de tusi y recibe una runa.',apply:(s,rng)=>{for(const p of s.players){p.gold=Math.max(0,p.gold-10);let rune;do rune=rollItem(s,rng);while(rune.kind!=='rune');p.bag.push(rune);}}},
+    {label:'Comprar gemas',detail:'Cada uno paga hasta 10 de tusi y recibe una gema.',apply:(s,rng)=>{for(const p of s.players){p.gold=Math.max(0,p.gold-10);let rune;do rune=rollItem(s,rng);while(rune.kind!=='rune');p.bag.push(rune);}}},
     {label:'Pedir consejo',detail:'+1 PM en el próximo combate.',apply:s=>addMod(s,'mp',1)},
     {label:'Robarle',detail:'Cada uno recibe 25 de tusi, pero empezáis el próximo combate con el 75 % de la vida.',apply:s=>{for(const p of s.players)p.gold+=25;s.pending.startHpPct=Math.min(s.pending.startHpPct||1,.75);}}]},
   library:{title:'Biblioteca olvidada',text:'Estanterías podridas guardan tomos de técnicas perdidas.',options:[
@@ -1954,7 +1979,17 @@ function shove(s,actor,target,cells,toward){
   }
 }
 /** Aplica una habilidad a una unidad concreta (daño, efectos, empuje...). */
-function applySkill(s,unit,target,skill,rng){
+/** ¿Es una habilidad de daño en área? */
+export function isAreaDamage(skill){
+  const o=skillOptions(skill);
+  return (skill[5]==='blast'||!!o.area)&&skill[4]>0&&!supportKinds.includes(skill[5]);
+}
+/** Daño en área: pleno en la casilla central y −20 % por cada casilla de distancia (mínimo 60 %). */
+export function areaFalloff(s,center,pos,skill){
+  if(!isAreaDamage(skill)||center==null||pos==null)return 1;
+  return Math.max(.6,1-.2*distance(s,center,pos));
+}
+function applySkill(s,unit,target,skill,rng,scale=1){
   const [name,,,min,max,kind]=skill;
   const opts=skillOptions(skill);
   const value=opts.value;
@@ -1981,7 +2016,7 @@ function applySkill(s,unit,target,skill,rng){
     const element=skillElement(unit,skill);
     const critical=rng()<Math.min(1,critChance(unit)+(opts.crit||0)/100);
     const before=target.hp;
-    hit(s,unit,target,roll(min,max,rng)+damageBonus(unit,skill),'damage',critical,armorType(unit,skill));
+    hit(s,unit,target,Math.max(1,Math.floor((roll(min,max,rng)+damageBonus(unit,skill))*scale)),'damage',critical,armorType(unit,skill));
     ignite(s,target,before-target.hp,element);
   }
   if(!alive(target))return;
@@ -2024,7 +2059,7 @@ function gearAction(s,p,a,rng) {
     p.bag.push(p.equipment[a.slot]);
     delete p.equipment[a.slot];
   }else if(a.type==='unsocket'){
-    fail('Las runas engarzadas son permanentes: no se pueden extraer.');
+    fail('Las gemas engastadas son permanentes: no se pueden extraer.');
   }else if(a.type==='next'){
     if(s.players[0].id!==p.id)fail('Solo el anfitrión puede continuar.');
     if(s.picks.length!==s.players.length)fail('Falta elegir botín.');
@@ -2040,8 +2075,8 @@ function gearAction(s,p,a,rng) {
     }else if(a.type==='socket'&&item.kind==='rune'&&Object.hasOwn(p.equipment,a.slot)){
       const gear=p.equipment[a.slot];
       const set=runesOf(gear);
-      if(socketsOf(gear)===0)fail('Ese equipo no tiene huecos de runa (la forja puede abrirle uno).');
-      if(set.length>=socketsOf(gear))fail('Ese equipo no tiene huecos libres: las runas engarzadas son permanentes y no se pueden reemplazar.');
+      if(socketsOf(gear)===0)fail('Ese equipo no tiene huecos para gemas (la forja puede abrirle uno).');
+      if(set.length>=socketsOf(gear))fail('Ese equipo no tiene huecos libres: las gemas engastadas son permanentes y no se pueden reemplazar.');
       p.bag.splice(bagIndex,1);
       gear.runes=[...set,item];delete gear.socket;
     }else if(a.type==='sell'){
@@ -2188,7 +2223,7 @@ export function act(s,id,a,rng=Math.random) {
     const area=spellArea(s,a.pos,skill,unit);
     spellCue(s,unit,a.pos,kind,area,skill);
     const support=supportKinds.includes(kind);
-    for(const other of s.units.filter(u=>alive(u)&&area.includes(u.pos)&&(support?!u.enemy:u.enemy)))applySkill(s,unit,other,skill,rng);
+    for(const other of s.units.filter(u=>alive(u)&&area.includes(u.pos)&&(support?!u.enemy:u.enemy)))applySkill(s,unit,other,skill,rng,areaFalloff(s,a.pos,other.pos,skill));
     finish(s,rng);
     if(s.phase==='combat'&&!alive(unit))advance(s,rng);
     return;

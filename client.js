@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=30';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=30';
-import {setupSfx} from './music.js?v=30';
-import {icon} from './icons.js?v=30';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=31';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=31';
+import {setupSfx} from './music.js?v=31';
+import {icon} from './icons.js?v=31';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -95,7 +95,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=30').then(({createIso})=>{
+import('./isometric.js?v=31').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -925,7 +925,7 @@ function updateGameOver(){
     accountCall('award',{floor:state.floor,bossKills:state.bossKills||0,won}).then(d=>{account.user=d.user;renderAccount();}).catch(()=>{});
   }else if(account.user&&session.code)setTimeout(refreshAccount,1500);
   hideUnit();
-  sfx(won?'heal':'blast');
+  sfx(won?'win':'lose');
   gameoverDialog.showModal();
 }
 const nodeIcons={combat:'sword',elite:'elite',event:'question',boss:'crown',shop:'shop'};
@@ -1105,9 +1105,45 @@ function resetAnimation(){
   lastDamageUntil=0;
   el('animations').replaceChildren();
 }
-function impact(event){
+/** Voz de cada criatura (banco de sonidos). */
+const voices={skeleton:'v_skeleton',skeletonking:'v_boss',slime:'v_slime',slimeking:'v_slime',lavaslime:'v_slime',skull:'v_ghost',oracle:'v_ghost',
+  umbralking:'v_ghost',worm:'v_worm',slug:'v_worm',bat:'v_bat',plant:'v_plant',sporemother:'v_plant',cerberus:'v_beast',imp:'v_imp',
+  vampire:'v_shade',succubus:'v_shade',vampqueen:'v_shade',firedemon:'v_boss'};
+const flying=new Set(['bat','skull','imp','oracle','umbralking','succubus','vampqueen','slime','slimeking','lavaslime','slug','worm','plant','sporemother']);
+/** Sonidos de un evento del combate: acción, voz, golpe, muerte, trampas y glifos. */
+function eventSound(event){
+  const unitOf=id=>state?.units.find(u=>u.id===id);
   if(event.kind==='spell'){
-    sfx(event.effect);
+    const actor=unitOf(event.actor);
+    sfx(event.effect==='slash'?'swing':event.effect);
+    if(actor?.enemy&&voices[actor.look])sfx(voices[actor.look],{volume:actor.boss?.9:.55});
+    if(actor?.boss&&event.effect!=='slash')sfx('v_boss',{volume:.8,delay:.1});
+    return;
+  }
+  if(['damage','glyph','trap','poison'].includes(event.kind)&&event.amount>0){
+    const target=unitOf(event.unit);
+    if(event.kind==='glyph')sfx('glyph',{volume:.8});
+    else if(event.kind==='trap')sfx('trap',{volume:.8});
+    else if(event.kind==='poison')sfx('venom',{volume:.5});
+    sfx('hit',{volume:event.critical?1:.75,rate:event.critical?.85:1});
+    if(event.kind==='damage'&&Math.random()<.5)sfx('slash',{volume:.4});
+    if(target&&(target.classId==='guardia'||target.look==='skeleton'||target.look==='skeletonking'))sfx('armor',{volume:.5});
+    if(target?.hp<=0)sfx(target.enemy?'die_monster':'die_hero',{delay:.12});
+    else if(target&&!target.enemy&&Math.random()<.5)sfx('hurt_hero',{volume:.6,delay:.05});
+    else if(target?.enemy&&voices[target.look]&&Math.random()<.4)sfx(voices[target.look],{volume:.45,delay:.06});
+  }
+}
+/** Pasos al moverse (chapoteo en la jungla); las criaturas que flotan o reptan no pisan. */
+function stepSounds(event){
+  const unit=state?.units.find(u=>u.id===event.unit);
+  if(!unit||flying.has(unit.look))return;
+  const wet=state.biome==='jungle';
+  const gap=unit.enemy?.135:.225;
+  event.path.forEach((_,i)=>sfx(wet?'step_wet':'step',{volume:wet?.25:.35,delay:i*gap+.05,rate:unit.look==='cerberus'?.8:1}));
+}
+function impact(event){
+  eventSound(event);
+  if(event.kind==='spell'){
     if(iso?.active)iso.impact(event);
     else{
       for(const pos of event.area||[event.pos]){
@@ -1154,6 +1190,7 @@ async function animate(){
     playing=event;
     if(!['combat','reward','won','lost'].includes(state.phase))continue;
     if(event.kind!=='move'){impact(event);continue;}
+    stepSounds(event);
     if(iso?.active){
       await iso.move(event);
       continue;
@@ -1317,6 +1354,7 @@ function drawBoard(turn,walking,skill){
   }
 }
 function render(){
+  sfx.ambient?.(state?.phase==='combat'?{crypt:'amb_crypt',jungle:'amb_jungle',hell:'amb_hell'}[state.biome]||'amb_crypt':'');
   el('entry').hidden=!!state;
   el('game').hidden=!state;
   document.body.classList.toggle('in-expedition',!!state);
@@ -1458,8 +1496,11 @@ async function request(base,path,body,key){
   }
   return result;
 }
+/** Sonido de cada acción del jugador fuera del combate (equipo, tienda, botín, mejora). */
+const actionSounds={equip:'equip',unequip:'equip',socket:'equip',unsocket:'equip',buy:'coins',sell:'coins',give:'coins',reward:'loot',train:'levelup',vote:'page',ready:'door',next:'door'};
 async function send(action){
   if(busy)return;
+  if(actionSounds[action.type])sfx(actionSounds[action.type],{volume:action.type==='train'?.7:.8});
   const epoch=generation;
   busy=true;
   revision++;

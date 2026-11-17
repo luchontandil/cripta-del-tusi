@@ -930,3 +930,5 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 .route-map.previewing .route-node:not(.preview):not(.current):not(.visited){opacity:.35}
 .route-map.previewing .route-node.preview{opacity:1;filter:none;box-shadow:0 0 0 2px var(--gold),0 0 12px #f2cd8a88}
 .map-lines line.preview{stroke:var(--gold);stroke-dasharray:none;stroke-width:3;opacity:1}
+
+.credits{margin:14px auto 4px;max-width:900px;text-align:center;font-size:.72rem;color:#8a8070;line-height:1.5}.credits a{color:#b8a888}

@@ -28,6 +28,7 @@ Correcciones de roster, escala medida, botín, eventos y VFX en la sección «Au
 | Familias de equipo | 9 slots (27 bases) + 9 runas + 4 rarezas | Pendiente | Bases confirmadas; el equipo solo existe como icono de UI, no sobre el héroe 3D |
 | Props/eventos | Obstáculos, agua/lava, trampas, antorchas | Pendiente | Eventos y tienda son tarjetas 2D de UI: no necesitan modelo 3D |
 | Hechizos/VFX | 40 habilidades + VFX de jefe | Pendiente | 8 habilidades × 5 clases; falta matriz completa por forma/elemento |
+| Sonido (SFX) | 44 categorías, 117 sonidos + 3 ambientes | `sfx/` y `sfx/CREDITS.md` en el repo del juego | **Propuesta** (17-11-2026) | OpenGameArt: 13 packs CC0 + Fantasy Sound Effects Library (Little Robot Sound Factory, CC-BY 3.0, atribución en pantalla de inicio) |
 | Animaciones | 11 estados | **Propuesta** (17-11-2026) — `anim_keyposes.png` | Hechos: tajo, disparo, hechizo, apoyo, empuje/atracción, golpe recibido y muerte. Básicos: desplazamiento y poderes de jefe |
 
 ## Assets
@@ -50,7 +51,18 @@ La lista completa, vistas, observaciones y huecos de auditoría está en [ASSET_
 | Gusano de cripta | Bestiario · Acto I | `monster_crypt_worm.png`, `monster_crypt_worm.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 348 tris, 6 draw calls |
 | Rey Osario | Bestiario · Acto I (jefe a mitad) | `boss_ossuary_king.png`, `boss_ossuary_king.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 1028 tris, 7 draw calls |
 | Rey del Umbral | Bestiario · Acto I (jefe final) | `boss_threshold_king.png`, `boss_threshold_king.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 1084 tris, 8 draw calls |
-| Monstruos y jefes de los Actos II y III | Bestiario | Ver inventario | Igual | Pendiente | Siguiente tanda |
+| Murciélago | Bestiario · Acto II (y invocado en III) | `monster_bat.png`, `monster_bat.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 192 tris, 3 draw calls |
+| Babosa | Bestiario · Acto II | `monster_slug.png`, `monster_slug.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 288 tris, 7 draw calls |
+| Planta escupidora | Bestiario · Acto II | `monster_spitter_plant.png`, `monster_spitter_plant.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 380 tris, 4 draw calls |
+| Madre Espora | Bestiario · Acto II (jefe final) | `boss_spore_mother.png`, `boss_spore_mother.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 524 tris, 10 draw calls |
+| Cancerbero | Bestiario · Acto II (jefe a mitad) | `boss_cerberus.png`, `boss_cerberus.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 900 tris, 12 draw calls |
+| Limo de lava | Bestiario · Acto III | `monster_lava_slime.png`, `monster_lava_slime.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 180 tris, 2 draw calls |
+| Diablillo | Bestiario · Acto III | `monster_imp.png`, `monster_imp.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 668 tris, 9 draw calls |
+| Vampiro | Bestiario · Acto III | `monster_vampire.png`, `monster_vampire.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 708 tris, 7 draw calls |
+| Súcubo | Bestiario · Acto III | `monster_succubus.png`, `monster_succubus.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 720 tris, 8 draw calls |
+| Oráculo de Ceniza | Bestiario · Acto III (jefe a mitad, alterna) | `boss_ash_oracle.png`, `boss_ash_oracle.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 336 tris, 6 draw calls |
+| Reina Vampira | Bestiario · Acto III (jefe a mitad, alterna) | `boss_vampire_queen.png`, `boss_vampire_queen.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 872 tris, 10 draw calls |
+| Demonio de Fuego | Bestiario · Acto III (jefe final) | `boss_fire_demon.png`, `boss_fire_demon.md` | F/L/T, 3/4, cenital, isométrico, escala | **Propuesta** (17-11-2026) | 768 tris, 7 draw calls |
 | Mazmorra, Jungla, Infierno | Entorno | `act_crypt.png`, `act_jungle.png`, `act_hell.png` | Room top-down/isométrico + kit modular/footprints | Pendiente | No fijar metros ni tile sin medida de código |
 | Slots, runas, rarezas | Equipo | `equipment/`, `props/rune_token.png` | Frente/lado/arriba/3-4, punto de agarre | Pendiente | Confirmar bases en el código de loot antes de crear ítems individuales |
 | Props, eventos y VFX | Gameplay | `props/`, `vfx/` | Vista aislada y overlay táctico | Pendiente | Mapear con reglas de colisión, LOS, alcance y áreas reales |

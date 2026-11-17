@@ -82,3 +82,11 @@ Cada clase tiene 8 hechizos de varios elementos al estilo Dofus: daño directo, 
 Con una cuenta (nick y contraseña) se guardan los puntos de cada partida: un punto por piso alcanzado, 3 por jefe, 10 por acto completado y 25 por la victoria. Los puntos se gastan en el árbol de **maestrías** (vigor, fuerza, precisión, coraza, fortuna, ojo para el botín, sabiduría y celeridad), que se aplica a todas las partidas futuras y se puede reiniciar. Se pueden agregar amigos por nick, ver quién está conectado e invitarlos a la sala. En multijugador, cada puesto tiene un color fijo: J1 rojo, J2 azul, J3 verde y J4 amarillo.
 
 Las cuentas se guardan en **Upstash Redis** mediante su API REST. Configura en el servidor las variables `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`; sin ellas, las cuentas solo viven en memoria y se pierden al reiniciar.
+
+
+## Sonido
+
+Efectos de sonido de OpenGameArt.org, procesados (recorte, mono, normalizado, OGG) en `sfx/`:
+packs CC0 de rubberduck, artisticdude, Kenney, qubodup, Ogrebane y JaggedStone, y la
+*Fantasy Sound Effects Library* de **Little Robot Sound Factory** (www.littlerobotsoundfactory.com),
+licencia CC-BY 3.0. Lista por archivo en [`sfx/CREDITS.md`](sfx/CREDITS.md).

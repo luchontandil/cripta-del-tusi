@@ -9,7 +9,7 @@ import { persistent } from './store.js';
 export const rooms = new Map();
 const assets = {'/':'index.html','/client.js':'client.js','/engine.js':'engine.js','/art.js':'art.js','/music.js':'music.js','/icons.js':'icons.js','/style.css':'style.css',
   '/isometric.js':'isometric.js','/models3d.js':'models3d.js','/three.module.js':'three.module.js','/three.core.js':'three.core.js','/three-LICENSE.txt':'three-LICENSE.txt'};
-const mime = {html:'text/html',js:'text/javascript',css:'text/css',txt:'text/plain'};
+const mime = {html:'text/html',js:'text/javascript',css:'text/css',txt:'text/plain',ogg:'audio/ogg',json:'application/json',md:'text/markdown'};
 const token = bytes => randomBytes(bytes).toString('hex');
 const snapshot = room => ({
   ...room.state,
@@ -26,6 +26,14 @@ export const server = createServer(async (req,res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204).end(); return; }
   const path = req.url.split('?')[0];
   try {
+    // Banco de sonidos: solo nombres simples dentro de sfx/.
+    if (req.method === 'GET' && /^\/sfx\/([a-z0-9_]+\.(ogg|json)|CREDITS\.md)$/.test(path)) {
+      const content = await readFile(new URL('.'+path,import.meta.url)).catch(()=>null);
+      if (!content) return send(404,{error:'Sonido no encontrado.'});
+      res.writeHead(200, {'Content-Type':mime[path.split('.').at(-1)],'Cache-Control':'public, max-age=86400'});
+      res.end(content);
+      return;
+    }
     if (req.method === 'GET' && Object.hasOwn(assets,path)) {
       const file = assets[path];
       const content = await readFile(new URL('./'+file,import.meta.url));

@@ -364,7 +364,6 @@ function forgeItem(item,mode,rng){
   }
   return refreshItem(item,rng,wasGrade);
 }
-const forgeTime=90000;
 function startForge(s){
   s.floor++;
   for(const p of s.players)p.level=s.floor;
@@ -372,8 +371,7 @@ function startForge(s){
   s.vote=null;
   s.event=null;
   s.ready=[];
-  s.turnStarted=Date.now();
-  s.deadline=s.turnStarted+forgeTime;
+  noTimer(s);
   note(s,'Piso '+s.floor+' · Forja del herrero.');
 }
 const legacyStat={arcane:'magic',shadow:'chaos'};
@@ -1300,6 +1298,23 @@ export const nodeKinds={
   boss:{name:'Jefe',description:'Cámara del jefe: un enemigo enorme con poderes propios.'}
 };
 const voteTime=45000;
+/**
+ * Fases sin prisa (mapa, eventos, tienda y forja): no hay reloj al entrar. Cuando al menos la mitad
+ * del grupo está lista (o ha votado), empieza una cuenta atrás para el resto; si están todos, se sigue ya.
+ */
+export const READY_TIME=30000;
+const majority=s=>Math.ceil(s.players.length/2);
+function noTimer(s){s.turnStarted=Date.now();s.deadline=null;}
+function armTimer(s,count){
+  if(count>=majority(s)&&count<s.players.length&&s.deadline==null){
+    s.turnStarted=Date.now();
+    s.deadline=s.turnStarted+READY_TIME;
+    note(s,'La mayoría está lista: '+READY_TIME/1000+' s para el resto.');
+  }else if(count<majority(s)&&s.deadline!=null){
+    s.deadline=null;
+    note(s,'Ya no está lista la mayoría: se para la cuenta atrás.');
+  }
+}
 /** Árbol de un acto: 8 pisos, 3-4 caminos por piso, jefe a mitad (piso 4) y al final (piso 8). */
 export function makeRoute(rng,act=1){
   const rows=[];
@@ -1374,8 +1389,7 @@ function openRoute(s,rng){
   s.phase='map';
   s.event=null;
   s.vote={kind:'map',options,votes:{}};
-  s.turnStarted=Date.now();
-  s.deadline=s.turnStarted+voteTime;
+  noTimer(s);
   note(s,'Piso '+(s.floor+1)+' · El grupo vota el camino.');
 }
 function enterNode(s,node,rng){
@@ -1391,6 +1405,7 @@ function castVote(s,player,option,rng){
   s.vote.votes[player.id]=option;
   note(s,player.name+' vota: '+voteLabel(s,option)+'.');
   if(s.players.every(p=>Object.hasOwn(s.vote.votes,p.id)))resolveVote(s,rng);
+  else armTimer(s,Object.keys(s.vote.votes).length);
 }
 function voteLabel(s,option){
   if(s.vote.kind==='map')return nodeKinds[findNode(s,s.vote.options[option]).kind].name;
@@ -1461,7 +1476,9 @@ const events={
       }}},
     {label:'Saquear',detail:'Cada uno recibe 12 de tusi.',apply:s=>{for(const p of s.players)p.gold+=12;}}]}
 };
-const shopTime=90000;
+/** Re-tirar el género de la tienda: crece con el piso y con cada re-tirada en la misma tienda. */
+export function shopRerollCost(s){return 10+Math.floor(s.floor*1.5)+8*(s.rerolls||0);}
+const stockFor=(s,rng)=>Array.from({length:6},(_,i)=>rollItem(s,rng,{bonus:.12,gear:i<4,ilvl:itemLevel(s)}));
 function startShop(s,rng){
   s.floor++;
   for(const p of s.players)p.level=s.floor;
@@ -1469,9 +1486,9 @@ function startShop(s,rng){
   s.vote=null;
   s.event=null;
   s.ready=[];
-  s.stock=Array.from({length:6},(_,i)=>rollItem(s,rng,{bonus:.12,gear:i<4,ilvl:itemLevel(s)}));
-  s.turnStarted=Date.now();
-  s.deadline=s.turnStarted+shopTime;
+  s.stock=stockFor(s,rng);
+  s.rerolls=0;
+  noTimer(s);
   note(s,'Piso '+s.floor+' · Tienda del mercader.');
 }
 /** Dar un objeto de la mochila o tusi a otro jugador (fuera de combate). */
@@ -1504,8 +1521,7 @@ function startEvent(s,rng){
   s.phase='event';
   s.event={id,title:event.title,text:event.text,options:event.options.map(({label,detail})=>({label,detail}))};
   s.vote={kind:'event',options:event.options.map((_,i)=>i),votes:{}};
-  s.turnStarted=Date.now();
-  s.deadline=s.turnStarted+voteTime;
+  noTimer(s);
   note(s,'Piso '+s.floor+' · Evento: '+event.title+'.');
 }
 /**
@@ -1532,6 +1548,7 @@ export function trainingChoices(player){
 }
 export function tick(s,rng=Math.random) {
   if(s.paused)return false;
+  if(s.deadline==null)return false;
   if(Date.now()<s.deadline)return false;
   if(s.phase==='reward'){
     for(const p of s.players.filter(p=>s.training&&!p.trained)){
@@ -2000,11 +2017,11 @@ export function act(s,id,a,rng=Math.random) {
   if(a.type==='pause'){
     if(['lobby','over'].includes(s.phase))fail('No hay nada que pausar.');
     if(!s.paused){
-      s.paused={by:player.name,at:Date.now(),left:Math.max(0,s.deadline-Date.now())};
+      s.paused={by:player.name,at:Date.now(),left:s.deadline==null?null:Math.max(0,s.deadline-Date.now())};
       note(s,player.name+' pausa la partida.');
     }else{
       const gone=Date.now()-s.paused.at;
-      s.deadline=Date.now()+s.paused.left;
+      s.deadline=s.paused.left==null?null:Date.now()+s.paused.left;
       if(s.turnStarted)s.turnStarted+=gone;
       note(s,player.name+' reanuda la partida.');
       s.paused=null;
@@ -2029,6 +2046,7 @@ export function act(s,id,a,rng=Math.random) {
       if(!s.ready.includes(player.id))s.ready.push(player.id);
       else s.ready=s.ready.filter(id=>id!==player.id);
       if(s.players.every(p=>s.ready.includes(p.id)))openRoute(s,rng);
+      else armTimer(s,s.ready.length);
       return;
     }
     if(a.type!=='forge')fail('Acción no disponible en la forja.');
@@ -2044,11 +2062,21 @@ export function act(s,id,a,rng=Math.random) {
     note(s,player.name+' forja '+item.name+' ('+forgeModes[a.mode].name.toLowerCase()+(before!==item.rarity?' → '+item.rarity.toLowerCase():'')+') por '+cost+' tusi.');
     return;
   }
+  if(s.phase==='shop'&&a.type==='reroll-shop'){
+    const cost=shopRerollCost(s);
+    if(player.gold<cost)fail('No tienes suficiente tusi para re-tirar la tienda.');
+    player.gold-=cost;
+    s.stock=stockFor(s,rng);
+    s.rerolls=(s.rerolls||0)+1;
+    note(s,player.name+' paga '+cost+' tusi y el mercader saca género nuevo.');
+    return;
+  }
   if(s.phase==='shop'){
     if(a.type==='ready'){
       if(!s.ready.includes(player.id))s.ready.push(player.id);
       else s.ready=s.ready.filter(id=>id!==player.id);
       if(s.players.every(p=>s.ready.includes(p.id)))openRoute(s,rng);
+      else armTimer(s,s.ready.length);
       return;
     }
     if(!['buy','sell'].includes(a.type))fail('Acción no disponible en la tienda.');

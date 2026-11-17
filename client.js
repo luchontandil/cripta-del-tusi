@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
-  BASE_AP,BASE_MP,heroStats,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=59';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=59';
-import {setupSfx} from './music.js?v=59';
-import {icon} from './icons.js?v=59';
+  BASE_AP,BASE_MP,heroStats,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=61';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=61';
+import {setupSfx} from './music.js?v=61';
+import {icon} from './icons.js?v=61';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=59').then(({createIso})=>{
+import('./isometric.js?v=61').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -328,8 +328,24 @@ function btn(label,action,pressed){
   return b;
 }
 const actionButton=(label,type,data={})=>btn(label,()=>send({type,...data}));
+/** Segundos en vivo en las notas de espera (mapa, eventos, tienda y forja). */
+function paintWait(){
+  if(state?.deadline==null)return;
+  const left=state.paused?state.paused.left:state.deadline-Date.now();
+  for(const n of document.querySelectorAll('.wait-seconds'))n.textContent=String(Math.max(0,Math.ceil(left/1000)));
+}
 function paintClock(){
   const clock=el('clock');
+  // Sin cuenta atrás (mapa, eventos, tienda y forja hasta que la mitad está lista): reloj en espera.
+  const idle=state.paused?state.paused.left==null:state.deadline==null;
+  clock.classList.toggle('idle',idle);
+  if(idle){
+    el('seconds').textContent='∞';
+    clock.style.setProperty('--time','1turn');
+    clock.setAttribute('aria-valuetext','Sin límite de tiempo');
+    clock.classList.remove('urgent');
+    return;
+  }
   const remaining=state.paused?state.paused.left:Math.max(0,state.deadline-Date.now());
   const seconds=Math.ceil(remaining/1000);
   const duration=state.deadline-state.turnStarted;
@@ -938,7 +954,11 @@ function renderInventory(player){
       else for(const [slot,label] of Object.entries(slots)){
         if(player.equipment[slot]&&runesOf(player.equipment[slot]).length<socketsOf(player.equipment[slot]))actions.push(actionButton('Engarzar en '+label.toLowerCase()+' (permanente)','socket',{item:item.id,slot}));
       }
-      if(shopping)actions.push(actionButton('Vender · '+(Math.floor(item.price/2)+runesOf(item).reduce((sum,r)=>sum+Math.floor(r.price/2),0))+' tusi','sell',{item:item.id}));
+      if(shopping){
+        const sell=actionButton('Vender · ','sell',{item:item.id});
+        sell.append(h('b','price',String(Math.floor(item.price/2)+runesOf(item).reduce((sum,r)=>sum+Math.floor(r.price/2),0))),' tusi');
+        actions.push(sell);
+      }
       for(const other of others){
         const gift=actionButton('','give',{to:other.id,item:item.id});
         gift.className='give-button';
@@ -1013,11 +1033,18 @@ function renderShop(box){
     card.querySelectorAll('button').forEach(b=>b.remove());
     const buy=actionButton('','buy',{item:item.id});
     buy.className='primary buy-button';
-    buy.append(icon('gold'),'Comprar · '+item.price+' tusi');
+    buy.append(icon('gold'),'Comprar · ',h('b','price',String(item.price)),' tusi');
     buy.disabled=player.gold<item.price;
     card.append(buy);
     return card;
   });
+  // Re-tirar el género (lo paga quien lo pulsa; cambia la tienda para todo el grupo).
+  const rerollCost=shopRerollCost(state);
+  const reroll=actionButton('','reroll-shop');
+  reroll.className='ghost reroll-shop';
+  reroll.append(icon('dice'),'Re-tirar tienda · ',h('b','price',String(rerollCost)),' tusi');
+  reroll.disabled=player.gold<rerollCost;
+  reroll.title='Cambia todos los objetos de la tienda. Cada re-tirada en esta tienda cuesta más.';
   const ready=state.ready||[];
   const me=ready.includes(player.id);
   const readyButton=btn('',()=>send({type:'ready'}));
@@ -1035,9 +1062,9 @@ function renderShop(box){
     h('div','journey-head',h('h3',null,icon('shop'),'Tienda del mercader'),
       h('p',null,'Compra aquí; vende arrastrando objetos de tu mochila hasta la tienda (o con «Vender»). Podéis pasaros objetos y tusi.')),
     sellHint,
-    h('div','shop-wallet',icon('gold'),h('b',null,String(player.gold)),' tusi disponibles'),
+    h('div','shop-bar',h('div','shop-wallet',icon('gold'),h('b',null,String(player.gold)),' tusi disponibles'),reroll),
     cards.length?h('div','loot-cards shop-cards',...cards):h('p','event-text','El mercader no tiene nada más que vender.'),
-    h('div','shop-footer',party,readyButton));
+    h('div','shop-footer',party,readyButton,waitNote(ready.length)));
 }
 /** Forja: re-tirar stats o subir la rareza de cualquier objeto (equipado o en la mochila). */
 function renderForge(box){
@@ -1072,7 +1099,7 @@ function renderForge(box){
       h('p',null,'Re-tira los stats de tu equipo o sube su rareza a cambio de tusi. Re-tirar solo afijos o solo sufijos cuesta algo más; mejorar la rareza (añade un afijo o sufijo) es lo más caro.')),
     h('div','shop-wallet',icon('gold'),h('b',null,String(player.gold)),' tusi disponibles'),
     cards.length?h('div','loot-cards forge-cards',...cards):h('p','event-text','No tienes equipo que forjar.'),
-    h('div','shop-footer',party,readyButton));
+    h('div','shop-footer',party,readyButton,waitNote(ready.length)));
 }
 const trainingDialog=el('training');
 trainingDialog.addEventListener('cancel',event=>event.preventDefault());
@@ -1181,10 +1208,17 @@ function voters(option){
     return v;
   }));
 }
+/** Línea de espera común: listos/votos y cuenta atrás (si la mitad ya está lista). */
+function waitNote(count){
+  const n=state.players.length;
+  if(n<2)return null;
+  if(state.deadline!=null)return h('small','wait-note on',icon('clock'),'La mayoría está lista: quedan ',h('b','wait-seconds',''),' s para el resto');
+  return h('small','wait-note',icon('clock'),'Sin prisa: la cuenta atrás de 30 s empieza cuando al menos '+Math.ceil(n/2)+' de '+n+' estén listos'+(count?' ('+count+' ya)':''));
+}
 function voteStatus(){
   const votes=Object.keys(state.vote?.votes||{}).length;
   const status=h('div','vote-status',icon('users'),h('span',null,'Votos: '+votes+' / '+state.players.length),
-    state.players.length>1?h('small',null,'Empate: decide el anfitrión · sin votos: primera opción'):null);
+    state.players.length>1?h('small',null,'Empate: decide el anfitrión · sin votos: primera opción'):null,waitNote(votes));
   const pending=modText(state.pending);
   if(pending)status.append(h('span','pending-mods',icon('info'),'Próximo combate: '+pending));
   return status;
@@ -1265,7 +1299,7 @@ function renderMap(box){
   }
   const legend=h('div','map-legend',...Object.entries(nodeKinds).map(([kind,info])=>h('span','legend-item kind-'+kind,icon(nodeIcons[kind]),info.name)));
   const actNumber=state.route.act||1;
-  box.replaceChildren(h('div','journey-head',h('h3',null,icon('crown'),'Acto '+actNumber+' de '+ACTS+' · '+actNames[actNumber-1]),h('p',null,'Cada jugador vota la siguiente sala. Cada camino cierra otros: pasa el ratón por una sala para ver lo que deja abierto. Tenéis 15 segundos.')),map,legend,voteStatus());
+  box.replaceChildren(h('div','journey-head',h('h3',null,icon('crown'),'Acto '+actNumber+' de '+ACTS+' · '+actNames[actNumber-1]),h('p',null,'Cada jugador vota la siguiente sala. Cada camino cierra otros: pasa el ratón por una sala para ver lo que deja abierto. Tomaos el tiempo que necesitéis.')),map,legend,voteStatus());
 }
 function renderEvent(box){
   const myVote=state.vote?.votes?.[session.id];
@@ -1633,6 +1667,7 @@ function render(){
   el('turn-bar').hidden=state.phase!=='combat'&&!rewardReady&&!journey;
   el('turn-bar').classList.toggle('timer-only',state.phase!=='combat');
   if(!el('turn-bar').hidden)paintClock();
+  paintWait();
   const signature=JSON.stringify([state,selected,rewardReady]);
   if(signature===rendered)return;
   rendered=signature;
@@ -1850,7 +1885,7 @@ async function refresh(){
 try{session=JSON.parse(sessionStorage.getItem('amber-session'));}catch{session=null;}
 refresh();
 setInterval(()=>{
-  if(state&&!session.code&&['combat','reward','map','event','shop','forge'].includes(state.phase)&&Date.now()>=state.deadline){
+  if(state&&!session.code&&state.deadline!=null&&['combat','reward','map','event','shop','forge'].includes(state.phase)&&Date.now()>=state.deadline){
     const next=structuredClone(state);
     if(tick(next))setState(next);
   }

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -337,7 +337,7 @@ test('dos clientes reciben la misma trayectoria completa y el cambio de turno', 
   assert.equal((await request(path+'/action',{type:'start'},peer.key)).status,400);
   const map=await request(path+'/action',{type:'start'},host.key);
   assert.equal(map.state.phase,'map');
-  assert.equal(map.state.deadline-map.state.turnStarted,45000);
+  assert.equal(map.state.deadline,null);
   const option=map.state.vote.options.findIndex(id=>map.state.route.rows[0].find(n=>n.id===id).kind==='combat');
   assert.equal((await request(path+'/action',{type:'vote',option},host.key)).state.phase,'map');
   const started=await request(path+'/action',{type:'vote',option},peer.key);
@@ -396,14 +396,31 @@ test('los eventos se votan, el empate lo decide el anfitrión y aplican efectos 
   if(!s.units[s.turn].enemy)assert.equal(s.ap,7+(s.units[s.turn].stats.action||0));
   assert.ok(hero.hp<=Math.ceil(hero.max*.8));
 });
-test('el voto se resuelve al acabarse los 45 segundos',()=>{
+test('mapa, eventos, tienda y forja: sin reloj hasta que la mitad del grupo está lista',()=>{
   const s=create();
-  join(s,'p0','Uno','guardia');join(s,'p1','Dos','mago');
+  join(s,'p0','Uno','guardia');join(s,'p1','Dos','mago');join(s,'p2','Tres','tirador');
   act(s,'p0',{type:'start'},rng);
-  assert.equal(s.deadline-s.turnStarted,45000);
-  act(s,'p1',{type:'vote',option:s.vote.options.length-1},rng);
+  assert.equal(s.phase,'map');
+  assert.equal(s.deadline,null);
+  assert.equal(tick(s,rng),false);                 // sin reloj no pasa nada
+  assert.equal(s.phase,'map');
+  act(s,'p1',{type:'vote',option:0},rng);          // 1 de 3: aún no es mayoría
+  assert.equal(s.deadline,null);
+  act(s,'p2',{type:'vote',option:0},rng);          // 2 de 3: empieza la cuenta atrás
+  assert.equal(s.deadline-s.turnStarted,READY_TIME);
   timeout(s);
   assert.notEqual(s.phase,'map');
+  // Tienda: listos uno a uno; con todos, se sigue al instante.
+  const t=create();
+  join(t,'p0','Uno','guardia');join(t,'p1','Dos','mago');
+  act(t,'p0',{type:'start'},rng);
+  t.phase='shop';t.ready=[];t.deadline=null;
+  act(t,'p0',{type:'ready'},rng);                  // 1 de 2 = la mitad: cuenta atrás
+  assert.ok(t.deadline!=null);
+  act(t,'p0',{type:'ready'},rng);                  // se arrepiente: se para
+  assert.equal(t.deadline,null);
+  act(t,'p0',{type:'ready'},rng);act(t,'p1',{type:'ready'},rng);
+  assert.notEqual(t.phase,'shop');
 });
 test('el combate de élite trae un enemigo extra y mejor botín',()=>{
   const normal=encounter(2,2),elite=encounter(2,2,true);
@@ -1035,4 +1052,20 @@ test('pausa: congela el reloj, bloquea acciones y devuelve el tiempo al reanudar
   act(s,'p0',{type:'pause'},rng);
   assert.ok(!s.paused);
   assert.ok(Math.abs((s.deadline-Date.now())-left)<1500);
+});
+test('tienda: se puede re-tirar pagando tusi y cada vez cuesta más',()=>{
+  let seed=55;const random=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+  const s=battle('guardia');
+  s.phase='shop';s.ready=[];s.stock=[];s.rerolls=0;s.deadline=null;
+  const p=s.players[0];p.gold=100;
+  const first=shopRerollCost(s);
+  act(s,'p0',{type:'reroll-shop'},random);
+  assert.equal(p.gold,100-first);
+  assert.equal(s.stock.length,6);
+  const before=s.stock.map(i=>i.id).join();
+  assert.ok(shopRerollCost(s)>first);
+  act(s,'p0',{type:'reroll-shop'},random);
+  assert.notEqual(s.stock.map(i=>i.id).join(),before);
+  p.gold=0;
+  assert.throws(()=>act(s,'p0',{type:'reroll-shop'},random),/tusi/);
 });

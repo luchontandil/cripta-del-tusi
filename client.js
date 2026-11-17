@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,glyphText,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=51';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=51';
-import {setupSfx} from './music.js?v=51';
-import {icon} from './icons.js?v=51';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=52';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=52';
+import {setupSfx} from './music.js?v=52';
+import {icon} from './icons.js?v=52';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -96,7 +96,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=51').then(({createIso})=>{
+import('./isometric.js?v=52').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1363,10 +1363,11 @@ function paintPath(path,origin){
   });
   if(iso?.active)iso.highlight(board.children);
 }
-function paintArea(area=[]){
+function paintArea(area=[],center=null){
   const board=el('board');
-  for(const cell of board.querySelectorAll('.area-preview'))cell.classList.remove('area-preview');
+  for(const cell of board.querySelectorAll('.area-preview,.area-center'))cell.classList.remove('area-preview','area-center');
   for(const pos of area)board.children[pos]?.classList.add('area-preview');
+  if(center!==null&&area.includes(center))board.children[center]?.classList.add('area-center');
   if(iso?.active)iso.highlight(board.children);
 }
 function drawBoard(turn,walking,skill){
@@ -1414,7 +1415,7 @@ function drawBoard(turn,walking,skill){
         el('path-status').textContent='Haz clic en una casilla azul para moverte.';
       };
     }else if(aim&&blast){
-      cell.onpointerenter=cell.onfocus=()=>paintArea(spellArea(state,pos,skill));
+      cell.onpointerenter=cell.onfocus=()=>paintArea(spellArea(state,pos,skill,turn),pos);
       cell.onpointerleave=cell.onblur=()=>paintArea();
     }
     if(unit){

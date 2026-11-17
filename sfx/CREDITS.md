@@ -12,10 +12,6 @@ Fuente: https://opengameart.org/content/swishes-sound-pack
 - `swing_2.ogg` ← swish-2.wav
 - `swing_3.ogg` ← swish-3.wav
 - `swing_4.ogg` ← swish-4.wav
-- `arrow_1.ogg` ← swish-10.wav
-- `arrow_2.ogg` ← swish-11.wav
-- `arrow_3.ogg` ← swish-12.wav
-- `arrow_4.ogg` ← swish-13.wav
 
 ## 80 CC0 RPG SFX — rubberduck · CC0
 Fuente: https://opengameart.org/content/80-cc0-rpg-sfx
@@ -45,9 +41,6 @@ Fuente: https://opengameart.org/content/80-cc0-rpg-sfx
 ## 75 CC0 breaking / falling / hit sfx — rubberduck · CC0
 Fuente: https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx
 
-- `arrowhit_1.ogg` ← bfh1_wood_hit_01.ogg
-- `arrowhit_2.ogg` ← bfh1_wood_hit_02.ogg
-- `arrowhit_3.ogg` ← bfh1_wood_hit_03.ogg
 - `push_1.ogg` ← bfh1_hit_06.ogg
 - `push_2.ogg` ← bfh1_hit_07.ogg
 - `push_3.ogg` ← bfh1_hit_08.ogg
@@ -210,6 +203,11 @@ Fuente: https://kenney.nl/assets/impact-sounds · https://kenney.nl/assets/inter
 - `bones_2.ogg` ← impactWood_light_001.ogg
 - `bones_3.ogg` ← impactWood_light_002.ogg
 - `bones_4.ogg` ← impactWood_light_003.ogg
+- `arrowhit_1.ogg` ← impactPlank_medium_000.ogg
+- `arrowhit_2.ogg` ← impactPlank_medium_001.ogg
+- `arrowhit_3.ogg` ← impactPlank_medium_002.ogg
+- `arrowhit_4.ogg` ← impactPlank_medium_003.ogg
+- `arrow_1..4.ogg` ← `swing_1..4` (swishes de artisticdude, CC0) acelerados ×1,3
 
 ## Dungeon Crawl: RPG Game Sounds — Soundsnap (licencia de Soundsnap del propietario del proyecto)
 Fuente: https://www.soundsnap.com/playlist/dungeon_crawl_rpg_game_sounds

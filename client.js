@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,glyphText,monsterSkills,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=40';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=40';
-import {setupSfx} from './music.js?v=40';
-import {icon} from './icons.js?v=40';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=41';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=41';
+import {setupSfx} from './music.js?v=41';
+import {icon} from './icons.js?v=41';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -96,7 +96,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=40').then(({createIso})=>{
+import('./isometric.js?v=41').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1129,6 +1129,8 @@ function eventSound(event){
   if(event.kind==='spell'){
     const actor=unitOf(event.actor);
     sfx(event.effect==='slash'?'swing':event.effect);
+    // La flecha: zumbido al soltarla y golpe seco al llegar.
+    if(event.effect==='arrow')sfx('arrowhit',{delay:.25,volume:.85});
     if(actor?.enemy&&voices[actor.look])sfx(voices[actor.look],{volume:actor.boss?.9:.55});
     if(actor?.boss&&event.effect!=='slash')sfx('v_boss',{volume:.8,delay:.1});
     return;

@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=32';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=32';
-import {setupSfx} from './music.js?v=32';
-import {icon} from './icons.js?v=32';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=33';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=33';
+import {setupSfx} from './music.js?v=33';
+import {icon} from './icons.js?v=33';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -95,7 +95,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=32').then(({createIso})=>{
+import('./isometric.js?v=33').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -624,6 +624,7 @@ function draggable(tile,payload){
 }
 function dropZone(tile,accept,drop){
   dropTargets.set(tile,{accept,drop});
+  tile.dataset.drop='';
 }
 function inventoryTarget(event){
   let node=document.elementFromPoint(event.clientX,event.clientY);
@@ -642,6 +643,9 @@ document.addEventListener('pointermove',event=>{
     drag.ghost.textContent=drag.label;
     document.body.append(drag.ghost);
     el('inventory').classList.add('dragging');
+    // Ilumina las casillas donde se puede soltar el objeto (su ranura de equipo, la mochila...).
+    for(const tile of el('inventory').querySelectorAll('.inventory-slot, .bag-zone, [data-drop]'))
+      if(dropTargets.get(tile)?.accept(drag.payload))tile.classList.add('drop-valid');
   }
   drag.ghost.style.left=event.clientX+'px';
   drag.ghost.style.top=event.clientY+'px';
@@ -659,6 +663,7 @@ function finishDrag(event){
   dropTarget=null;
   active.ghost?.remove();
   el('inventory').classList.remove('dragging');
+  for(const tile of el('inventory').querySelectorAll('.drop-valid'))tile.classList.remove('drop-valid');
   if(active.ghost)suppressInventoryClick=performance.now()+310;
   if(target)dropTargets.get(target).drop(active.payload);
 }
@@ -919,7 +924,9 @@ function updateGameOver(){
   const points=state.result?.points??runPoints({floor:state.floor,bossKills:state.bossKills,won});
   const line=el('gameover-points');
   line.hidden=false;
-  line.replaceChildren(icon('xp'),'+'+points+' puntos de maestría',account.user?'':' (crea una cuenta para guardarlos)');
+  // Solo las cuentas registradas ganan puntos de maestría.
+  if(account.user)line.replaceChildren(icon('xp'),'+'+points+' puntos de maestría');
+  else line.replaceChildren(icon('xp'),'Sin cuenta no se ganan puntos de maestría. Regístrate para empezar a acumularlos.');
   if(account.user&&!session.code&&!soloAwarded){
     soloAwarded=true;
     accountCall('award',{floor:state.floor,bossKills:state.bossKills||0,won}).then(d=>{account.user=d.user;renderAccount();}).catch(()=>{});

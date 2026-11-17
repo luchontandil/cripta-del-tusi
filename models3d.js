@@ -1571,3 +1571,81 @@ function ps1FireDemon(){
 }
 Object.assign(creatures,{bat:ps1Bat,slug:ps1Slug,plant:ps1Plant,sporemother:ps1Plant,cerberus:ps1Cerberus,
   imp:ps1Imp,vampire:ps1Vampire,succubus:ps1Succubus,oracle:ps1Oracle,vampqueen:ps1VampQueen,firedemon:ps1FireDemon});
+
+// ───────────── Obstáculos estilo PS1 (bajos para no tapar la visión, ~0,6–0,9 de alto) ─────────────
+const glowMaterials=new Map();
+function glowMat(color){if(!glowMaterials.has(color))glowMaterials.set(color,new T.MeshStandardMaterial({color,emissive:color,emissiveIntensity:1.1,flatShading:true}));return glowMaterials.get(color);}
+function glowPart(root,shape,color,pos,scale){const m=new T.Mesh(P[shape],glowMat(color));m.position.set(...pos);m.scale.set(...scale);root.add(m);return m;}
+/** Montón de cascotes alrededor de la base (variación por semilla). */
+function rubble(p,color,dark,seed,n=4){for(let i=0;i<n;i++){const a=seed*2.3+i*1.7,r=.28+((seed*7+i*3)%5)*.03;lp(p,P.ico0,i%2?color:dark,[Math.sin(a)*r,.04,Math.cos(a)*r],[a,a*2,0],[.12+(i%3)*.03,.08,.11]);}}
+const obstacleBuilders={
+  crypt:[
+    (p,root,seed)=>{ // columna rota
+      lp(p,P.box,'#2c3142',[0,.06,0],[0,0,0],[.78,.12,.78]);lp(p,P.box,'#41465a',[0,.15,0],[0,0,0],[.62,.08,.62]);
+      lp(p,P.prism6,'#565c72',[0,.42,0],[0,Math.PI/6,0],[.44,.48,.44]);
+      for(let i=0;i<6;i++){const a=i*Math.PI/3;lp(p,P.box,'#3a3f52',[Math.sin(a)*.2,.42,Math.cos(a)*.2],[0,a,0],[.04,.46,.02]);}
+      lp(p,P.cone6,'#565c72',[.05,.7,0],[0,0,.3],[.42,.16,.42]);lp(p,P.ico0,'#6a7088',[.12,.74,.08],[1,2,0],[.14,.1,.12]);
+      lp(p,P.box,'#565c72',[.3,.1,.22],[0,.5,1.4],[.2,.4,.2]);rubble(p,'#4a5066','#2c3142',seed,3);
+    },
+    (p,root)=>{ // sarcófago con velas
+      lp(p,P.box,'#2c3142',[0,.08,0],[0,0,0],[.78,.16,.56]);lp(p,P.box,'#4a5066',[0,.3,0],[0,0,0],[.7,.3,.48]);
+      lp(p,P.box,'#5a6078',[0,.48,0],[0,0,0],[.76,.08,.54]);lp(p,P.box,'#6a7088',[0,.55,0],[0,0,0],[.6,.06,.4]);
+      lp(p,P.box,'#3a3f52',[0,.585,.0],[0,0,0],[.06,.02,.3]);lp(p,P.box,'#3a3f52',[0,.585,-.05],[0,0,0],[.22,.02,.06]);
+      for(const [x,z] of [[-.3,.22],[.32,-.2],[.3,.24]]){lp(p,P.prism6,'#e8dcc0',[x,.66,z],[0,0,0],[.05,.12,.05]);glowPart(root,'oct','#ffb347',[x,.75,z],[.03,.05,.03]);}
+    },
+    (p,root,seed)=>{ // montón de huesos y escombros
+      lp(p,P.ico0,'#3a3f52',[0,.18,0],[0,.5,0],[.62,.36,.56]);lp(p,P.ico0,'#4a5066',[.1,.34,-.08],[.4,1,0],[.4,.26,.38]);
+      lp(p,P.head,BONE,[-.08,.48,.1],[0,.4,0],[.16,.15,.17]);
+      for(const s of [-1,1])lp(p,P.box,SHADOW,[-.08+s*.035,.49,.18],[0,.4,0],[.04,.04,.02]);
+      for(let i=0;i<5;i++){const a=i*1.3+seed;lp(p,P.prism6,BONE,[Math.sin(a)*.24,.3+i*.03,Math.cos(a)*.2],[a,0,Math.PI/2.4],[.035,.3,.035]);}
+      rubble(p,'#4a5066','#2c3142',seed,4);
+    }
+  ],
+  jungle:[
+    (p,root,seed)=>{ // árbol bajo y retorcido
+      lp(p,P.taper6,'#5a3a22',[0,.3,0],[0,0,.15],[.26,.6,.26]);lp(p,P.cone6,'#4a3020',[0,.08,0],[0,0,0],[.5,.16,.5]);
+      for(const [x,z,r] of [[.22,.1,.6],[-.2,-.08,-.5]])lp(p,P.prism6,'#4a3020',[x,.06,z],[0,0,Math.PI/2+r],[.06,.3,.06]);
+      lp(p,P.ico0,'#2f5a26',[0,.72,0],[0,seed,0],[.86,.34,.8]);lp(p,P.ico0,'#3f7a30',[.12,.84,-.06],[0,seed+1,0],[.56,.26,.52]);
+      lp(p,P.ico0,'#57983a',[-.14,.88,.1],[0,seed+2,0],[.3,.18,.3]);
+      for(let i=0;i<3;i++)lp(p,P.box,'#3f6a2a',[-.3+i*.28,.42,.32-i*.12],[0,0,0],[.02,.42,.02]);
+    },
+    (p,root,seed)=>{ // helechos con flores
+      for(let i=0;i<7;i++){const a=i*Math.PI*2/7+seed;lp(p,P.box,i%2?'#3f7a30':'#57983a',[Math.sin(a)*.18,.24,Math.cos(a)*.18],[Math.cos(a)*.7,a,0],[.1,.04,.5]);}
+      lp(p,P.ico0,'#2f5a26',[0,.14,0],[0,0,0],[.4,.24,.4]);
+      glowPart(root,'oct','#ff6a9a',[.14,.42,.08],[.07,.07,.07]);glowPart(root,'oct','#ffd36b',[-.16,.36,-.12],[.06,.06,.06]);
+    },
+    (p,root,seed)=>{ // ídolo de piedra cubierto de musgo
+      lp(p,P.box,'#4a5246',[0,.08,0],[0,0,0],[.7,.16,.66]);lp(p,P.box,'#6a7466',[0,.42,0],[0,.15,0],[.5,.56,.46]);
+      lp(p,P.box,'#3f7a30',[0,.71,0],[0,.15,0],[.54,.06,.5]);lp(p,P.box,'#3f7a30',[.18,.45,.2],[0,.15,0],[.12,.4,.08]);
+      for(const s of [-1,1])lp(p,P.box,'#2a2e28',[s*.11,.5,.23],[0,.15,0],[.08,.06,.04]);
+      lp(p,P.box,'#2a2e28',[0,.34,.23],[0,.15,0],[.22,.05,.04]);glowPart(root,'oct','#9be05a',[-.11,.5,.25],[.03,.03,.02]);
+      rubble(p,'#5d6658','#3a4236',seed,3);
+    }
+  ],
+  hell:[
+    (p,root,seed)=>{ // agujas de obsidiana
+      lp(p,P.ico0,'#5e524c',[0,.1,0],[0,0,0],[.7,.2,.66]);
+      for(const [x,z,h] of [[0,0,.85],[.2,-.12,.55],[-.18,.14,.6],[.12,.22,.4]])lp(p,P.cone6,'#4e4440',[x,h/2+.05,z],[x*.4,0,-z*.4],[.2,h,.2]);
+      glowPart(root,'box','#ff7a1a',[0,.35,.08],[.03,.4,.02]);glowPart(root,'box','#ff7a1a',[.2,.22,-.04],[.02,.22,.02]);
+    },
+    (p,root)=>{ // brasero de azufre
+      lp(p,P.taper8,'#4e4440',[0,.12,0],[0,0,0],[.5,.24,.5]);lp(p,P.prism6,'#5e524c',[0,.32,0],[0,0,0],[.16,.2,.16]);
+      lp(p,P.taper8,'#5e524c',[0,.5,0],[Math.PI,0,0],[.56,.16,.56]);lp(p,P.prism6,'#7a685e',[0,.58,0],[0,0,0],[.6,.03,.6]);
+      for(let i=0;i<4;i++){const a=i*Math.PI/2+.4;lp(p,P.cone6,'#5e524c',[Math.sin(a)*.27,.66,Math.cos(a)*.27],[0,0,0],[.05,.14,.05]);}
+      glowPart(root,'cone6','#ff7a1a',[0,.72,0],[.38,.32,.38]);glowPart(root,'cone6','#ffd36b',[0,.76,0],[.2,.22,.2]);
+    },
+    (p,root,seed)=>{ // roca de lava enfriada con huesos
+      lp(p,P.ico0,'#4e4440',[0,.24,0],[0,seed,0],[.72,.48,.64]);lp(p,P.ico0,'#5e524c',[.14,.42,-.08],[0,seed+1,0],[.4,.3,.38]);
+      for(let i=0;i<3;i++)lp(p,P.prism6,'#c8c0a8',[-.25+i*.12,.08,.3],[0,i,Math.PI/2],[.03,.24,.03]);
+      glowPart(root,'box','#ff7a1a',[-.05,.3,.3],[.3,.02,.02]);glowPart(root,'box','#ff7a1a',[.2,.4,.12],[.02,.18,.02]);
+      rubble(p,'#5e524c','#5e524c',seed,3);
+    }
+  ]
+};
+/** Construye un obstáculo PS1 de una sola malla (más brillos sueltos). */
+export function ps1Obstacle(root,kind,variant,seed=1){
+  const set=obstacleBuilders[kind]||obstacleBuilders.crypt;
+  const p=[];
+  set[variant%set.length](p,root,seed);
+  root.add(fuse(p,'obstacle'));
+}

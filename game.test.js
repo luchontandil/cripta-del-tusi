@@ -71,7 +71,7 @@ test('la vulnerabilidad se aplica a otro atacante y el clérigo cura a un aliado
   act(s,'p1',{type:'skill',skill:0,pos:34},rng);
   assert.equal(hp-enemy.hp,9);
   act(s,'p1',{type:'skill',skill:1,pos:30},rng);
-  assert.equal(archer.hp,24);
+  assert.equal(archer.hp,23);
 });
 test('el jefe anuncia una sola cruz y, al activarla en su turno, las cadenas dañan y restan PM',()=>{
   const s=battle('tirador');
@@ -155,7 +155,7 @@ test('la vista previa aplica el crítico ×1,5 y solo resta armadura al daño f�
   foe.stats.ward=3;
   assert.deepEqual(damagePreview(hero,foe,classes.guardia.skills[0]),{element:'physical',normal:[6,9],critical:[10,15],chance:.12});
   hero.stats.fire=2;
-  assert.deepEqual(damagePreview(hero,foe,classes.guardia.skills.at(-1)).normal,[10,14]);
+  assert.deepEqual(damagePreview(hero,foe,classes.guardia.skills.at(-1)).normal,[9,12]);
 });
 test('la IA avanza hacia el rival aunque un aliado cierre el único paso',()=>{
   const s=battle('tirador');
@@ -224,8 +224,8 @@ test('el Mago puede lanzar a una casilla vacía y dañar a dos enemigos en cruz'
   assert.ok(spellArea(s,center,skill).includes(second.pos));
   act(s,'p0',{type:'skill',skill:1,pos:center},rng);
   assert.equal(s.ap,1);
-  assert.equal(first.max-first.hp,8);
-  assert.equal(second.max-second.hp,8);
+  assert.equal(first.max-first.hp,7);
+  assert.equal(second.max-second.hp,7);
   assert.equal(ally.hp,ally.max);
   assert.deepEqual(s.events.find(event=>event.kind==='spell').area,spellArea(s,center,skill));
 });
@@ -554,12 +554,12 @@ test('colores fijos por puesto y maestrías aplicadas a la partida',()=>{
   assert.equal(a.stats.physical-b.stats.physical,1);
   assert.equal(a.stats.ward-b.stats.ward,3);
   assert.equal(a.color,'red');
-  assert.equal(masteryCost('fuerza',2),6);
+  assert.equal(masteryCost('fuerza',2),9);
 });
 test('los puntos de cuenta crecen con lo lejos que se llega',()=>{
   assert.ok(runPoints({floor:3})<runPoints({floor:9,bossKills:2}));
   assert.ok(runPoints({floor:24,bossKills:6,won:true})>runPoints({floor:24,bossKills:5}));
-  assert.equal(runPoints({floor:999,bossKills:99,won:true}),24+18+30+25);
+  assert.equal(runPoints({floor:999,bossKills:99,won:true}),12+12+15+15);
 });
 test('cuentas: registro, maestrías, amigos, invitaciones y puntos al terminar la partida en sala', {timeout:10000}, async t=>{
   const {server:app}=await import('./server.js');
@@ -581,11 +581,11 @@ test('cuentas: registro, maestrías, amigos, invitaciones y puntos al terminar l
   assert.deepEqual(friends.user.friends,['Bob']);
   assert.equal(friends.friends[0].online,true);
   const solo=await call('/api/account/award',{floor:9,bossKills:2,won:false},ana.token);
-  assert.equal(solo.points,9+6+10);
+  assert.equal(solo.points,4+4+5);
   assert.equal((await call('/api/account/award',{floor:9},ana.token)).status,400);
   const bought=await call('/api/account/mastery',{key:'vigor'},ana.token);
   assert.equal(bought.user.mastery.vigor,1);
-  assert.equal(bought.user.spent,1);
+  assert.equal(bought.user.spent,2);
   assert.equal((await call('/api/account/mastery',{key:'celeridad'},bob.token)).status,400);
   const room=await call('/api/rooms',{classId:'guardia'},ana.token);
   assert.equal(room.state.players[0].name,'Ana');
@@ -603,7 +603,7 @@ test('cuentas: registro, maestrías, amigos, invitaciones y puntos al terminar l
   await call('/api/'+room.code,null,null,room.key);
   await call('/api/'+room.code,null,null,joined.key);
   const after=(await call('/api/account/me',null,bob.token)).user.points;
-  assert.equal(after-before,5+3);
+  assert.equal(after-before,2+2);
   assert.ok(before>=0);
 });
 
@@ -736,4 +736,43 @@ test('el árbol de pisos tiene ramas: cada elección cierra caminos',()=>{
   }
   assert.ok(edges/nodes<2,'pocas conexiones por sala: '+(edges/nodes).toFixed(2));
   assert.ok(closed>nodes*.4,'la mayoría de elecciones cierran salas');
+});
+
+test('las invocaciones mueren cuando cae su invocador',()=>{
+  const s=battle('guardia');
+  const boss=s.units.find(u=>u.enemy);
+  boss.look='skeletonking';boss.boss=true;
+  boss.pos=s.units[0].pos-1;
+  const before=s.units.length;
+  for(let i=0;i<3;i++){const p=s.units.find(u=>u.enemy);p.cycle=0;}
+  s.units.push({...structuredClone(boss),id:'minion1',minion:boss.id,boss:false,look:'skeleton',hp:10,max:10,pos:boss.pos-1});
+  const hero=s.units.find(u=>!u.enemy);
+  s.turn=s.units.indexOf(hero);s.ap=6;boss.hp=1;boss.stats.ward=0;
+  act(s,hero.id,{type:'skill',skill:0,pos:boss.pos},()=>.5);
+  assert.equal(boss.hp,0);
+  assert.equal(s.units.find(u=>u.id==='minion1').hp,0);
+  assert.ok(s.units.length>=before);
+});
+
+test('las trampas no se amontonan ni se ponen en pasillos',()=>{
+  let r=11;const seq=()=>{r=(r*16807)%2147483647;return r/2147483647;};
+  const s=create();join(s,'p0','A','guardia');act(s,'p0',{type:'start'},seq);
+  let rooms=0;
+  while(s.floor<23){
+    for(let k=0;k<8&&s.phase!=='combat';k++){
+      if(s.phase==='map'){const o=Math.max(0,s.vote.options.findIndex(id=>s.route.rows.flat().find(n=>n.id===id).kind==='combat'));act(s,'p0',{type:'vote',option:o},seq);}
+      else if(s.phase==='event')act(s,'p0',{type:'vote',option:0},seq);
+      else if(s.phase==='shop')act(s,'p0',{type:'ready'},seq);
+    }
+    const free=pos=>onBoard(s,pos)&&!s.walls.includes(pos)&&!s.water.includes(pos);
+    for(const t of s.traps){
+      const near=[t.pos-1,t.pos+1,t.pos-s.width,t.pos+s.width].filter(p=>free(p)&&Math.abs(p%s.width-t.pos%s.width)+Math.abs(Math.floor(p/s.width)-Math.floor(t.pos/s.width))===1);
+      assert.ok(near.length>=3,'trampa en pasillo');
+      for(const o of s.traps)if(o!==t)assert.ok(Math.abs(o.pos%s.width-t.pos%s.width)+Math.abs(Math.floor(o.pos/s.width)-Math.floor(t.pos/s.width))>2,'trampas pegadas');
+    }
+    assert.ok(s.traps.length<=5);
+    rooms++;
+    s.phase='reward';s.picks=['p0'];act(s,'p0',{type:'next'},seq);
+  }
+  assert.ok(rooms>10);
 });

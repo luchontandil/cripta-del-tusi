@@ -202,7 +202,7 @@ summary{cursor:pointer}
 #iso-world canvas{display:block;width:100%;height:100%;touch-action:manipulation;cursor:crosshair;image-rendering:pixelated}
 .iso-labels{position:absolute;inset:0;pointer-events:none}
 .iso-label{
-  position:absolute;top:0;left:0;width:max-content;max-width:140px;padding:2px 6px 3px;border-radius:5px;
+  position:absolute;top:0;left:0;width:104px;padding:2px 6px 3px;border-radius:5px;
   background:#0d0b14e6;border:1px solid #ffffff1c;color:#fff1d0;font-size:.68rem;font-weight:800;line-height:1.15;text-align:center;
   box-shadow:0 2px 6px #0008;
 }
@@ -687,7 +687,7 @@ summary{cursor:pointer}
   #phase{grid-area:phase}.status{grid-area:status}.top-actions{grid-area:actions}
   .topbar .label{display:none}
   #iso-world{height:clamp(260px,72vw,420px)}
-  .iso-label{font-size:.58rem;max-width:100px}
+  .iso-label{font-size:.58rem;width:88px}
   .loot-cards{grid-template-columns:1fr}
   .loot-card{display:grid;grid-template-columns:58px 1fr;column-gap:10px;align-items:center}
   .loot-card>*:not(.loot-icon){grid-column:2}
@@ -932,3 +932,16 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 .map-lines line.preview{stroke:var(--gold);stroke-dasharray:none;stroke-width:3;opacity:1}
 
 .credits{margin:14px auto 4px;max-width:900px;text-align:center;font-size:.72rem;color:#8a8070;line-height:1.5}.credits a{color:#b8a888}
+
+/* Menú de sonido */
+.sound-menu{position:fixed;z-index:60;width:228px;padding:10px 12px;background:#17131c;border:2px solid #4a3a2a;box-shadow:0 6px 0 #0008;color:#e8dcc0;font-size:.8rem;display:grid;gap:8px}
+.sound-menu[hidden]{display:none}
+.sound-row{display:grid;grid-template-columns:62px 1fr 38px;align-items:center;gap:6px}
+.sound-row:has(input[type=checkbox]){grid-template-columns:auto 1fr}
+.sound-row input[type=range]{width:100%;accent-color:#e0a84f}
+.sound-row output{text-align:right;font-variant-numeric:tabular-nums;color:#b8a888}
+
+/* Arrastrar objetos: casillas válidas iluminadas */
+.inventory-slot.drop-valid,.drop-valid{outline:2px dashed #f2cd8a;outline-offset:-2px;box-shadow:0 0 12px #f2cd8a88,inset 0 0 14px #f2cd8a44;animation:dropPulse 1s ease-in-out infinite}
+@keyframes dropPulse{50%{box-shadow:0 0 18px #f2cd8acc,inset 0 0 18px #f2cd8a66}}
+.iso-label{box-sizing:border-box}

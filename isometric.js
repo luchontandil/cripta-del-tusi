@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,obstacle,piece,solid} from './models3d.js?v=32';
-import {playerColors} from './engine.js?v=32';
+import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=33';
+import {playerColors} from './engine.js?v=33';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -417,7 +417,7 @@ export function createIso(mount,onCell){
         stage.add(block);
         block.position.copy(coord);
         block.rotation.y=((pos%4)*Math.PI)/2;
-        obstacle(block,mode,Math.floor(v*3));
+        ps1Obstacle(block,['jungle','hell'].includes(mode)?mode:'crypt',Math.floor(v*3),pos%7+1);
       }else if(v<.085&&!state.water?.includes(pos)&&!trap){
         const chip=piece(stage,'cube',palette[0],coord.x-.22,.012,coord.z+.21,.22,.022,.035);
         chip.rotation.y=v*12;

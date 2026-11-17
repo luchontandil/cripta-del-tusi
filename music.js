@@ -1,8 +1,12 @@
 // Short, synthesized effects. This module never starts a soundtrack.
-import {icon} from './icons.js?v=32';
+import {icon} from './icons.js?v=33';
 export function setupSfx(button){
   let context,master;
   let muted=false;
+  // Volúmenes guardados en el navegador (0–1): efectos y ambiente.
+  const stored=(key,fallback)=>{try{const v=parseFloat(localStorage.getItem(key));return Number.isFinite(v)?Math.min(1,Math.max(0,v)):fallback;}catch{return fallback;}};
+  let volumeSfx=stored('cripta-sfx-volume',.6),volumeAmbience=stored('cripta-amb-volume',.5);
+  let ambienceBus=null;
   try{muted=localStorage.getItem('cripta-sfx-muted')==='yes';}catch{}
   function ready(){
     if(muted)return false;
@@ -12,8 +16,11 @@ export function setupSfx(button){
         if(!Audio)return false;
         context=new Audio();
         master=context.createGain();
-        master.gain.value=.5;
+        master.gain.value=.34*volumeSfx;          // volumen base más bajo que antes
         master.connect(context.destination);
+        ambienceBus=context.createGain();
+        ambienceBus.gain.value=.34*volumeAmbience;
+        ambienceBus.connect(context.destination);
       }
       if(context.state!=='running')context.resume().catch(()=>{});
       return true;
@@ -78,8 +85,8 @@ export function setupSfx(button){
       if(!data||ambienceKey!==key||muted)return;
       const source=context.createBufferSource(),gain=context.createGain();
       source.buffer=data;source.loop=true;
-      gain.gain.value=0;gain.gain.setTargetAtTime(.32,context.currentTime,1.2);
-      source.connect(gain).connect(master);source.start();
+      gain.gain.value=0;gain.gain.setTargetAtTime(.6,context.currentTime,1.2);
+      source.connect(gain).connect(ambienceBus);source.start();
       ambience={source,gain};
     });
   }
@@ -102,17 +109,41 @@ export function setupSfx(button){
   };
   function reflect(){
     button.setAttribute('aria-pressed',String(!muted));
+    button.setAttribute('aria-expanded',String(!menu.hidden));
     button.replaceChildren(icon(muted?'mute':'sound'));
-    button.title=muted?'Sonido desactivado':'Sonido activado';
+    button.title='Sonido';
+    muteBox.checked=!muted;
+    sfxRange.value=Math.round(volumeSfx*100);ambRange.value=Math.round(volumeAmbience*100);
+    sfxOut.textContent=sfxRange.value+' %';ambOut.textContent=ambRange.value+' %';
   }
-  reflect();
-  button.addEventListener('click',()=>{
-    muted=!muted;
+  // Menú de sonido: activar/desactivar y barras de volumen.
+  const menu=document.createElement('div');
+  menu.className='sound-menu';menu.hidden=true;menu.setAttribute('role','dialog');menu.setAttribute('aria-label','Opciones de sonido');
+  menu.innerHTML=`<strong>Sonido</strong>
+    <label class="sound-row"><input type="checkbox" data-k="on"> Sonido activado</label>
+    <label class="sound-row">Efectos <input type="range" min="0" max="100" step="5" data-k="sfx"><output></output></label>
+    <label class="sound-row">Ambiente <input type="range" min="0" max="100" step="5" data-k="amb"><output></output></label>`;
+  document.body.append(menu);
+  const muteBox=menu.querySelector('[data-k="on"]'),sfxRange=menu.querySelector('[data-k="sfx"]'),ambRange=menu.querySelector('[data-k="amb"]');
+  const [sfxOut,ambOut]=menu.querySelectorAll('output');
+  function place(){const r=button.getBoundingClientRect();menu.style.top=(r.bottom+6)+'px';menu.style.left=Math.max(8,Math.min(innerWidth-236,r.right-228))+'px';}
+  function setMuted(next){
+    muted=next;
     try{localStorage.setItem('cripta-sfx-muted',muted?'yes':'no');}catch{}
-    reflect();
     if(muted){const key=ambienceKey;ambient('');ambienceKey=key;}
     else{play('click');const key=ambienceKey;ambienceKey='';ambient(key);}
-  });
+    reflect();
+  }
+  muteBox.addEventListener('change',()=>setMuted(!muteBox.checked));
+  sfxRange.addEventListener('input',()=>{volumeSfx=sfxRange.value/100;try{localStorage.setItem('cripta-sfx-volume',volumeSfx);}catch{}
+    if(master)master.gain.value=.34*volumeSfx;reflect();});
+  sfxRange.addEventListener('change',()=>play('hit'));
+  ambRange.addEventListener('input',()=>{volumeAmbience=ambRange.value/100;try{localStorage.setItem('cripta-amb-volume',volumeAmbience);}catch{}
+    if(ambienceBus)ambienceBus.gain.value=.34*volumeAmbience;reflect();});
+  reflect();
+  button.addEventListener('click',()=>{menu.hidden=!menu.hidden;if(!menu.hidden){place();ready();}reflect();});
+  document.addEventListener('pointerdown',event=>{if(!menu.hidden&&!menu.contains(event.target)&&!button.contains(event.target)){menu.hidden=true;reflect();}});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!menu.hidden){menu.hidden=true;reflect();button.focus();}});
   document.addEventListener('click',event=>{
     const control=event.target.closest?.('button, summary');
     if(control&&control!==button&&!control.closest('#board')&&!control.disabled)play('click');

@@ -10,25 +10,25 @@ export const classes = {
     ['Quebrar armadura',2,1,3,5,'expose','✷',0,{element:'physical',value:3,max:{value:2}}],
     ['Segundo aliento',2,0,5,8,'heal','✚',0,{max:{range:2}}],
     ['Empujón de escudo',2,1,4,6,'push','➶',0,{element:'physical',push:3,max:{push:1}}],
-    ['Barrido',3,1,5,8,'damage','⚔',0,{element:'physical',area:'cone',max:{cost:-1}}],
+    ['Barrido',3,1,6,9,'damage','⚔',0,{element:'physical',area:'cone',max:{cost:-1}}],
     ['Gancho',2,4,2,4,'pull','↢',2,{element:'physical',pull:'melee',inLine:true,anyTarget:true,max:{range:1}}],
     ['Muralla',2,3,0,0,'shield','⛨',0,{value:3,max:{value:1}}],
-    ['Golpe de brasas',2,2,8,12,'damage','✹',0,{element:'fire',max:{modifiable:true}}]
+    ['Golpe de brasas',2,2,7,10,'damage','✹',0,{element:'fire',max:{modifiable:true}}]
   ]},
   tirador: {name:'Arquero', hp:31, initiative:14, skills:[
-    ['Flecha precisa',2,7,5,8,'damage','➶',2,{element:'physical',max:{crit:15}}],
+    ['Flecha precisa',2,7,6,8,'damage','➶',2,{element:'physical',max:{crit:15}}],
     ['Flecha de lastre',2,6,3,5,'slow','❄',2,{element:'ice',value:2,max:{value:1}}],
-    ['Flecha perforante',3,8,11,15,'expose','✷',3,{element:'physical',value:3,max:{range:1}}],
+    ['Flecha perforante',3,8,9,12,'expose','✷',3,{element:'physical',value:3,max:{range:1}}],
     ['Paso atrás',1,1,2,3,'push','↢',0,{element:'physical',push:2,max:{push:1}}],
     ['Lluvia de flechas',3,7,4,7,'blast','✹',3,{element:'physical',area:'cross',max:{cost:-1}}],
-    ['Flecha penetrante',3,6,5,8,'damage','➶',2,{element:'physical',area:'line',size:2,max:{size:1}}],
+    ['Flecha penetrante',3,6,6,9,'damage','➶',2,{element:'physical',area:'line',size:2,max:{size:1}}],
     ['Flecha de retroceso',2,5,3,5,'push','➶',2,{element:'physical',push:2,max:{push:1}}],
-    ['Flecha ígnea',2,6,7,10,'damage','✹',2,{element:'fire',max:{crit:15}}]
+    ['Flecha ígnea',2,6,6,9,'damage','✹',2,{element:'fire',max:{crit:15}}]
   ]},
   mistico: {name:'Clérigo', hp:36, initiative:12, skills:[
     ['Luz ardiente',2,4,5,8,'damage','✦',0,{element:'arcane',max:{range:1}}],
-    ['Restaurar',2,5,7,11,'heal','✚',0,{max:{range:1}}],
-    ['Sello de fragilidad',2,4,2,4,'expose','✷',0,{element:'arcane',value:3,max:{value:2}}],
+    ['Restaurar',2,5,6,10,'heal','✚',0,{max:{range:1}}],
+    ['Sello de fragilidad',1,4,1,3,'expose','✷',0,{element:'arcane',value:3,max:{value:2}}],
     ['Purificar',2,3,3,6,'cleanse','❖',0,{max:{range:2}}],
     ['Escudo sagrado',2,4,0,0,'shield','⛨',0,{value:3,max:{value:2}}],
     ['Celeridad divina',2,4,0,0,'haste','➝',0,{value:2,max:{range:2}}],
@@ -37,23 +37,23 @@ export const classes = {
   ]},
   mago: {name:'Mago', hp:30, initiative:13, skills:[
     ['Descarga arcana',2,6,6,9,'damage','✦',0,{element:'arcane',max:{crit:15}}],
-    ['Bola de fuego',3,5,7,11,'blast','✹',2,{element:'fire',area:'cross',max:{size:1}}],
+    ['Bola de fuego',3,5,6,10,'blast','✹',2,{element:'fire',area:'cross',max:{size:1}}],
     ['Escarcha',2,5,3,6,'slow','❄',0,{element:'ice',value:2,max:{value:1}}],
     ['Cono de hielo',3,1,6,9,'slow','❄',0,{element:'ice',area:'cone',value:1,max:{size:1}}],
     ['Relámpago',3,1,6,10,'damage','✦',0,{element:'arcane',area:'line',size:3,max:{size:1}}],
     ['Onda de choque',2,3,4,6,'push','✦',0,{element:'arcane',push:2,max:{push:1}}],
-    ['Teletransporte',2,4,0,0,'dash','↢',1,{teleport:true,los:false,max:{range:1}}],
-    ['Rayo umbrío',2,6,8,12,'damage','✦',0,{element:'shadow',max:{modifiable:true}}]
+    ['Teletransporte',3,4,0,0,'dash','↢',1,{teleport:true,los:false,max:{range:1}}],
+    ['Rayo umbrío',2,6,7,10,'damage','✦',0,{element:'shadow',max:{modifiable:true}}]
   ]},
   sombra: {name:'Ninja', hp:35, initiative:15, skills:[
-    ['Shuriken',2,5,6,9,'damage','✧',1,{element:'physical',max:{crit:15}}],
+    ['Shuriken',2,5,5,8,'damage','✧',1,{element:'physical',max:{crit:15}}],
     ['Cuchilla envenenada',2,4,3,5,'venom','✧',0,{element:'shadow',value:3,max:{value:2}}],
     ['Paso de sombra',2,3,0,0,'dash','↢',1,{max:{range:1}}],
     ['Puñalada trasera',3,1,12,16,'damage','⚔',0,{element:'shadow',max:{crit:20}}],
-    ['Bomba de humo',2,4,2,4,'slow','❄',0,{element:'shadow',area:'cross',value:1,max:{value:1}}],
+    ['Bomba de humo',2,4,3,5,'slow','❄',0,{element:'shadow',area:'cross',value:1,max:{value:1}}],
     ['Kunai con cadena',2,5,4,6,'pull','↢',2,{element:'physical',pull:3,max:{range:1}}],
     ['Sustitución',2,5,0,0,'swap','↢',1,{max:{cost:-1}}],
-    ['Corte glacial',2,2,6,10,'slow','❄',0,{element:'ice',value:2,max:{modifiable:true}}]
+    ['Corte glacial',2,2,5,8,'slow','❄',0,{element:'ice',value:2,max:{modifiable:true}}]
   ]}
 };
 /** Con cuántas habilidades empieza cada clase (el resto se aprende al subir de nivel). */
@@ -199,7 +199,8 @@ function rollTier(tiers,ilvl,rng){
 }
 /** Rareza según el nivel del objeto y la suerte extra (élite, eventos). */
 function rollRarity(ilvl,bonus,rng,minGrade=0){
-  const weights=[60,30,8+ilvl*2.2,1+ilvl*1.1].map((w,i)=>i<minGrade?0:w*(i>=2?1+bonus*3:1));
+  // Raros y legendarios algo más escasos (~25 % menos que antes).
+  const weights=[60,30,6+ilvl*1.65,.7+ilvl*.8].map((w,i)=>i<minGrade?0:w*(i>=2?1+bonus*3:1));
   return weighted(weights.map((w,i)=>[i,w]),rng);
 }
 export const itemLevel=(s,extra=0)=>Math.max(1,s.floor+extra);
@@ -283,7 +284,7 @@ export const masteryTree={
   celeridad:{name:'Celeridad',icon:'mp',max:1,cost:8,requires:'vigor',description:()=>'+1 PM en todos los combates'}
 };
 /** Coste del siguiente rango de una maestría. */
-export const masteryCost=(key,rank)=>masteryTree[key].cost*(rank+1);
+export const masteryCost=(key,rank)=>Math.ceil(masteryTree[key].cost*(rank+1)*1.5);
 export function cleanMastery(input={}){
   const out={};
   for(const [key,node] of Object.entries(masteryTree)){
@@ -308,7 +309,7 @@ export function runPoints(summary){
   const floor=Math.max(0,Math.min(ACTS*FLOORS_PER_ACT,Math.floor(Number(summary.floor)||0)));
   const kills=Math.max(0,Math.min(6,Math.floor(Number(summary.bossKills)||0)));
   const acts=Math.max(0,actOf(floor)-1)+(summary.won?1:0);
-  return floor+kills*3+acts*10+(summary.won?25:0);
+  return Math.floor(floor/2)+kills*2+acts*5+(summary.won?15:0);
 }
 export const monsterNames={slime:'Limo',bat:'Murciélago',skull:'Calavera flotante',worm:'Gusano de cripta',slimeking:'Limo colosal',
   skeleton:'Esqueleto',succubus:'Súcubo',vampire:'Vampiro',imp:'Diablillo',slug:'Babosa',plant:'Planta escupidora',lavaslime:'Limo de lava'};
@@ -539,10 +540,14 @@ function makeLayout(s,rng){
     }
   }
   // Trampas: pinchos en todos los pisos y gas venenoso desde el piso 2.
+  // Nunca en pasillos (casillas con 2 o menos vecinas libres) ni pegadas a otra trampa.
   const traps=[];
-  const spots=open.filter(pos=>!boundary.has(pos));
-  for(let i=0;i<1+Math.floor(s.floor*.7)&&spots.length;i++){
+  const walkable=pos=>onBoard(s,pos)&&!boundary.has(pos);
+  const spots=open.filter(pos=>walkable(pos)&&adjacent(s,pos).filter(walkable).length>=3);
+  const count=Math.min(5,1+Math.floor(actFloor(s.floor)*.5)+(s.act||1)-1);
+  for(let i=0;i<count&&spots.length;i++){
     const pos=spots.splice(roll(0,spots.length-1,rng),1)[0];
+    if(traps.some(t=>distance(s,t.pos,pos)<=2)){i--;continue;}
     traps.push({pos,kind:s.floor>=2&&rng()<.4?'gas':'spikes'});
   }
   return {name,style,walls:blocks,water,traps};
@@ -719,6 +724,16 @@ function hit(s,actor,target,raw,kind='damage',critical=false,element='physical')
   target.hp-=damage;
   emit(s,{kind,unit:target.id,pos:target.pos,from:actor.pos,amount:damage,critical});
   note(s,actor.name+' → '+target.name+' · −'+damage+' PV'+(extra?' (+'+extra+' vulnerabilidad)':'')+(critical?' · crítico':''));
+  if(target.hp<=0)releaseMinions(s,target);
+}
+/** Al morir un invocador, sus invocaciones se deshacen con él. */
+function releaseMinions(s,owner){
+  for(const minion of s.units.filter(u=>u.minion===owner.id&&u.hp>0)){
+    const amount=minion.hp;
+    minion.hp=0;
+    emit(s,{kind:'damage',unit:minion.id,pos:minion.pos,from:owner.pos,amount});
+    note(s,minion.name+' se deshace al caer '+owner.name+'.');
+  }
 }
 function effect(unit,key,value,turns) {
   const previous=unit.effects[key];

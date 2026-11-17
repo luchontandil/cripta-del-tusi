@@ -509,6 +509,20 @@ function contour(s,rng){
   }
   return {shape,voids};
 }
+/**
+ * Formas de sala. Las pequeñas obligan al cuerpo a cuerpo; las galerías largas y las amplias
+ * favorecen a quien ataca a distancia (a veces el grupo, a veces los enemigos).
+ */
+export function roomForms(extra=0,rng=Math.random){
+  const r=(a,b)=>a+Math.floor(rng()*(b-a+1));
+  return [
+    {key:'estandar',name:'Sala',w:12+2*extra,h:7+extra},
+    {key:'pequena',name:'Sala pequeña',w:r(9,10)+extra,h:6},
+    {key:'larga',name:'Galería larga',w:Math.min(22,r(17,19)+2*extra),h:5+Math.min(1,extra)},
+    {key:'amplia',name:'Sala amplia',w:Math.min(22,r(15,16)+2*extra),h:Math.min(12,r(10,11)+extra)},
+    {key:'cuadrada',name:'Sala cuadrada',w:10+extra,h:Math.min(12,9+extra)}
+  ];
+}
 /** Nombres de sala por ambientación: se combinan al azar. */
 const roomNames={
   crypt:[['Galería','Osario','Capilla','Pasaje','Cámara','Nave','Sepulcro','Calabozo','Cripta','Mazmorra'],
@@ -636,23 +650,30 @@ function makeLayout(s,rng){
   const biome=s.biome||'crypt';
   const styles={...roomStyles,...(biomeStyles[biome]||{})};
   const style=pick(Object.keys(styles).filter(key=>key!==s.layoutStyle),rng);
-  // Los obstáculos van en el centro: las columnas de salida de cada bando quedan libres.
-  const area={x0:4,x1:w-5,y0:rng()<.5?0:1,y1:h-1-(rng()<.5?0:1)};
+  // Los obstáculos se reparten por casi todo el mapa: quedan libres las 3 columnas de salida de cada bando.
+  const area={x0:3,x1:w-4,y0:0,y1:h-1};
   const cells=[];
   styles[style](cells,area,rng);
   // A veces la sala sale simétrica (en espejo arriba/abajo).
   if(rng()<.4)for(const [x,y] of [...cells])cells.push([x,h-1-y]);
+  // Densidad: cada sala tiene un tope de obstáculos (de arena diáfana a sala con cobertura).
+  // Tope sobre el mapa entero (≈5–14 %): de arena casi diáfana a sala con bastante cobertura.
+  const boardCells=Array.from({length:w*h},(_,pos)=>pos).filter(pos=>onBoard(s,pos)).length;
+  const density=pick([.05,.07,.09,.11,.14],rng);
+  const budget=Math.max(2,Math.round(boardCells*density));
   const walls=[];
-  for(const [x,y] of cells){
+  const shuffled=[...cells].map(c=>[rng(),c]).sort((a,b)=>a[0]-b[0]).map(([,c])=>c);
+  for(const [x,y] of shuffled){
     const pos=y*w+x;
-    if(x>=4&&x<=w-5&&y>=0&&y<h&&onBoard(s,pos)&&!walls.includes(pos))walls.push(pos);
+    if(walls.length>=budget)break;
+    if(x>=3&&x<=w-4&&y>=0&&y<h&&onBoard(s,pos)&&!walls.includes(pos))walls.push(pos);
   }
   const [nouns,tails]=roomNames[biome]||roomNames.crypt;
   let name=pick(nouns,rng)+' '+pick(tails,rng);
   if(name===s.layoutName)name=nouns[(nouns.indexOf(name.split(' ')[0])+1)%nouns.length]+' '+pick(tails,rng);
   const boundary=new Set();
   const ground=Array.from({length:w*h},(_,pos)=>pos).filter(pos=>onBoard(s,pos));
-  const candidates=ground.filter(pos=>pos%w>=4&&pos%w<=w-5&&Math.floor(pos/w)>0&&Math.floor(pos/w)<h-1&&!walls.includes(pos));
+  const candidates=ground.filter(pos=>pos%w>=3&&pos%w<=w-4&&!walls.includes(pos));
   function connected(){
     const visited=new Set([ground.find(pos=>!boundary.has(pos))]);
     for(const pos of visited)for(const next of adjacent(s,pos)){
@@ -664,7 +685,7 @@ function makeLayout(s,rng){
     boundary.add(pos);
     if(!connected())boundary.delete(pos);
   }
-  for(let i=0;i<2+Math.floor(s.floor/2)&&candidates.length;i++){
+  for(let i=0;i<Math.min(3,Math.floor(budget/6))&&candidates.length;i++){
     const pos=candidates.splice(roll(0,candidates.length-1,rng),1)[0];
     boundary.add(pos);
     if(!connected())boundary.delete(pos);
@@ -685,11 +706,13 @@ function makeLayout(s,rng){
       if(connected())water.push(pos);else boundary.delete(pos);
     }
   }
-  const pools=s.floor===1?1:biome==='jungle'?roll(2,4,rng):biome==='hell'?roll(1,3,rng):roll(0,2,rng);
-  for(let i=0;i<pools&&open.length;i++){
+  const pools=s.floor===1?1:biome==='jungle'?roll(1,3,rng):biome==='hell'?roll(1,2,rng):roll(0,2,rng);
+  // El agua (o lava) tampoco puede comerse la sala: como mucho ≈8 % del mapa.
+  const waterCap=Math.max(3,Math.round(boardCells*.08))+water.length;
+  for(let i=0;i<pools&&open.length&&water.length<waterCap;i++){
     let pos=open[roll(0,open.length-1,rng)];
-    const size=biome==='jungle'?roll(3,6,rng):roll(2,5,rng);
-    for(let j=0;j<size&&pos!==undefined;j++){
+    const size=biome==='jungle'?roll(3,5,rng):roll(2,4,rng);
+    for(let j=0;j<size&&pos!==undefined&&water.length<waterCap;j++){
       if(!boundary.has(pos)){
         boundary.add(pos);
         if(connected())water.push(pos);else boundary.delete(pos);
@@ -766,16 +789,12 @@ function openFloor(s,rng,elite=false,boss=null) {
   s.rounds=1;
   s.mapSeed=randomSeed(rng);
   const mapRng=floorRandom(s.mapSeed);
-  const baseWidth=Math.min(16,10+2*s.players.length);
-  const baseHeight=7+s.players.length;
-  const sizes=[
-    [baseWidth,baseHeight],
-    [baseWidth+2,baseHeight],
-    [baseWidth,baseHeight+1],
-    [Math.max(12,baseWidth-2),baseHeight+2]
-  ];
-  const available=sizes.filter(([width,height])=>width!==s.width||height!==s.height);
-  [s.width,s.height]=s.floor===1?sizes[0]:pick(available,mapRng);
+  // Formas de sala: unas ayudan al cuerpo a cuerpo (pequeñas), otras a la distancia (largas, amplias).
+  const extra=s.players.length-1;
+  const forms=roomForms(extra,mapRng);
+  const form=s.floor===1?forms[0]:pick(forms.filter(f=>f.key!==s.roomForm),mapRng);
+  s.roomForm=form.key;s.roomFormName=form.name;
+  [s.width,s.height]=[form.w,form.h];
   Object.assign(s,contour(s,mapRng));
   s.act=actOf(s.floor);
   s.biome=actBiomes[s.act-1];
@@ -824,7 +843,7 @@ function openFloor(s,rng,elite=false,boss=null) {
   });
   s.units=[...heroes,...foes].sort((a,b)=>b.initiative-a.initiative);
   s.turn=0;
-  note(s,'Piso '+s.floor+' · '+s.layoutName+(s.voids.length?' · '+s.shape.toUpperCase():'')+(boss?' · '+bosses[boss].name:elite?' · Combate de élite':''));
+  note(s,'Piso '+s.floor+' · '+s.layoutName+' · '+(s.roomFormName||'Sala').toLowerCase()+(s.voids.length?' · '+s.shape.toUpperCase():'')+(boss?' · '+bosses[boss].name:elite?' · Combate de élite':''));
   if(Math.abs(scale.hp-1)>=.05||Math.abs(scale.damage-1)>=.05)
     note(s,'Los enemigos se adaptan al poder del grupo: vida ×'+scale.hp.toFixed(2)+', daño ×'+scale.damage.toFixed(2)+'.');
   const effects=modText(s.mods);

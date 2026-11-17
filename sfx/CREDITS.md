@@ -52,9 +52,6 @@ Fuente: https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx
 ## Magic Spell SFX — JaggedStone · CC0
 Fuente: https://opengameart.org/content/magic-spell-sfx
 
-- `arcane_1.ogg` ← magical_1_0.ogg
-- `arcane_2.ogg` ← magical_2.ogg
-- `arcane_3.ogg` ← magical_3.ogg
 - `heal_1.ogg` ← magical_4.ogg
 - `heal_2.ogg` ← magical_5.ogg
 - `cleanse_1.ogg` ← magical_6_0.ogg
@@ -63,8 +60,6 @@ Fuente: https://opengameart.org/content/magic-spell-sfx
 ## Fantasy Sound Effects Library — Little Robot Sound Factory (www.littlerobotsoundfactory.com) · CC-BY 3.0
 Fuente: https://opengameart.org/content/fantasy-sound-effects-library
 
-- `arcane_4.ogg` ← Spell_00.wav
-- `arcane_5.ogg` ← Spell_01.wav
 - `v_imp_1.ogg` ← Goblin_00.wav
 - `v_imp_2.ogg` ← Goblin_01.wav
 - `v_imp_3.ogg` ← Goblin_02.wav
@@ -244,3 +239,4 @@ No son de dominio público: solo para uso dentro de este juego, no se pueden reu
 
 - `music_dungeon.ogg` ← «Dungeon Pulse», aportada por el propietario del proyecto (convertida a OGG, normalizada y preparada para repetirse en bucle).
 - `el_lightning_1..3.ogg` ← sfx100v2_thunder_01.ogg (sfx_100_v2, CC0, OpenGameArt) en tres tonos
+- `arcane_1..3.ogg` ← Spell_00.wav, Spell_01.wav, Spell_03.wav (Fantasy Sound Effects Library, Little Robot Sound Factory, CC-BY 3.0)

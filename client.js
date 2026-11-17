@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,glyphText,monsterSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=46';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=46';
-import {setupSfx} from './music.js?v=46';
-import {icon} from './icons.js?v=46';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=47';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=47';
+import {setupSfx} from './music.js?v=47';
+import {icon} from './icons.js?v=47';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -96,7 +96,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=46').then(({createIso})=>{
+import('./isometric.js?v=47').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1150,10 +1150,11 @@ function eventSound(event){
     const elementSound={fire:'el_fire',ice:'el_ice',chaos:'el_shadow',magic:'arcane',lightning:'el_lightning'}[event.element];
     const already={el_fire:'blast',el_shadow:'venom',arcane:'arcane'}[elementSound];
     if(elementSound&&event.effect!==already){
-      const travel=Math.min(.45,.12+.04*(state?.width?Math.abs((event.pos%state.width)-(event.from%state.width))+Math.abs(Math.floor(event.pos/state.width)-Math.floor(event.from/state.width)):3));
+      const travel=Math.min(.62,.2+.055*(state?.width?Math.abs((event.pos%state.width)-(event.from%state.width))+Math.abs(Math.floor(event.pos/state.width)-Math.floor(event.from/state.width)):3));
       sfx(elementSound,{delay:travel,volume:.8});
     }
-    if(actor?.enemy&&voices[actor.look])sfx(voices[actor.look],{volume:actor.boss?.9:.55});
+    // Voz al atacar (salvo los espectros: su lamento queda para cuando reciben daño o mueren).
+    if(actor?.enemy&&voices[actor.look]&&voices[actor.look]!=='v_ghost')sfx(voices[actor.look],{volume:actor.boss?.9:.55});
     if(actor?.boss&&event.effect!=='slash')sfx('v_boss',{volume:.8,delay:.1});
     return;
   }

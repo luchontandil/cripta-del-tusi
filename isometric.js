@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=46';
-import {playerColors} from './engine.js?v=46';
+import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=47';
+import {playerColors} from './engine.js?v=47';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -674,10 +674,18 @@ export function createIso(mount,onCell){
       if(travel>.01)model.root.rotation.y=Math.atan2(target.x-from.x,target.z-from.z);
     }
     const ranged=travel>1.1&&!['heal','cleanse','dash','slash'].includes(event.effect);
-    const flight=ranged?Math.min(300,120+travel*18):65;
+    // Proyectil visible: más lento, con halo y estela, del color de su elemento.
+    const flight=ranged?Math.min(620,200+travel*55):65;
     if(ranged){
-      const shot=piece(transient,event.effect==='arrow'?'cone':'gem',color,from.x,.68,from.z,.17,.25,.17,true);
-      effects.push({mesh:shot,start:time,duration:flight,source:from,target,shape:event.effect});
+      const elementColor={fire:'#ff7a2e',ice:'#8fe3ff',lightning:'#ffe45c',chaos:'#9be05a',magic:'#c9a6ff'}[event.element];
+      const tint=elementColor||color;
+      const actorUnit=state.units.find(u=>u.id===event.actor);
+      const lift=actorUnit&&['skull','bat','imp','oracle','umbralking','succubus','vampqueen'].includes(actorUnit.look)?.35:0;
+      const arrow=event.effect==='arrow';
+      const shot=piece(transient,arrow?'cone':'orb',tint,from.x,.68+lift,from.z,arrow?.12:.27,arrow?.42:.27,arrow?.12:.27,true);
+      const halo=arrow?null:piece(shot,'orb',tint,0,0,0,1.9,1.9,1.9,true);
+      if(halo){halo.material=halo.material.clone();halo.material.transparent=true;halo.material.opacity=.35;halo.material.depthWrite=false;}
+      effects.push({mesh:shot,start:time,duration:flight,source:from,target,shape:event.effect,lift,trail:tint,lastTrail:0});
     }
     const area=event.area||[event.pos];
     for(const [i,pos] of area.entries()){
@@ -793,12 +801,22 @@ export function createIso(mount,onCell){
       }else if(fx.ring){
         fx.mesh.scale.setScalar(.25+Math.sin(t*Math.PI*.76)*.86);
         fx.mesh.position.y=.04+t*.08;
+      }else if(fx.fade){
+        fx.mesh.scale.setScalar(fx.size*(1-t));
+        fx.mesh.position.y-=.002;
       }else if(fx.pop){
         fx.mesh.scale.x=fx.mesh.scale.z=.36+t*.55;
         fx.mesh.position.y=.04+t*.045;
       }else{
         fx.mesh.position.lerpVectors(fx.source,fx.target,t);
-        fx.mesh.position.y=.56+Math.sin(t*Math.PI)*.52;
+        fx.mesh.position.y=.56+(fx.lift||0)*(1-t)+Math.sin(t*Math.PI)*.42;
+        // Estela: chispas que se quedan atrás y se apagan.
+        if(fx.trail&&now-fx.lastTrail>26&&!reduced){
+          fx.lastTrail=now;
+          const p=fx.mesh.position;
+          const spark=piece(transient,'gem',fx.trail,p.x,p.y,p.z,.13,.13,.13,true);
+          effects.push({mesh:spark,start:now,duration:300,fade:true,size:.13});
+        }
         if(fx.shape==='arrow'){
           fx.mesh.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),fx.target.clone().sub(fx.source).normalize());
           fx.mesh.scale.y=.48;

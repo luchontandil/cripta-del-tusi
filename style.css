@@ -1151,3 +1151,16 @@ body:not(.in-expedition) .tagline{margin:0 0 8px;font-size:.72rem}
 .live-version{position:fixed;left:8px;bottom:6px;z-index:5;font-size:.68rem;letter-spacing:.03em;color:#ffffff70;background:#0008;padding:2px 7px;border-radius:3px;pointer-events:auto;user-select:text}
 .live-version.stale{color:#ffcf6e}
 body.in-expedition .live-version{opacity:.55}
+/* Barras de volumen con estilo propio (igual en Chrome y Firefox): sin el marco ni el relleno
+   de los campos de texto, que desplazaban el recorrido y el 0 no quedaba al inicio. */
+input[type=range]{-webkit-appearance:none;appearance:none;padding:0;margin:0;border:0;box-shadow:none;background:transparent;height:18px;width:100%;cursor:pointer;
+  --fill:calc((var(--v,0) - var(--min,0)) / (var(--max,100) - var(--min,0)) * 100%)}
+input[type=range]:focus{outline:none;box-shadow:none}
+input[type=range]:focus-visible{outline:1px dashed #e0a84f88;outline-offset:2px}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(90deg,#e0a84f var(--fill),#3a3140 var(--fill))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-4px;border-radius:50%;background:#f1c779;border:2px solid #17131c;box-shadow:0 0 0 1px #e0a84f}
+input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:#3a3140}
+input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:#e0a84f}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#f1c779;border:2px solid #17131c;box-shadow:0 0 0 1px #e0a84f}
+.sound-row{grid-template-columns:62px 1fr 44px}
+.sound-row output{white-space:nowrap}

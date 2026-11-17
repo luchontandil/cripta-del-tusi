@@ -1,5 +1,5 @@
 // Sonido del juego: efectos, ambiente por acto y música de fondo.
-import {icon} from './icons.js?v=67';
+import {icon} from './icons.js?v=68';
 export function setupSfx(button){
   let context,master;
   let muted=false;
@@ -185,6 +185,7 @@ export function setupSfx(button){
     }
     muteBox.checked=!muted;
     sfxRange.value=Math.round(volumeSfx*100);ambRange.value=Math.round(volumeAmbience*100);musicRange.value=Math.round(volumeMusic*100);
+    for(const r of [sfxRange,ambRange,musicRange])r.style.setProperty('--v',r.value);
     sfxOut.textContent=sfxRange.value+' %';ambOut.textContent=ambRange.value+' %';musicOut.textContent=musicRange.value+' %';
   }
   // Menú de sonido: activar/desactivar y barras de volumen.

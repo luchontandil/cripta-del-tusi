@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=67';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=67';
-import {setupSfx} from './music.js?v=67';
-import {icon} from './icons.js?v=67';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=68';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=68';
+import {setupSfx} from './music.js?v=68';
+import {icon} from './icons.js?v=68';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=67').then(({createIso})=>{
+import('./isometric.js?v=68').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1944,7 +1944,7 @@ function renderSfxEditor(bank){
     if(e.volume===1)delete e.volume;if(e.pitch===1)delete e.pitch;if(!e.from)delete e.from;if(!e.off?.length)delete e.off;
     if(!Object.keys(e).length)delete sfxDraft[key];};
   const slider=(label,min,max,value,format,onInput)=>{
-    const input=document.createElement('input');input.type='range';input.min=min;input.max=max;input.step=5;input.value=value;
+    const input=document.createElement('input');input.type='range';input.min=min;input.max=max;input.step=5;input.value=value;input.style.setProperty('--min',min);input.style.setProperty('--max',max);input.style.setProperty('--v',value);input.addEventListener('input',()=>input.style.setProperty('--v',input.value));
     const out=h('output',null,format(value));
     input.oninput=()=>{out.textContent=format(+input.value);onInput(+input.value);};
     return h('label','sfx-slider',h('span',null,label),input,out);

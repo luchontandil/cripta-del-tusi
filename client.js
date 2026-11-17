@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=68';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=68';
-import {setupSfx} from './music.js?v=68';
-import {icon} from './icons.js?v=68';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=69';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=69';
+import {setupSfx} from './music.js?v=69';
+import {icon} from './icons.js?v=69';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=68').then(({createIso})=>{
+import('./isometric.js?v=69').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -268,7 +268,9 @@ function showInvites(){
 function hideInviteToast(){el('invite-toast').hidden=true;}
 const masteriesDialog=el('masteries');
 el('masteries-close').onclick=()=>masteriesDialog.close();
-el('mastery-reset').onclick=async()=>{try{const d=await accountCall('mastery-reset',{});account.user=d.user;renderMasteries();renderAccount();}catch(e){error(e.message);}};
+el('mastery-reset').onclick=async()=>{try{const d=await accountCall('mastery-reset',{});account.user=d.user;renderMasteries();renderAccount();syncLobbyMastery();}catch(e){error(e.message);}};
+/** En la sala de espera, el servidor vuelve a leer las maestrías de tu cuenta. */
+function syncLobbyMastery(){if(session?.code&&state?.phase==='lobby')send({type:'mastery'});}
 function openMasteries(){renderMasteries();masteriesDialog.showModal();}
 function renderMasteries(){
   const u=account.user;if(!u)return;
@@ -278,7 +280,7 @@ function renderMasteries(){
     const maxed=rank>=node.max;
     const cost=maxed?0:masteryCost(key,rank);
     const locked=node.requires&&!(u.mastery[node.requires]>0);
-    const buy=btn('',async()=>{try{const d=await accountCall('mastery',{key});account.user=d.user;renderMasteries();renderAccount();}catch(e){error(e.message);}});
+    const buy=btn('',async()=>{try{const d=await accountCall('mastery',{key});account.user=d.user;renderMasteries();renderAccount();syncLobbyMastery();}catch(e){error(e.message);}});
     buy.className=maxed?'ghost':'primary';
     buy.disabled=maxed||locked||available()<cost;
     buy.append(maxed?'Máximo':locked?'Requiere '+masteryTree[node.requires].name:'Mejorar · '+cost+' pts');
@@ -1360,9 +1362,28 @@ function renderLobby(box){
       return h('li','friend'+(f.online?' online':''),h('span','dot'),h('b',null,f.nick),h('small',null,f.online?'Conectado':'Desconectado'),b);
     })));
   }else if(session.code)invite.push(h('p','hint','Entra con tu cuenta para invitar a tus amigos directamente.'));
+  // Tu hueco: elegir clase y maestrías antes de empezar.
+  const me=state.players.find(p=>p.id===session.id);
+  const setup=[];
+  if(me){
+    const picks=h('div','lobby-classes',...Object.keys(classes).map(kind=>{
+      const b=h('button','lobby-class'+(me.classId===kind?' on':''),h('span','class-art',portrait(kind)),h('span',null,classes[kind].name));
+      b.type='button';b.title=classes[kind].name+' · '+roles[kind];
+      b.setAttribute('aria-pressed',String(me.classId===kind));
+      b.onclick=()=>{if(me.classId===kind)return;send({type:'class',classId:kind});const select=el('class');if(select){select.value=kind;classPreview();}};
+      return b;
+    }));
+    const ranks=Object.values(me.mastery||{}).reduce((a,b)=>a+b,0);
+    const masteryLine=account.user
+      ?h('div','lobby-mastery',h('span',null,icon('xp'),ranks?ranks+' rangos de maestría activos':'Sin maestrías activas'),
+        Object.assign(btn('',()=>openMasteries()),{className:'primary'}))
+      :h('p','hint','Entra con tu cuenta para usar tus maestrías.');
+    masteryLine.querySelector?.('button')?.append(icon('xp'),'Editar maestrías');
+    setup.push(h('div','lobby-setup',h('h3',null,icon('level'),'Tu personaje'),picks,masteryLine));
+  }
   box.replaceChildren(
     h('div','journey-head',h('h3',null,icon('users'),'Sala '+(session.code||'')),h('p',null,host?'Cuando estéis todos, pulsa «Iniciar expedición».':'Esperando a que el anfitrión inicie la expedición.')),
-    party,...invite);
+    party,...setup,...invite);
 }
 function renderJourney(){
   const box=el('journey');
@@ -1876,6 +1897,9 @@ async function enter(creating){
 el('create').onclick=()=>enter(true);
 el('join').onclick=()=>enter(false);
 el('leave').onclick=()=>{
+  // Avisa al servidor para liberar el hueco en la sala (sin esperar respuesta).
+  if(session?.code&&session.key)fetch(session.base+'/api/'+session.code+'/leave',{method:'POST',keepalive:true,
+    headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.key},body:'{}'}).catch(()=>{});
   generation++;busy=false;state=null;session=null;selected=null;rendered='';
   resetAnimation();
   syncViewport();

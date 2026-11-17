@@ -1164,3 +1164,14 @@ input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:#
 input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#f1c779;border:2px solid #17131c;box-shadow:0 0 0 1px #e0a84f}
 .sound-row{grid-template-columns:62px 1fr 44px}
 .sound-row output{white-space:nowrap}
+/* Sala: elegir clase y maestrías */
+.lobby-setup{margin-top:12px;padding:10px 12px;background:#120e10;border:2px solid #000;box-shadow:inset 1px 1px 0 #3a302c;display:grid;gap:10px}
+.lobby-setup h3{display:flex;align-items:center;gap:7px;color:var(--gold);margin:0}
+.lobby-classes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.lobby-class{display:grid;justify-items:center;gap:2px;padding:6px 2px;background:#1a1418;border:2px solid #2c2228;color:#d9ccb0;font:inherit;font-size:.78rem;cursor:pointer}
+.lobby-class .class-art{display:grid;place-items:center;width:40px;height:40px}
+.lobby-class canvas{width:32px;image-rendering:pixelated}
+.lobby-class:hover{border-color:#6b5638}
+.lobby-class.on{border-color:var(--gold);background:#2a2014;color:var(--gold)}
+.lobby-mastery{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.lobby-mastery>span{display:flex;align-items:center;gap:6px}

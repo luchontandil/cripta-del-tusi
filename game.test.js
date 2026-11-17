@@ -1069,3 +1069,34 @@ test('tienda: se puede re-tirar pagando tusi y cada vez cuesta más',()=>{
   p.gold=0;
   assert.throws(()=>act(s,'p0',{type:'reroll-shop'},random),/tusi/);
 });
+test('sala: cambiar de clase, maestrías desde la cuenta, salir y no duplicar al volver a entrar', {timeout:10000}, async t=>{
+  const {server:app}=await import('./server.js');
+  if(!app.listening){app.listen(0,'127.0.0.1');await once(app,'listening');}
+  t.after(()=>app.close());
+  const base='http://127.0.0.1:'+app.address().port;
+  const call=async(path,body,account,key)=>{
+    const response=await fetch(base+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(account?{'X-Account':account}:{}),...(key?{Authorization:'Bearer '+key}:{})},body:body?JSON.stringify(body):undefined});
+    return {status:response.status,...await response.json()};
+  };
+  const carla=await call('/api/account/register',{nick:'Carla',password:'secreto3'});
+  const room=await call('/api/rooms',{name:'Anfi',classId:'guardia'});
+  const first=await call('/api/'+room.code+'/join',{classId:'mago'},carla.token);
+  assert.equal(first.state.players.length,2);
+  // Cambia de clase en la sala
+  const changed=await call('/api/'+room.code+'/action',{type:'class',classId:'sombra'},carla.token,first.key);
+  assert.equal(changed.state.players.find(p=>p.id===first.id).classId,'sombra');
+  assert.equal((await call('/api/'+room.code+'/action',{type:'class',classId:'dragón'},carla.token,first.key)).status,400);
+  // Las maestrías salen de la cuenta: lo que mande el cliente no cuenta
+  const cheat=await call('/api/'+room.code+'/action',{type:'mastery',mastery:{fuerza:3},trusted:true},carla.token,first.key);
+  assert.deepEqual(cheat.state.players.find(p=>p.id===first.id).mastery,{});
+  assert.equal((await call('/api/'+room.code+'/action',{type:'mastery'},null,room.key)).status,400);
+  // Volver a entrar con la misma cuenta sustituye el hueco anterior
+  const again=await call('/api/'+room.code+'/join',{classId:'tirador'},carla.token);
+  assert.equal(again.state.players.length,2);
+  assert.equal(again.state.players.filter(p=>p.account==='carla'||p.name==='Carla').length,1);
+  assert.equal((await call('/api/'+room.code,null,null,first.key)).status,401);
+  // Salir libera el hueco
+  assert.equal((await call('/api/'+room.code+'/leave',{},null,again.key)).status,200);
+  const after=await call('/api/'+room.code,null,null,room.key);
+  assert.equal(after.state.players.length,1);
+});

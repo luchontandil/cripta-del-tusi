@@ -455,6 +455,20 @@ export function join(s,id,name,classId,extra={}) {
   s.players.push({id,name:String(name||'Aventurero').trim().slice(0,22)||'Aventurero',classId,bag:[],equipment:{},
     gold:(mastery.fortuna||0)*10,level:1,xp:0,skillRanks:ranks,trained:true,color,mastery,account:extra.account||null});
 }
+/** Saca a un jugador de la sala de espera (se fue, cerró la pestaña o volvió a entrar). */
+export function leave(s,id){
+  if(s.phase!=='lobby')return false;
+  const before=s.players.length;
+  s.players=s.players.filter(p=>p.id!==id);
+  return s.players.length<before;
+}
+/** Rehace lo que depende de la clase y las maestrías mientras se espera en la sala. */
+function lobbyLoadout(player){
+  const ranks=skillRanks(player.classId);
+  if(player.mastery?.sabiduria)ranks[0]=Math.min(3,ranks[0]+1);
+  player.skillRanks=ranks;
+  player.gold=(player.mastery?.fortuna||0)*10;
+}
 /** Puntos de cuenta al terminar la partida: según lo lejos que se llegó. */
 export function runPoints(summary){
   const floor=Math.max(0,Math.min(ACTS*FLOORS_PER_ACT,Math.floor(Number(summary.floor)||0)));
@@ -2006,6 +2020,20 @@ export function act(s,id,a,rng=Math.random) {
   const player=s.players.find(p=>p.id===id);
   if(!player)fail('Jugador desconocido.');
   const host=s.players[0].id===id;
+  // En la sala, antes de empezar: cada jugador puede cambiar de clase y de maestrías.
+  // (Las maestrías las pone el servidor desde la cuenta, nunca el propio cliente.)
+  if(a.type==='class'&&s.phase==='lobby'){
+    if(!Object.hasOwn(classes,a.classId))fail('Elige una clase válida.');
+    player.classId=a.classId;
+    lobbyLoadout(player);
+    return;
+  }
+  if(a.type==='mastery'&&s.phase==='lobby'){
+    if(!a.trusted)fail('Las maestrías se cargan desde tu cuenta.');
+    player.mastery=cleanMastery(a.mastery);
+    lobbyLoadout(player);
+    return;
+  }
   if(a.type==='start'&&s.phase==='lobby'&&host){
     s.route=makeRoute(rng,1);
     s.act=1;

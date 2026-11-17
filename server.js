@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { create, join, act, tick } from './engine.js';
+import { create, join, act, tick, leave } from './engine.js';
 import * as accounts from './accounts.js';
 // Versión publicada: Render pone el commit en RENDER_GIT_COMMIT; la de los ficheros sale de index.html.
 const liveVersion={
@@ -81,8 +81,11 @@ export const server = createServer(async (req,res) => {
       const key = token(24);
       // Con cuenta: el nombre es el nick y se aplican sus maestrías.
       const user = await accounts.userFromToken(accountToken);
+      // La misma cuenta que vuelve a entrar sustituye a su hueco anterior (no se duplica).
+      if (user && room.state.phase === 'lobby') for (const old of room.state.players.filter(p => p.account === user.nick)) dropPlayer(room, old.id);
       join(room.state,id,user?.nick||body.name,body.classId,user?{mastery:user.mastery,account:user.nick}:{});
       room.keys.set(key,id);
+      (room.seen ||= new Map()).set(id,Date.now());
       room.touched = Date.now();
       let roomCode = code;
       if (creating) {
@@ -96,7 +99,21 @@ export const server = createServer(async (req,res) => {
     const id = room.keys.get(req.headers.authorization?.slice(7));
     if (!id) return send(401,{error:'Sesión inválida.'});
     room.touched=Date.now();
+    (room.seen ||= new Map()).set(id,Date.now());
+    if (req.method === 'POST' && operation === 'leave') {
+      dropPlayer(room,id);
+      if (!room.state.players.length) rooms.delete(code);
+      return send(200,{ok:true});
+    }
+    pruneLobby(room);
     if (req.method === 'POST' && operation === 'action') {
+      // Maestrías en la sala: se leen de la cuenta del jugador, no de lo que mande el cliente.
+      if (body.type === 'mastery') {
+        const user = await accounts.userFromToken(accountToken);
+        const player = room.state.players.find(p => p.id === id);
+        if (!user || !player || (player.account && player.account !== user.nick)) return send(400,{error:'Entra con tu cuenta para usar maestrías.'});
+        body = {type:'mastery', mastery:user.mastery, trusted:true};
+      } else if (body && typeof body === 'object') delete body.trusted;
       act(room.state,id,body);
       if (room.state.phase === 'lobby') room.awarded = false;
       await settle(room);
@@ -108,6 +125,19 @@ export const server = createServer(async (req,res) => {
     send(error.status || 400,{error:error.message});
   }
 });
+/** Quita a un jugador de la sala de espera y anula su sesión. */
+function dropPlayer(room,id){
+  if (!leave(room.state,id)) return;
+  for (const [key,owner] of room.keys) if (owner === id) room.keys.delete(key);
+  room.seen?.delete(id);
+}
+/** En la sala de espera, quien lleva 15 s sin dar señales (cerró la pestaña) deja su hueco. */
+const LOBBY_IDLE = 15000;
+function pruneLobby(room){
+  if (room.state.phase !== 'lobby') return;
+  const now = Date.now();
+  for (const p of [...room.state.players]) if (now - (room.seen?.get(p.id) ?? now) > LOBBY_IDLE) dropPlayer(room,p.id);
+}
 /** Al terminar una partida en sala, reparte los puntos a cada cuenta (una sola vez). */
 async function settle(room){
   const s=room.state;

@@ -135,7 +135,7 @@ export const supportKinds=['heal','cleanse','shield','haste'];
 export const castsOnCell=skill=>!!skillOptions(skill).area||skill[5]==='dash'||skill[5]==='blast';
 export const slots = {weapon:'Arma',helmet:'Casco',armor:'Armadura',gloves:'Guantes',belt:'Cinturón',boots:'Botas',ring:'Anillo',amulet:'Amuleto',charm:'Talismán'};
 export const statNames = {...Object.fromEntries(Object.entries(elements).map(([key,name])=>[key,'Daño '+name.toLowerCase()])),
-  vitality:'Vida',reach:'Alcance',ward:'Armadura',critical:'Crítico',movement:'PM',action:'PA'};
+  vitality:'Vida',reach:'Alcance (habilidades modificables)',ward:'Armadura',critical:'Crítico',movement:'PM',action:'PA'};
 export const rarities = ['Normal','Poco común','Raro','Legendario'];
 const bases = {
   weapon:['Arco de tejo','Sable de cobre','Cetro de ónice','Lanza de vigía'],
@@ -167,29 +167,29 @@ export const affixes={
   suffix:{
     vitality:[[1,3,5,'del Zorro'],[2,5,8,'del Oso'],[3,8,12,'de la Ballena'],[5,12,16,'del Coloso'],[7,16,22,'del Titán'],[11,22,30,'del Leviatán'],[16,30,40,'del Behemot'],[21,40,52,'de los Dioses']],
     critical:[[1,3,5,'del Halcón'],[2,5,8,'del Cazador'],[4,8,11,'del Asesino'],[6,11,15,'del Verdugo'],[11,15,19,'de la Carnicería'],[17,19,24,'del Apocalipsis']],
-    reach:[[1,1,1,'del Vigía'],[6,2,2,'del Horizonte']],
+    reach:[[3,1,1,'del Vigía'],[9,2,2,'del Horizonte']],
     movement:[[1,1,1,'de la Liebre'],[7,2,2,'del Viento']],
     action:[[3,1,1,'del Erudito']]
   }
 };
 const elementsAll=['physical','magic','fire','ice','lightning','chaos'];
 const slotAffixes={
-  weapon:{prefix:elementsAll,suffix:['critical','reach','action']},
+  weapon:{prefix:elementsAll,suffix:['critical','vitality','action']},
   helmet:{prefix:['ward','fire','ice','magic','lightning'],suffix:['vitality','critical','reach']},
   armor:{prefix:['ward','physical','chaos'],suffix:['vitality','critical']},
-  gloves:{prefix:elementsAll,suffix:['critical','reach']},
+  gloves:{prefix:elementsAll,suffix:['critical','vitality']},
   belt:{prefix:['ward','physical','fire','lightning'],suffix:['vitality','critical']},
   boots:{prefix:['ward','ice','chaos'],suffix:['movement','vitality']},
-  ring:{prefix:elementsAll,suffix:['critical','reach','vitality']},
-  amulet:{prefix:['magic','fire','lightning','chaos','ward'],suffix:['action','vitality','reach']},
-  charm:{prefix:elementsAll,suffix:['critical','reach']}
+  ring:{prefix:elementsAll,suffix:['critical','vitality']},
+  amulet:{prefix:['magic','fire','lightning','chaos','ward'],suffix:['action','vitality']},
+  charm:{prefix:elementsAll,suffix:['critical','vitality']}
 };
 const rareFirst=['Lamento','Colmillo','Susurro','Ruina','Presagio','Garra','Aullido','Eco','Lamento','Fauces','Maldición','Grito'];
 const rareSecond=['sombrío','de hueso','carmesí','del ocaso','funesto','de la cripta','errante','voraz','silente','de ceniza','eterno','roto'];
 const legendaryNames=['La Última Brasa','Juramento del Umbral','El Ojo Insomne','Lágrima de Tusi','Promesa Rota','Corona del Rey Caído',
   'Fauces del Abismo','Canción de Ceniza','El Vigía Eterno','Pacto de Sangre','Aliento del Oráculo','Silencio del Osario'];
 const inscriptions = [
-  ['Brasa','fire',2],['Escarcha','ice',2],['Acero','physical',2],['Éter','magic',2],['Chispa','lightning',2],['Umbría','chaos',2],['Brújula','reach',1],
+  ['Brasa','fire',2],['Escarcha','ice',2],['Acero','physical',2],['Éter','magic',2],['Chispa','lightning',2],['Umbría','chaos',2],
   ['Muralla','ward',1], ['Centella','critical',8], ['Pulso','vitality',5]
 ];
 const pick = (values,rng) => values[Math.floor(rng()*values.length)];
@@ -272,6 +272,7 @@ function sumStats(equipment) {
         const key=legacyStat[raw]||raw;
         if(!Object.hasOwn(totals,key))continue;
         if(key==='movement'&&gear.slot!=='boots')continue;
+        if(key==='reach'&&gear.slot!=='helmet')continue;
         if(key==='action'&&gear.slot!=='amulet'&&!(gear.slot==='weapon'&&actionWeapons.has(gear.base||gear.name)))continue;
         totals[key]+=value;
       }

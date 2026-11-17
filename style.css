@@ -1002,3 +1002,7 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 .shop-sell-hint{display:flex;align-items:center;justify-content:center;gap:6px;margin:6px 0 10px;padding:8px;border:1px dashed #f2cd8a55;border-radius:6px;font-size:.8rem;color:#e8dcc0aa}
 [data-drop].drop-valid .shop-sell-hint{color:#f2cd8a;border-color:#f2cd8a}
 [data-drop].drop-target{outline:2px solid var(--gold);outline-offset:-2px;box-shadow:0 0 14px var(--gold-glow)}
+/* Marca de alcance modificable en la barra de habilidades */
+.ability-reach{position:absolute;left:3px;bottom:20px;width:14px;height:14px;display:grid;place-items:center;border-radius:3px;background:#17131ccc;color:#f3b5d0}
+.ability-reach .icon{width:11px;height:11px}
+.tip-reach-note{font-size:.72rem;color:#f3b5d0;margin:4px 0 0}

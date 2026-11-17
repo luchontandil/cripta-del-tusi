@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   glyphInfo,glyphText,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=49';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=49';
-import {setupSfx} from './music.js?v=49';
-import {icon} from './icons.js?v=49';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=50';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=50';
+import {setupSfx} from './music.js?v=50';
+import {icon} from './icons.js?v=50';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -96,7 +96,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=49').then(({createIso})=>{
+import('./isometric.js?v=50').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -495,9 +495,10 @@ function skillRows(unit,skill){
   if(o.push||o.pull)rows.push(statRow('mp',o.push?'Empuje':'Atrae',o.pull==='melee'?'Hasta el contacto':(o.push||o.pull)+((o.push||o.pull)>1?' casillas':' casilla')));
   if(o.inLine)rows.push(statRow('move','Lanzar','En línea recta'));
   if(o.anyTarget)rows.push(statRow('users','Objetivo','Aliado o enemigo'));
-  rows.push(statRow('range','Alcance',(f.minRange?f.minRange+'–':'')+f.maxRange+(f.maxRange===1?' casilla':' casillas')+(f.reach?' (+'+f.reach+')':'')));
-  rows.push(statRow('reach','Alcance modificable',f.modifiable?'Sí':'No',f.modifiable?'yes':'no'));
+  rows.push(statRow('range','Alcance',(f.minRange?f.minRange+'–':'')+f.maxRange+(f.maxRange===1?' casilla':' casillas')+(f.reach?' (+'+f.reach+' equipo)':'')));
+  rows.push(statRow('reach','Tipo de alcance',f.modifiable?'Modificable':'Fijo',f.modifiable?'yes':'no'));
   rows.push(statRow('info','Línea de visión',o.los===false?'No necesaria':'Necesaria'));
+  rows.push(h('p','tip-reach-note',f.modifiable?'Alcance modificable: el «+Alcance» de tu casco lo aumenta.':'Alcance fijo: el «+Alcance» del equipo no lo cambia.'));
   return rows;
 }
 function skillTipNodes(unit,index,skill,rank,hotkey=null){
@@ -1467,6 +1468,7 @@ function render(){
         const element=skillElement(turn,current);
         b.append(h('span','ability-element element-'+element,icon(element)));
       }
+      if(modifiableRange(current))b.append(h('span','ability-reach',icon('reach')));
       b.setAttribute('aria-keyshortcuts',String(hotkey));
       const maxRange=range+(modifiableRange(current)?turn.stats.reach:0);
       const healing=['heal','cleanse'].includes(kind);

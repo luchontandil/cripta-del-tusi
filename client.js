@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
-  BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=80';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=80';
-import {setupSfx} from './music.js?v=80';
-import {icon} from './icons.js?v=80';
+  BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=82';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=82';
+import {setupSfx} from './music.js?v=82';
+import {icon} from './icons.js?v=82';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=80').then(({createIso})=>{
+import('./isometric.js?v=82').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -568,7 +568,7 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
   showTip(nodes,anchor,unit.enemy?'tip-foe':'tip-ally');
 }
 window.addEventListener('scroll',hideUnit,{passive:true});
-const areaNames={cross:'cruz',circle:'círculo',cone:'cono',line:'línea'};
+const areaNames={cross:'cruz',circle:'círculo',cone:'cono',line:'línea',wave:'rectángulo delante de ti'};
 /** Texto del efecto de una habilidad, con sus valores reales (rango y bonificaciones incluidos). */
 /** Qué hace cada habilidad, en una frase (los números exactos van en la ficha). */
 const skillLore={
@@ -596,9 +596,10 @@ const skillLore={
   'Celeridad divina':'Bendices a un aliado: tendrá más PM en su próximo turno.',
   'Juicio':'Fuego sagrado cae en cruz sobre la zona: daña y prende a los enemigos que alcance.',
   'Alba radiante':'Una luz cálida en cruz que cura a todos los aliados de la zona.',
+  'Misil mágico':'Lanza un misil mágico que además hace daño físico: escala con tu daño mágico y con tu daño físico.',
+  'Bola de fuego':'Lanza una bola de fuego que hace daño en área al objetivo, con baja probabilidad de dejar quemaduras.',
+  'Escarcha':'Un soplido de escarcha delante de ti que puede ralentizar un poco a los enemigos que alcanza.',
   'Descarga arcana':'Un proyectil de magia pura contra un enemigo a la vista.',
-  'Bola de fuego':'Una bola de fuego que estalla en cruz: daña y prende a todos los enemigos de la zona.',
-  'Escarcha':'Congelas los pies del enemigo: le quitas PM en su próximo turno.',
   'Cono de hielo':'Un soplo helado en cono delante de ti: daña y ralentiza a los enemigos alcanzados.',
   'Relámpago':'Un rayo en línea recta desde ti que alcanza a todos los enemigos de la línea.',
   'Onda de choque':'Una onda mágica que golpea y aleja al enemigo.',
@@ -618,7 +619,7 @@ function skillEffectText(skill){
   const area='';   // el área ya se ve en su fila con el croquis
   const text={
     expose:'Vulnerable 2 turnos: los ataques contra el objetivo hacen +'+(o.value||3),
-    slow:'Ralentiza: −'+(o.value||2)+' PM en el próximo turno del objetivo',
+    slow:(o.slowChance!==undefined?o.slowChance+' % de probabilidad de ralentizar: ':'Ralentiza: ')+'−'+(o.value||2)+' PM en el próximo turno del objetivo',
     venom:'Veneno: '+(o.value||3)+' PV por turno durante 2 turnos',
     blast:'',
     push:'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' en línea (si choca, recibe daño extra)',
@@ -630,7 +631,7 @@ function skillEffectText(skill){
     swap:'Intercambia tu posición con la del objetivo',
     dash:o.teleport?(o.los===false?'Teletransporte (sin necesitar línea de visión)':'Teletransporte a una casilla libre que veas, sin gastar PM'):'Desplazamiento por una ruta libre sin gastar PM'
   }[kind]||'';
-  const burn=o.element==='fire'?' · Quemadura: arde 2 turnos y pierde ¼ del daño al empezar cada uno':'';
+  const burn=o.element==='fire'?' · '+(o.burnChance!==undefined?o.burnChance+' % de probabilidad de quemar: ':'Quemadura: ')+'arde 2 turnos y pierde ¼ del daño al empezar cada uno':'';
   return (text+area+burn).replace(/^ · /,'');
 }
 /** Datos calculados de una habilidad para un personaje (con su equipo, si lo tiene). */
@@ -703,14 +704,16 @@ function skillRows(unit,skill){
   }
   const sketch=areaSketch(skill);
   if(o.area||sketch){
-    const row=statRow('blast','Área',o.area?areaNames[o.area]+(o.size>1?' · tamaño '+o.size:''):'cruz');
+    const row=statRow('blast','Área',o.area==='wave'?(o.width||3)+'×'+(o.size||1)+' al frente':o.area?areaNames[o.area]+(o.size>1?' · tamaño '+o.size:''):'cruz');
     if(sketch)row.querySelector('.tip-value').append(sketch);
     rows.push(row);
   }
   if(o.push||o.pull)rows.push(statRow('mp',o.push?'Empuje':'Atrae',o.pull==='melee'?'Hasta el contacto':(o.push||o.pull)+((o.push||o.pull)>1?' casillas':' casilla')));
   if(o.inLine)rows.push(statRow('move','Lanzar','En línea recta'));
+  if(o.casts)rows.push(statRow('clock','Lanzamientos por turno',String(o.casts)+(state?.phase==='combat'&&unit.id===state.units[state.turn]?.id?' · quedan '+Math.max(0,castsLeft(state,unit,skill)):'')));
+  if(o.scales)rows.push(statRow('plus','Escala con',o.scales.map(k=>'daño '+elements[k].toLowerCase()).join(' + ')));
   if(o.anyTarget)rows.push(statRow('users','Objetivo','Aliado o enemigo'));
-  rows.push(statRow('range','Alcance',(f.minRange?f.minRange+'–':'')+f.maxRange+(f.maxRange===1?' casilla':' casillas')+(f.reach?' (+'+f.reach+' equipo)':'')));
+  rows.push(statRow('range','Alcance',(f.minRange&&f.minRange!==f.maxRange?f.minRange+'–':'')+f.maxRange+(f.maxRange===1?' casilla':' casillas')+(f.reach?' (+'+f.reach+' equipo)':'')));
   rows.push(statRow('reach','Tipo de alcance',f.modifiable?'Modificable':'Fijo',f.modifiable?'yes':'no'));
   rows.push(statRow('info','Línea de visión',o.los===false?'No necesaria':'Necesaria'));
   rows.push(h('p','tip-reach-note',f.modifiable?'Alcance modificable: el «+Alcance» de tu casco lo aumenta.':'Alcance fijo: el «+Alcance» del equipo no lo cambia.'));
@@ -1826,7 +1829,8 @@ function drawBoard(turn,walking,skill){
     const trap=state.traps?.find(t=>t.pos===pos);
     const castRange=skill&&inRange(state,turn,pos,skill);
     const blocked=skill&&hasRange(state,turn,pos,skill)&&!castRange;
-    const blast=skill?.[5]==='blast';
+    // Cualquier habilidad con área (explosión, cono, línea, rectángulo) muestra todas sus casillas al apuntar.
+    const blast=skill?.[5]==='blast'||!!skill&&!!skillOptions(skill).area;
     const aim=castRange&&(castableCell(state,turn,pos,skill)||(!['dash','blast'].includes(skill[5])&&targetable(state,turn,unit,skill)));
     const path=walking.get(pos);
     const cell=btn('',()=>{

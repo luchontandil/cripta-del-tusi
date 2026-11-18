@@ -221,7 +221,7 @@ test('la IA rodea un muro y publica el trayecto antes de atacar',()=>{
   s.walls=[2,3,4,14,15,16,26,27,28];
   act(s,'p0',{type:'end'},rng);
   const route=planEnemy(s,foe,[hero]);
-  assert.deepEqual(route,[25,37,38]);
+  assert.deepEqual(route,[25,37,38,39],'con 4 PM rodea el muro y se acerca todo lo que puede');
   const hp=hero.hp;
   timeout(s);
   assert.equal(s.units[s.turn],foe);
@@ -247,9 +247,9 @@ test('el Mago puede lanzar a una casilla vacía y dañar a dos enemigos en cruz'
   assert.ok(spellArea(s,center,skill).includes(second.pos));
   act(s,'p0',{type:'skill',skill:1,pos:center},rng);
   assert.equal(s.ap,3);
-  // Bola de fuego 5–8, y los dos están a una casilla del centro: 80 % del daño.
-  assert.equal(first.max-first.hp,4);
-  assert.equal(second.max-second.hp,4);
+  // Bola de fuego 4–5, y los dos están a una casilla del centro: 80 % del daño.
+  assert.equal(first.max-first.hp,3);
+  assert.equal(second.max-second.hp,3);
   assert.equal(ally.hp,ally.max);
   assert.deepEqual(s.events.find(event=>event.kind==='spell').area,spellArea(s,center,skill));
 });
@@ -660,8 +660,8 @@ test('habilidades estilo Dofus: Ninja con shuriken, cono, línea, empuje con cho
   assert.equal(classes.sombra.name,'Ninja');
   assert.equal(classes.sombra.skills[0][0],'Shuriken');
   assert.ok(classes.sombra.skills[0][2]>1);
-  for(const cls of Object.values(classes)){
-    assert.ok(cls.skills.length>=8);
+  for(const [id,cls] of Object.entries(classes)){
+    assert.ok(cls.skills.length>=(id==='mago'?3:8),cls.name);
     const elementsUsed=new Set(cls.skills.map(sk=>sk[8]?.element).filter(Boolean));
     assert.ok(elementsUsed.size>=2,cls.name);
     for(const sk of cls.skills)assert.ok(maxBonusText(sk),sk[0]);
@@ -676,10 +676,10 @@ test('habilidades estilo Dofus: Ninja con shuriken, cono, línea, empuje con cho
   g.pos=3*w+5;
   const cone=spellArea(s,3*w+4,skillFor({...g,skillRanks:[1,1,1,1,1,1,1,1]},4),g);
   assert.deepEqual(new Set(cone),new Set([3*w+4,3*w+3,2*w+3,4*w+3]));
-  // Línea del Relámpago: casilla elegida y 3 detrás.
-  m.pos=6*w+8;
-  const line=spellArea(s,6*w+7,skillFor({...m,skillRanks:[1,1,1,1,1,1,1,1]},4),m);
-  assert.deepEqual(new Set(line),new Set([6*w+7,6*w+6,6*w+5,6*w+4]));
+  // Escarcha del Mago: rectángulo de 3 de ancho por 4 de largo delante de él.
+  m.pos=4*w+8;
+  const wave=spellArea(s,4*w+7,skillFor({...m,skillRanks:[1,1,1]},2),m);
+  assert.deepEqual(new Set(wave),new Set([4*w+7,3*w+7,5*w+7,4*w+6,3*w+6,5*w+6,4*w+5,3*w+5,5*w+5,4*w+4,3*w+4,5*w+4]));
   // Empujón de escudo contra un muro: la unidad choca y recibe daño extra.
   s.turn=s.units.indexOf(g);s.ap=6;
   g.skillRanks=[1,1,1,1,0,1,1,0];
@@ -861,8 +861,8 @@ test('daño: físicas suman solo el físico; hechizos suman mágico + su element
   const skill=(cls,name)=>classes[cls].skills.find(sk=>sk[0]===name);
   assert.equal(damagePercent(archer,skill('tirador','Flecha ígnea')),3);
   assert.equal(damagePercent(mage,skill('mago','Bola de fuego')),5+7);
-  assert.equal(damagePercent(mage,skill('mago','Relámpago')),5+13);
-  assert.equal(damagePercent(mage,skill('mago','Descarga arcana')),5);
+  assert.equal(damagePercent(mage,skill('mago','Escarcha')),5+11);
+  assert.equal(damagePercent(mage,skill('mago','Misil mágico')),5+3,'el Misil escala con mágico y físico');
   assert.equal(skillSchool(archer,skill('tirador','Flecha ígnea')),'physical');
   // La armadura (en %) solo frena lo físico.
   const target={stats:{ward:40},effects:{}};
@@ -1045,7 +1045,8 @@ test('quemadura: un golpe de fuego prende, quema al empezar el turno y el hielo 
   s.turn=s.units.indexOf(hero);s.ap=6;
   const fireball=classes.mago.skills.findIndex(sk=>sk[0]==='Bola de fuego');
   hero.skillRanks[fireball]=Math.max(1,hero.skillRanks[fireball]||0);
-  act(s,'p0',{type:'skill',skill:fireball,pos:foe.pos},()=>.5);
+  // La Bola de fuego quema con un 20 % de probabilidad: con una tirada baja, prende.
+  act(s,'p0',{type:'skill',skill:fireball,pos:foe.pos},()=>.1);
   assert.ok(foe.effects.burn,'arde');
   const before=foe.hp;
   act(s,'p0',{type:'end'},rng);          // empieza el turno del enemigo: le quema
@@ -1241,4 +1242,34 @@ test('vampirismo: el héroe recupera un % del daño que hace; pulir sube un tier
   const fire=item.affixes.find(m=>m.stat==='fire');
   assert.equal(fire.tier,3);assert.equal(fire.label,'Candente');assert.ok(fire.value>=9&&fire.value<=13,'T3 de fuego: 9–13 %');
   assert.ok(E.forgeBlock({...item,ilvl:1,affixes:[{type:'prefix',stat:'fire',tier:5,tiers:8,value:8,label:'Calcinante'}]},'polish'),'no se pule más allá de nivel+6');
+});
+
+test('Mago nuevo: misil en línea 2 veces por turno, bola con alcance mínimo y escarcha que ralentiza con probabilidad',()=>{
+  const s=battle('mago');
+  s.walls=[];s.water=[];s.traps=[];
+  const mage=s.units.find(u=>!u.enemy),w=s.width;
+  const foes=s.units.filter(u=>u.enemy);
+  for(const u of foes)u.hp=0;
+  const foe=foes[0];Object.assign(foe,{hp:300,max:300,resist:{},effects:{}});foe.stats.ward=0;
+  mage.pos=4*w+8;s.turn=s.units.indexOf(mage);s.ap=6;s.casts={};
+  const [missile,fire,frost]=[0,1,2].map(i=>skillFor(mage,i));
+  assert.deepEqual([missile[0],fire[0],frost[0]],['Misil mágico','Bola de fuego','Escarcha']);
+  // En línea: misma fila o columna; en diagonal no.
+  foe.pos=4*w+5;assert.ok(inRange(s,mage,foe.pos,missile));
+  assert.equal(inRange(s,mage,3*w+6,missile),false,'diagonal no');
+  act(s,'p0',{type:'skill',skill:0,pos:foe.pos},rng);
+  act(s,'p0',{type:'skill',skill:0,pos:foe.pos},rng);
+  assert.equal(s.ap,2);
+  assert.throws(()=>act(s,'p0',{type:'skill',skill:0,pos:foe.pos},rng),/todas las veces|puntos de acción/);
+  // Bola de fuego: alcance mínimo 2.
+  s.ap=6;
+  assert.equal(inRange(s,mage,4*w+7,fire),false,'pegado no');
+  assert.ok(inRange(s,mage,4*w+6,fire));
+  // Escarcha: con tirada alta no ralentiza; con baja, sí.
+  foe.pos=4*w+6;foe.effects={};
+  act(s,'p0',{type:'skill',skill:2,pos:4*w+7},()=>.9);
+  assert.ok(!foe.effects.slow);
+  s.turn=s.units.indexOf(mage);s.ap=6;s.casts={};
+  act(s,'p0',{type:'skill',skill:2,pos:4*w+7},()=>.1);
+  assert.equal(foe.effects.slow?.value,1);
 });

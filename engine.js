@@ -35,15 +35,12 @@ export const classes = {
     ['Juicio',3,5,5,8,'blast','✹',2,{element:'fire',area:'cross',max:{crit:15}}],
     ['Alba radiante',3,4,8,12,'heal','✚',0,{area:'cross',max:{cost:-1}}]
   ]},
+  // Mago (rework): tres hechizos de inicio. Daños base bajos a propósito: escalan con el daño mágico
+  // y su elemento (el Misil, con mágico y físico). Cada rango suma +1.
   mago: {name:'Mago', hp:30, initiative:13, skills:[
-    ['Descarga arcana',2,6,6,9,'damage','✦',0,{element:'magic',max:{crit:15}}],
-    ['Bola de fuego',3,5,5,8,'blast','✹',2,{element:'fire',area:'cross',max:{size:1}}],
-    ['Escarcha',2,5,3,6,'slow','❄',0,{element:'ice',value:2,max:{value:1}}],
-    ['Cono de hielo',3,1,5,7,'slow','❄',0,{element:'ice',area:'cone',value:1,max:{size:1}}],
-    ['Relámpago',3,1,5,8,'damage','✦',0,{element:'lightning',area:'line',size:3,max:{size:1}}],
-    ['Onda de choque',2,3,4,6,'push','✦',0,{element:'magic',push:2,max:{push:1}}],
-    ['Teletransporte',3,4,0,0,'dash','↢',1,{teleport:true,los:false,max:{range:1}}],
-    ['Rayo umbrío',2,6,7,10,'damage','✦',0,{element:'chaos',max:{modifiable:true}}]
+    ['Misil mágico',2,5,2,4,'damage','✦',1,{element:'magic',inLine:true,casts:2,scales:['magic','physical'],perRank:2,max:{crit:10}}],
+    ['Bola de fuego',3,5,4,5,'blast','✹',2,{element:'fire',area:'cross',burnChance:20,casts:1,perRank:1,max:{burnChance:20}}],
+    ['Escarcha',3,1,2,5,'slow','❄',1,{element:'ice',area:'wave',size:4,width:3,value:1,slowChance:50,casts:1,perRank:1,max:{slowChance:25}}]
   ]},
   sombra: {name:'Ninja', hp:35, initiative:15, skills:[
     ['Shuriken',2,5,5,8,'damage','✧',1,{element:'physical',max:{crit:15}}],
@@ -71,6 +68,9 @@ export function maxBonusText(skill){
   if(bonus.value)return '+'+bonus.value+' al efecto';
   if(bonus.push)return '+'+bonus.push+' casilla de empuje';
   if(bonus.size)return 'área o línea más grande (+'+bonus.size+')';
+  if(bonus.burnChance)return '+'+bonus.burnChance+' % de probabilidad de quemar';
+  if(bonus.slowChance)return '+'+bonus.slowChance+' % de probabilidad de ralentizar';
+  if(bonus.casts)return '+'+bonus.casts+' lanzamiento por turno';
   return '';
 }
 export function skillFor(unit,index,preview=false){
@@ -81,7 +81,7 @@ export function skillFor(unit,index,preview=false){
   const opts={...skillOptions(base)};
   skill[8]=opts;
   // Cada rango suma +2 de daño (+1 en las de área, que ya golpean a varios).
-  const perRank=isAreaDamage(base)?1:2;
+  const perRank=opts.perRank??(isAreaDamage(base)?1:2);
   if(rank>1&&skill[5]!=='dash'&&skill[4]>0){skill[3]+=(rank-1)*perRank;skill[4]+=(rank-1)*perRank;}
   if(rank>1&&skill[5]==='dash')skill[2]+=rank-1;
   if(rank>=3){
@@ -93,6 +93,9 @@ export function skillFor(unit,index,preview=false){
     if(bonus.value)opts.value=(opts.value||0)+bonus.value;
     if(bonus.push){if(opts.push)opts.push+=bonus.push;if(opts.pull)opts.pull+=bonus.push;}
     if(bonus.size)opts.size=(opts.size||1)+bonus.size;
+    if(bonus.burnChance)opts.burnChance=(opts.burnChance||0)+bonus.burnChance;
+    if(bonus.slowChance)opts.slowChance=Math.min(100,(opts.slowChance||0)+bonus.slowChance);
+    if(bonus.casts)opts.casts=(opts.casts||1)+bonus.casts;
   }
   return skill;
 }
@@ -130,6 +133,9 @@ export function skillSchool(unit,skill){
 export const LEVEL_DAMAGE=8;
 export function damagePercent(unit,skill){
   const stats=unit.stats||{};
+  // Escalado propio de la habilidad (p. ej. el Misil mágico: mágico + físico).
+  const scales=skillOptions(skill).scales;
+  if(scales)return scales.reduce((sum,key)=>sum+(stats[key]||0),0);
   if(skillSchool(unit,skill)==='physical')return stats.physical||0;
   const element=skillElement(unit,skill);
   return (stats.magic||0)+(elementalKeys.includes(element)?stats[element]||0:0);
@@ -675,7 +681,7 @@ function useSkill(s,unit){
 function monster(species,id,floor,{ranged=false,elite=false,solo=false}={}){
   const trait=monsterTraits[species]||{};
   const factor=(ranged?.75:elite?1.15:1)*(solo?.85:1);
-  const hp=Math.round((16+4*floor)*factor);
+  const hp=Math.round((12+4*floor)*factor);   // (antes 16+4·piso: los primeros combates se alargaban con la IA nueva)
   return {id,name:monsterNames[species],look:species,boss:false,elite,enemy:true,resist:{...(trait.resist||{})},
     initiative:trait.initiative||(ranged?11:6),range:trait.range||(ranged?8:1),hp,
     damage:Math.max(1,Math.round((ranged?2+floor:3+floor)*(solo?.85:1))),
@@ -1007,7 +1013,7 @@ function makeLayout(s,rng){
 }
 /** Daño esperado por turno de un héroe con su mejor habilidad ofensiva. */
 /** PA y PM base de todos los personajes. */
-export const BASE_AP=6,BASE_MP=3;
+export const BASE_AP=6,BASE_MP=3,ENEMY_MP=4;
 export function heroOffense(hero){
   const ap=BASE_AP+(hero.stats?.action||0);
   let best=0;
@@ -1176,7 +1182,7 @@ export function damagePreview(unit,target,skill,scale=1){
   const range=critical=>[skill[3],skill[4]].map(base=>netDamage(target,scaledDamage(unit,skill,base,scale),armor,critical,extra));
   return {normal:range(false),critical:range(true),chance:Math.min(1,critChance(unit)+(skillOptions(skill).crit||0)/100),element};
 }
-function hit(s,actor,target,raw,kind='damage',critical=false,element='physical') {
+function hit(s,actor,target,raw,kind='damage',critical=false,element='physical',burns=true) {
   const extra=kind==='damage'?(target.effects.expose?.value||0):0;
   const damage=Math.min(target.hp,netDamage(target,raw,element,critical,extra));
   target.hp-=damage;
@@ -1195,7 +1201,7 @@ function hit(s,actor,target,raw,kind='damage',critical=false,element='physical')
   note(s,actor.name+' → '+target.name+' · −'+damage+' PV'+(extra?' (+'+extra+' vulnerabilidad)':'')+(critical?' · crítico':''));
   if(target.hp<=0)releaseMinions(s,target);
   // Golpes de fuego (monstruos, glifos, hechizos) prenden; el hielo apaga.
-  else if(kind==='damage'||kind==='glyph')ignite(s,target,damage,element);
+  else if((kind==='damage'||kind==='glyph')&&(burns||element!=='fire'))ignite(s,target,damage,element);
 }
 /** Al morir un invocador, sus invocaciones se deshacen con él. */
 function releaseMinions(s,owner){
@@ -1286,8 +1292,10 @@ function beginTurn(s) {
   const u=s.units[s.turn];
   s.enemyPlan=null;
   const bonus=u.enemy?{}:s.mods||{};
+  s.casts={};
   s.ap=Math.max(1,(u.enemy?4:BASE_AP)+(u.stats?.action||0)+(bonus.ap||0)-(u.effects.weak?.value||0));
-  s.mp=Math.max(0,(u.enemy?3:BASE_MP)+(u.stats?.movement||0)+(bonus.mp||0)+(u.effects.haste?.value||0)-(u.effects.slow?.value||0));
+  // Los enemigos tienen 4 PM de base (uno más que los héroes).
+  s.mp=Math.max(0,(u.enemy?ENEMY_MP:BASE_MP)+(u.stats?.movement||0)+(bonus.mp||0)+(u.effects.haste?.value||0)-(u.effects.slow?.value||0));
   s.turnStarted=Date.now();
   s.deadline=s.turnStarted+(u.enemy?350:60000);
   if(u.effects.poison)hit(s,{name:'Veneno',pos:u.pos},u,u.effects.poison.value,'poison',false,'chaos');
@@ -1422,43 +1430,53 @@ function attackOptions(s,unit,heroes,pos){
     .sort((a,b)=>priority(s,unit,b,pos)-priority(s,unit,a,pos));
 }
 const trapsOn=(s,path)=>path.filter(pos=>s.traps?.some(t=>t.pos===pos)).length;
+/** Casillas peligrosas de un camino: trampas y glifos a punto de estallar. */
+const hazardsOn=(s,path)=>trapsOn(s,path)+path.filter(pos=>s.glyphs?.some(g=>g.warn&&g.cells.includes(pos))).length;
+/** Arquetipo de IA: los que atacan de lejos mantienen la distancia; el resto va de frente. */
+export const archetypeOf=unit=>unit.range>1?'ranged':'melee';
 export function planEnemy(s,unit,heroes){
   const routes=paths(s,unit,s.width*s.height);
+  const ranged=archetypeOf(unit)==='ranged';
   const firing=[];
   for(const [pos,path] of [[unit.pos,[]],...routes]){
     const target=attackOptions(s,unit,heroes,pos)[0];
     if(!target)continue;
     const nearest=Math.min(...heroes.map(h=>distance(s,pos,h.pos)));
-    const rangedSafety=unit.range>1?Math.min(nearest,unit.range)*2.2:0;
-    // Cuerpo a cuerpo: evita quedar rodeado por varios héroes a la vez.
-    const crowd=unit.range>1?0:heroes.filter(h=>distance(s,pos,h.pos)===1).length;
-    const score=priority(s,unit,target,pos)+rangedSafety-crowd*1.5-path.length*.4-trapsOn(s,path)*12;
+    const adjacent=heroes.filter(h=>distance(s,pos,h.pos)===1).length;
+    // Distancia: dispara desde lo más lejos que permita su alcance y nunca pegado a un héroe.
+    // Cuerpo a cuerpo: va de frente por el camino más corto.
+    const stance=ranged?Math.min(nearest,unit.range)*3-adjacent*10-(nearest===2?3:0):-adjacent*.5;
+    const score=priority(s,unit,target,pos)+stance-path.length*(ranged?.25:.6)-hazardsOn(s,path)*25;
     firing.push({path,score});
   }
   const local=firing.filter(option=>option.path.length<=s.mp).sort((a,b)=>b.score-a.score);
   if(local.length)return local[0].path;
-  const approach=firing.sort((a,b)=>(a.path.length+trapsOn(s,a.path)*4)-(b.path.length+trapsOn(s,b.path)*4)||b.score-a.score)[0];
+  const approach=firing.sort((a,b)=>(a.path.length+hazardsOn(s,a.path)*8)-(b.path.length+hazardsOn(s,b.path)*8)||b.score-a.score)[0];
   if(approach){
     // Avanza sin detenerse sobre una trampa si puede evitarlo.
     let step=approach.path.slice(0,s.mp);
-    while(step.length&&s.traps?.some(t=>t.pos===step.at(-1)))step=step.slice(0,-1);
+    while(step.length&&hazardsOn(s,[step.at(-1)]))step=step.slice(0,-1);
     return step;
   }
   const nearest=pos=>Math.min(...heroes.map(hero=>distance(s,pos,hero.pos)));
-  const available=[...routes].filter(([pos,path])=>path.length<=s.mp&&nearest(pos)<nearest(unit.pos)&&!trapsOn(s,path));
+  const available=[...routes].filter(([pos,path])=>path.length<=s.mp&&nearest(pos)<nearest(unit.pos)&&!hazardsOn(s,path));
   available.sort(([a,pa],[b,pb])=>nearest(a)-nearest(b)||pa.length-pb.length);
   return available[0]?.[1]||[];
 }
-/** Tras atacar, los tiradores y los murciélagos se alejan con el movimiento que les quede. */
+/**
+ * Tras atacar, los de distancia (y los murciélagos) se alejan con el movimiento que les quede:
+ * buscan quedar fuera del alcance cuerpo a cuerpo, sin pasar por trampas.
+ */
 function retreat(s,unit,heroes){
   if(s.mp<=0||!alive(unit))return;
-  if(unit.range<=1&&unit.look!=='bat')return;
+  if(archetypeOf(unit)!=='ranged'&&unit.look!=='bat')return;
   const living=heroes.filter(alive);
   if(!living.length)return;
   const nearest=pos=>Math.min(...living.map(h=>distance(s,pos,h.pos)));
   const here=nearest(unit.pos);
-  if(unit.range>1&&here>=3)return;
-  const options=[...paths(s,unit,s.mp)].filter(([pos,path])=>!trapsOn(s,path)&&nearest(pos)>here);
+  // Ya está lejos (más de lo que un héroe recorre en un turno): no hace falta huir.
+  if(here>BASE_MP+1)return;
+  const options=[...paths(s,unit,s.mp)].filter(([pos,path])=>!hazardsOn(s,path)&&nearest(pos)>here);
   options.sort(([a,pa],[b,pb])=>nearest(b)-nearest(a)||pa.length-pb.length);
   if(options[0])move(s,unit,options[0][1]);
 }
@@ -2063,11 +2081,23 @@ function spellCue(s,unit,pos,kind,area,skill){
 }
 export function hasRange(s,unit,pos,skill) {
   const [,cost,range,,,,,min=0]=skill;
-  if(!onBoard(s,pos)||s.walls.includes(pos)||cost>s.ap)return false;
+  if(!onBoard(s,pos)||s.walls.includes(pos)||cost>s.ap||castsLeft(s,unit,skill)<=0)return false;
   const d=distance(s,unit.pos,pos);
   // Hechizos en línea recta: solo en la misma fila o columna que el lanzador.
   if(skillOptions(skill).inLine&&pos%s.width!==unit.pos%s.width&&Math.floor(pos/s.width)!==Math.floor(unit.pos/s.width))return false;
   return d>=min&&d<=range+(modifiableRange(skill)?(unit.stats?.reach||0):0);
+}
+/** Lanzamientos que le quedan este turno a una habilidad con límite (Infinity si no tiene). */
+export function castsLeft(s,unit,skill){
+  const limit=skillOptions(skill).casts;
+  if(!limit)return Infinity;
+  return limit-(s.casts?.[unit.id+':'+skill[0]]||0);
+}
+function countCast(s,unit,skill){
+  if(!skillOptions(skill).casts)return;
+  s.casts=s.casts||{};
+  const key=unit.id+':'+skill[0];
+  s.casts[key]=(s.casts[key]||0)+1;
 }
 export function inRange(s,unit,pos,skill) {
   return hasRange(s,unit,pos,skill)&&(skillOptions(skill).los===false||lineOfSight(s,unit.pos,pos));
@@ -2099,6 +2129,15 @@ export function spellArea(s,pos,skill,caster=null) {
   const cells=new Set([pos]);
   if(area==='cross'||area==='circle'){
     for(let p=0;p<s.width*s.height;p++)if(onBoard(s,p)&&distance(s,pos,p)<=size)cells.add(p);
+  }else if(area==='wave'&&caster){
+    // Rectángulo delante del lanzador: «size» casillas de largo y «width» de ancho, empezando en la casilla elegida.
+    const {dx,dy}=direction(s,caster.pos,pos);
+    const half=Math.floor((opts.width||3)/2);
+    let center=pos;
+    for(let depth=0;depth<size&&center>=0;depth++){
+      for(let k=-half;k<=half;k++){const c=k?step(s,center,dy*k,dx*k):center;if(c>=0&&onBoard(s,c))cells.add(c);}
+      center=step(s,center,dx,dy);
+    }
   }else if((area==='cone'||area==='line')&&caster){
     const {dx,dy}=direction(s,caster.pos,pos);
     let row=[pos];
@@ -2177,12 +2216,17 @@ function applySkill(s,unit,target,skill,rng,scale=1){
     const element=skillElement(unit,skill);
     const critical=rng()<Math.min(1,critChance(unit)+(opts.crit||0)/100);
     const before=target.hp;
-    hit(s,unit,target,scaledDamage(unit,skill,roll(min,max,rng),scale),'damage',critical,armorType(unit,skill));
-    ignite(s,target,before-target.hp,element);
+    // Con «burnChance», el fuego solo quema con esa probabilidad (si no, siempre).
+    const burns=opts.burnChance===undefined||rng()*100<opts.burnChance;
+    hit(s,unit,target,scaledDamage(unit,skill,roll(min,max,rng),scale),'damage',critical,armorType(unit,skill),burns);
+    if(burns)ignite(s,target,before-target.hp,element);
   }
   if(!alive(target))return;
   if(kind==='expose'){effect(target,'expose',value||3,2);note(s,target.name+' queda vulnerable: todos los atacantes infligen +'+(value||3)+'.');}
-  if(kind==='slow')effect(target,'slow',value||2,1);
+  if(kind==='slow'&&(opts.slowChance===undefined||rng()*100<opts.slowChance)){
+    effect(target,'slow',value||2,1);
+    if(opts.slowChance!==undefined)note(s,target.name+' queda ralentizado: −'+(value||2)+' PM.');
+  }
   if(kind==='venom'){effect(target,'poison',value||3,2);note(s,target.name+' queda envenenado.');}
   if(kind==='push')shove(s,unit,target,opts.push||1,false);
   if(kind==='pull')shove(s,unit,target,opts.pull==='melee'?Math.max(0,distance(s,unit.pos,target.pos)-1):opts.pull||1,true);
@@ -2369,10 +2413,11 @@ export function act(s,id,a,rng=Math.random) {
   if(a.type!=='skill'||!Number.isInteger(a.skill)||!skill)fail('Acción inválida.');
   const [,cost,,,,kind]=skill;
   if(cost>s.ap)fail('No te quedan suficientes puntos de acción.');
+  if(castsLeft(s,unit,skill)<=0)fail('Ya usaste '+skill[0]+' todas las veces que permite este turno.');
   const target=s.units.find(u=>alive(u)&&u.pos===a.pos);
   if(kind==='dash'){
     if(!castableCell(s,unit,a.pos,skill))fail('No hay una ruta libre a esa casilla.');
-    s.ap-=cost;
+    s.ap-=cost;countCast(s,unit,skill);
     spellCue(s,unit,a.pos,kind);
     const teleport=!!skillOptions(skill).teleport;
     const route=teleport?[a.pos]:paths(s,unit,skill[2]).get(a.pos);
@@ -2382,7 +2427,7 @@ export function act(s,id,a,rng=Math.random) {
   }
   if(castsOnCell(skill)){
     if(!castableCell(s,unit,a.pos,skill))fail('Casilla fuera de alcance o sin línea de visión.');
-    s.ap-=cost;
+    s.ap-=cost;countCast(s,unit,skill);
     const area=spellArea(s,a.pos,skill,unit);
     spellCue(s,unit,a.pos,kind,area,skill);
     const support=supportKinds.includes(kind);
@@ -2392,7 +2437,7 @@ export function act(s,id,a,rng=Math.random) {
     return;
   }
   if(!targetable(s,unit,target,skill))fail('Objetivo inválido, fuera de alcance o sin línea de visión.');
-  s.ap-=cost;
+  s.ap-=cost;countCast(s,unit,skill);
   spellCue(s,unit,target.pos,kind,undefined,skill);
   applySkill(s,unit,target,skill,rng);
   finish(s,rng);

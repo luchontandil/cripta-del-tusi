@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=82';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=82';
-import {setupSfx} from './music.js?v=82';
-import {icon} from './icons.js?v=82';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=83';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=83';
+import {setupSfx} from './music.js?v=83';
+import {icon} from './icons.js?v=83';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=82').then(({createIso})=>{
+import('./isometric.js?v=83').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1931,6 +1931,8 @@ function render(){
   }
   if(['won','lost'].includes(state.phase)&&host)controls.append(actionButton('Volver a la sala','restart'));
   const walking=mine&&selected===null?paths(state,turn,state.mp):new Map();
+  // Si la habilidad elegida ya no se puede usar (sin PA o sin lanzamientos), se deselecciona.
+  if(mine&&selected!==null){const chosen=skillFor(turn,selected);if(!chosen||chosen[1]>state.ap||castsLeft(state,turn,chosen)<=0)selected=null;}
   const skill=mine&&selected!==null?skillFor(turn,selected):null;
   if(mine){
     let slot=0;
@@ -1960,7 +1962,11 @@ function render(){
         showTip(skillTipNodes(turn,i,current,rank,hotkey),{left:rect.left,top:rect.top,bottom:rect.bottom},'tip-skill');
       };
       b.onpointerleave=b.onblur=hideUnit;
-      b.disabled=cost>state.ap;
+      // Sin lanzamientos este turno: la carta se apaga en gris (y lo dice).
+      const spent=castsLeft(state,turn,current)<=0;
+      b.disabled=cost>state.ap||spent;
+      b.classList.toggle('spent',spent);
+      if(spent)b.append(h('span','ability-spent','Usado'));
       controls.append(b);
     });
     const hint=h('small','hint-line');
@@ -1985,7 +1991,7 @@ function selectSpell(index){
   const unit=state?.units[state.turn];
   if(state?.phase!=='combat'||unit?.id!==session?.id)return;
   const skill=skillFor(unit,index);
-  if(!skill||skill[1]>state.ap)return;
+  if(!skill||skill[1]>state.ap||castsLeft(state,unit,skill)<=0)return;
   selected=selected===index?null:index;
   render();
 }

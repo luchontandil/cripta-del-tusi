@@ -1266,3 +1266,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;bac
 .impact.damage-number.critical[class*=el-]{text-shadow:0 3px 0 #27150a,0 0 16px #ffd76acc,2px 2px 0 #000,-1px -1px 0 #000}
 .impact.damage-number.critical .impact-type{width:.55em;height:.55em}
 .impact.damage-number .impact-type svg{width:100%;height:100%}
+/* Habilidad sin lanzamientos este turno: carta en gris */
+.ability.spent{filter:grayscale(1) brightness(.55);opacity:.8}
+.ability.spent .ability-cost{color:var(--muted)!important}
+.ability-spent{position:absolute;inset:auto 0 50% 0;transform:translateY(50%);text-align:center;font-size:.6rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:#000a;padding:1px 0;pointer-events:none}

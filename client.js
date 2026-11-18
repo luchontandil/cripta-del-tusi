@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,passiveEffects} from './engine.js?v=85';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=85';
-import {setupSfx} from './music.js?v=85';
-import {icon} from './icons.js?v=85';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,passiveEffects} from './engine.js?v=86';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=86';
+import {setupSfx} from './music.js?v=86';
+import {icon} from './icons.js?v=86';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=85').then(({createIso})=>{
+import('./isometric.js?v=86').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -221,10 +221,12 @@ function renderAccount(){
       if(account.mode!=='login'&&pass.value!==repeat.value){error('Las contraseñas no coinciden.');repeat.focus();return;}
       account.busy=true;
       try{
+        go.disabled=true;go.replaceChildren(icon('clock'),account.mode==='login'?'Entrando…':'Creando cuenta…');
         const data=await accountCall(account.mode==='login'?'login':'register',{nick:nick.value,password:pass.value});
         setAccountToken(data.token);account.user=data.user;
-        error('');await refreshAccount();renderAccount();classPreview();
-      }catch(e){error(e.message);}finally{account.busy=false;}
+        // Se entra ya; los amigos y el resto se cargan después, sin esperar.
+        error('');renderAccount();classPreview();refreshAccount();
+      }catch(e){error(e.message);go.disabled=false;renderAccount();}finally{account.busy=false;}
     });
     go.className='primary';
     go.append(icon(account.mode==='login'?'play':'users'),account.mode==='login'?'Entrar':'Crear cuenta');
@@ -328,6 +330,7 @@ function cardTile(card,extra=''){
   const type=skill?(skillSchool({classId:card.classId},skill)==='magic'?'Hechizo':'Físico')+(skill[2]>1?' · alcance '+skill[2]:' · cuerpo a cuerpo'):'Pasiva';
   const tile=h('article','card-tile kind-'+card.kind+' '+extra,cost,art,h('strong','card-name',card.name),h('small','card-kind',type),h('p','card-text',cardBlurb(card)));
   tile.tabIndex=0;
+  tile.dataset.name=card.name;
   hoverTip(tile,()=>cardTipNodes(card));
   return tile;
 }
@@ -342,10 +345,21 @@ function classTabs(current,onPick){
 const deckDialog=el('deck');
 let deckClass='guardia';
 function openDeck(classId=deckClass){deckClass=classId;renderDeck();if(!deckDialog.open)deckDialog.showModal();}
-async function saveDeck(loadout){
+/**
+ * Guardar el mazo: el cambio se ve al instante (sin esperar al servidor) y se guarda en segundo plano;
+ * si el servidor lo rechaza, se deshace.
+ */
+let deckSave=Promise.resolve();
+function saveDeck(loadout){
   if(!account.user){error('Crea una cuenta para cambiar tus cartas: sin cuenta se juega con las de inicio.');return;}
-  try{const d=await accountCall('loadout',{classId:deckClass,loadout});account.user=d.user;error('');renderDeck();renderAccount();classPreview();syncLobbyDeck();}
-  catch(e){error(e.message);}
+  const classId=deckClass,before=account.user.loadouts?.[classId];
+  account.user.loadouts={...account.user.loadouts,[classId]:loadout};
+  error('');renderDeck();classPreview();
+  // Los guardados van en cola, en orden, para que el último cambio sea el que queda.
+  deckSave=deckSave.then(async()=>{
+    try{const d=await accountCall('loadout',{classId,loadout});account.user.slots=d.user.slots;account.user.shards=d.user.shards;account.user.cards=d.user.cards;syncLobbyDeck();}
+    catch(e){account.user.loadouts={...account.user.loadouts,[classId]:before};error(e.message);renderDeck();classPreview();}
+  });
 }
 function renderDeck(){
   const loadout=myLoadout(deckClass),slots=slotsFor(deckClass);
@@ -358,19 +372,32 @@ function renderDeck(){
       buy.disabled=!account.user||available()<EXTRA_SLOT_PRICE;
       return h('div','deck-slot locked',icon('cube'),h('small',null,'Hueco extra'),buy);
     }
-    if(!id)return h('div','deck-slot empty',h('small',null,'Activa '+(i+1)),h('span','hint','Vacío'));
+    if(!id){
+      const empty=h('div','deck-slot empty',h('small',null,'Activa '+(i+1)),h('span','hint','Suelta una carta'));
+      dropZone(empty,p=>p.card&&cards[p.card].kind==='active'&&!loadout.actives.includes(p.card),p=>saveDeck({...loadout,actives:[...loadout.actives,p.card]}));
+      return empty;
+    }
     const tile=cardTile(cards[id],'equipped');
+    draggable(tile,{card:id,from:'deck'});
+    // Soltar otra activa encima la sustituye.
+    dropZone(tile,p=>p.card&&p.card!==id&&cards[p.card].kind==='active',p=>{
+      // Desde la colección: la sustituye. Desde otro hueco: se intercambian.
+      const actives=p.from==='deck'?loadout.actives.map(x=>x===id?p.card:x===p.card?id:x):loadout.actives.map(x=>x===id?p.card:x);
+      saveDeck({...loadout,actives});
+    });
     tile.onclick=()=>{if(loadout.actives.length<=1)return error('Necesitas al menos una carta activa.');saveDeck({...loadout,actives:loadout.actives.filter(x=>x!==id)});};
     tile.title='Clic para quitarla del mazo';
     return h('div','deck-slot',tile);
   });
-  const passiveSlot=loadout.passive?(()=>{const t=cardTile(cards[loadout.passive],'equipped');t.onclick=()=>saveDeck({...loadout,passive:null});t.title='Clic para quitarla';return h('div','deck-slot passive',t);})()
-    :h('div','deck-slot passive empty',h('small',null,'Pasiva'),h('span','hint','Vacío'));
+  const passiveSlot=loadout.passive?(()=>{const t=cardTile(cards[loadout.passive],'equipped');t.onclick=()=>saveDeck({...loadout,passive:null});t.title='Clic para quitarla';draggable(t,{card:loadout.passive,from:'deck'});return h('div','deck-slot passive',t);})()
+    :h('div','deck-slot passive empty',h('small',null,'Pasiva'),h('span','hint','Suelta una pasiva'));
+  dropZone(passiveSlot,p=>p.card&&cards[p.card].kind==='passive'&&p.card!==loadout.passive,p=>saveDeck({...loadout,passive:p.card}));
   const collection=all.map(card=>{
     const owned=ownsCard(card.id),equipped=loadout.actives.includes(card.id)||loadout.passive===card.id;
     const tile=cardTile(card,(owned?'owned':'locked')+(equipped?' in-deck':''));
-    if(!owned){tile.append(h('span','card-price',icon('cube'),String(card.price)));tile.onclick=()=>openShardShop(card.classId);tile.title='Se compra en la tienda de Esquirlas';}
+    if(!owned){tile.append(h('span','card-price',icon('cube'),String(card.price)));tile.onclick=()=>openShardShop(card.classId);tile.title='Se compra en la Tienda';}
     else if(!equipped){
+      draggable(tile,{card:card.id,from:'collection'});
       tile.onclick=()=>{
         if(card.kind==='passive')return saveDeck({...loadout,passive:card.id});
         if(loadout.actives.length>=slots)return error('Mazo lleno: quita una carta activa primero.');
@@ -381,7 +408,7 @@ function renderDeck(){
     return tile;
   });
   const close=btn('Cerrar',()=>deckDialog.close());close.className='ghost';
-  const shop=btn('',()=>openShardShop(deckClass));shop.className='primary';shop.append(icon('shop'),'Tienda de Esquirlas');
+  const shop=btn('',()=>openShardShop(deckClass));shop.className='primary';shop.append(icon('shop'),'Tienda');
   collection.sort((a,b)=>Number(b.classList.contains('owned'))-Number(a.classList.contains('owned')));
   const board=h('section','deck-board',deckBackdrop(deckClass),
     h('h3','deck-title',icon('play'),'Activas · '+loadout.actives.length+'/'+slots),h('div','deck-slots',...activeSlots),
@@ -390,6 +417,12 @@ function renderDeck(){
       :'Sin cuenta juegas con las cartas de inicio. Crea una cuenta para comprar cartas y montar tu mazo.'));
   const owned=all.filter(c=>ownsCard(c.id)).length;
   const side=h('aside','deck-collection',h('h3','deck-title',icon('bag'),'Tus cartas · '+owned+'/'+all.length),h('div','card-grid',...collection));
+  // Arrastrar una carta equipada a la colección la quita del mazo.
+  dropZone(side,p=>p.card&&p.from==='deck',p=>{
+    if(cards[p.card].kind==='passive')return saveDeck({...loadout,passive:null});
+    if(loadout.actives.length<=1)return error('Necesitas al menos una carta activa.');
+    saveDeck({...loadout,actives:loadout.actives.filter(x=>x!==p.card)});
+  });
   deckDialog.replaceChildren(
     h('div','masteries-head',Object.assign(h('h2',null,icon('level'),'Mazo · '+classes[deckClass].name),{id:'deck-title'}),account.user?shardChip(available()):null,shop,close),
     classTabs(deckClass,id=>openDeck(id)),
@@ -443,7 +476,7 @@ function renderShardShop(){
     if(!forSale.length)body.append(h('p','hint','Pronto habrá más cartas para esta clase.'));
   }
   shopDialog.replaceChildren(
-    h('div','masteries-head',Object.assign(h('h2',null,icon('shop'),'Tienda de Esquirlas'),{id:'shop-title'}),account.user?shardChip(available()):null,close),
+    h('div','masteries-head',Object.assign(h('h2',null,icon('shop'),'Tienda'),{id:'shop-title'}),account.user?shardChip(available()):null,close),
     h('p','hint',account.user?'Las Esquirlas se ganan al terminar cada partida: 10 por piso, 40 por jefe, 100 por acto superado y 300 por ganar.':'Crea una cuenta para ganar Esquirlas y comprar cartas.'),
     tabs,body);
 }
@@ -535,8 +568,12 @@ function unitLabel(u){
   const effects=Object.entries(u.effects||{}).map(([key,value])=>iconName[key]+' '+value.value+' ('+value.turns+' t)');
   return u.name+' · '+u.hp+'/'+u.max+' PV'+(effects.length?' · '+effects.join(' · '):'');
 }
+/** Ventana modal abierta (va por encima de todo), o el documento. */
+const modalHost=()=>[...document.querySelectorAll('dialog[open]')].find(d=>d.matches(':modal'))||document.body;
+/** La ficha flotante: se guarda la referencia porque a veces vive dentro de una ventana que se redibuja. */
+const tipBox=el('unit-tooltip');
 function hideUnit(){
-  el('unit-tooltip').hidden=true;
+  tipBox.hidden=true;
   if(document.querySelector('#board .foe-reach'))paintFoeReach(null);
 }
 function resourceText(element,text){
@@ -550,7 +587,7 @@ function resourceText(element,text){
 }
 /** Coloca la ficha flotante junto al ancla, sin salirse de la ventana. */
 function placeTip(anchor){
-  const tooltip=el('unit-tooltip');
+  const tooltip=tipBox;
   tooltip.hidden=false;
   tooltip.classList.remove('docked');tooltip.style.width='';
   // Fichas de unidades del tablero: ancladas en la columna izquierda (sobre el registro), sin tapar el combate.
@@ -571,10 +608,9 @@ function placeTip(anchor){
   tooltip.style.top=(above>=6?above:Math.max(6,Math.min(anchor.bottom+9,window.innerHeight-tooltip.offsetHeight-6)))+'px';
 }
 function showTip(nodes,anchor,tone=''){
-  const tooltip=el('unit-tooltip');
+  const tooltip=tipBox;
   // Las ventanas modales (mazo, tienda…) van por encima de todo: la ficha tiene que ir dentro de la abierta.
-  const host=[...document.querySelectorAll('dialog[open]')].find(d=>d.matches(':modal'))||document.body;
-  if(tooltip.parentElement!==host)host.append(tooltip);
+  if(tooltip.parentElement!==modalHost())modalHost().append(tooltip);
   tooltip.className='tip'+(tone?' '+tone:'');
   tooltip.replaceChildren(...nodes);
   placeTip(anchor);
@@ -1023,7 +1059,7 @@ function lootCard(item,player){
 }
 const dropTargets=new WeakMap();
 function draggable(tile,payload){
-  const face=tile.querySelector('summary');
+  const face=tile.querySelector('summary')||tile;
   face.classList.add('draggable-item');
   face.addEventListener('pointerdown',event=>{
     if(event.button!==0)return;
@@ -1049,8 +1085,9 @@ document.addEventListener('pointermove',event=>{
     drag.ghost=document.createElement('span');
     drag.ghost.className='item-ghost';
     drag.ghost.textContent=drag.label;
-    document.body.append(drag.ghost);
+    modalHost().append(drag.ghost);
     el('inventory').classList.add('dragging');
+    hideUnit();
     // Ilumina las casillas donde se puede soltar el objeto (su ranura de equipo, la mochila...).
     for(const tile of document.querySelectorAll('.inventory-slot, .bag-zone, [data-drop]'))
       if(dropTargets.get(tile)?.accept(drag.payload))tile.classList.add('drop-valid');
@@ -1073,10 +1110,15 @@ function finishDrag(event){
   el('inventory').classList.remove('dragging');
   for(const tile of document.querySelectorAll('.drop-valid'))tile.classList.remove('drop-valid');
   if(active.ghost)suppressInventoryClick=performance.now()+310;
+  if(active.ghost)suppressDeckClick=performance.now()+310;
   if(target)dropTargets.get(target).drop(active.payload);
 }
 document.addEventListener('pointerup',finishDrag);
 document.addEventListener('pointercancel',finishDrag);
+let suppressDeckClick=0;
+for(const dialog of [el('deck'),el('shard-shop')])dialog.addEventListener('click',event=>{
+  if(performance.now()<suppressDeckClick){event.preventDefault();event.stopImmediatePropagation();}
+},true);
 el('inventory').addEventListener('click',event=>{
   if(performance.now()<suppressInventoryClick){event.preventDefault();event.stopImmediatePropagation();}
 },true);

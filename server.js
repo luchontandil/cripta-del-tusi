@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import { create, join, act, tick, leave } from './engine.js';
+import { create, join, act, tick, leave, setAway } from './engine.js';
 import * as accounts from './accounts.js';
 // Versión publicada: Render pone el commit en RENDER_GIT_COMMIT; la de los ficheros sale de index.html.
 const liveVersion={
@@ -91,6 +91,15 @@ export const server = createServer(async (req,res) => {
       const key = token(24);
       // Con cuenta: el nombre es el nick y se aplican sus maestrías.
       const user = await accounts.userFromToken(accountToken);
+      // Partida empezada: la cuenta que ya tiene héroe en ella vuelve a él (recargó, cerró el navegador o se cortó).
+      const mine = user && room.state.phase !== 'lobby' && room.state.players.find(p => p.account === user.nick);
+      if (mine) {
+        room.keys.set(key,mine.id);
+        (room.seen ||= new Map()).set(mine.id,Date.now());
+        room.touched = Date.now();
+        if (setAway(room.state,mine.id,false)) changed(room);
+        return send(200,{id:mine.id,key,code,state:snapshot(room),version:room.version});
+      }
       // La misma cuenta que vuelve a entrar sustituye a su hueco anterior (no se duplica).
       if (user && room.state.phase === 'lobby') for (const old of room.state.players.filter(p => p.account === user.nick)) dropPlayer(room, old.id);
       // El mazo de cartas sale de la cuenta (sin cuenta: las cartas de inicio).
@@ -156,6 +165,22 @@ function pruneLobby(room){
   const now = Date.now();
   for (const p of [...room.state.players]) if (now - (room.seen?.get(p.id) ?? now) > LOBBY_IDLE) {dropPlayer(room,p.id);changed(room);}
 }
+/** En partida, quien lleva 10 s sin dar señales queda «desconectado»: no se le espera (ver engine.setAway). */
+const AWAY_AFTER = 10000;
+function markAway(room){
+  if (room.state.phase === 'lobby') return false;
+  const now = Date.now();
+  let any = false;
+  for (const p of room.state.players) any = setAway(room.state,p.id,now - (room.seen?.get(p.id) ?? now) > AWAY_AFTER) || any;
+  return any;
+}
+/** Sala en curso de una cuenta (para «Volver a tu partida»). */
+function roomOf(nick){
+  if (!nick) return null;
+  for (const [code,room] of rooms)
+    if (!['won','lost'].includes(room.state.phase) && room.state.players.some(p => p.account === nick)) return {code,phase:room.state.phase};
+  return null;
+}
 /** Cada cambio del estado de una sala sube su versión (así los clientes saben si hay algo nuevo). */
 function changed(room){room.version=(room.version||1)+1;}
 /** Al terminar una partida en sala, reparte los puntos a cada cuenta (una sola vez). */
@@ -173,7 +198,7 @@ async function accountRoute(operation,method,body,tokenValue){
   if(method==='POST'&&operation==='login')return accounts.login(body.nick,body.password);
   if(method==='GET'&&operation==='status')return {persistent,...liveVersion};
   // Ping de invitaciones: sin tocar la base de datos (sesión en caché, invitaciones en memoria).
-  if(method==='GET'&&operation==='ping')return {invites:accounts.pendingInvites(await accounts.nickFromToken(tokenValue))};
+  if(method==='GET'&&operation==='ping'){const nick=await accounts.nickFromToken(tokenValue);return {invites:accounts.pendingInvites(nick),room:roomOf(nick)};}
   const user=await accounts.userFromToken(tokenValue);
   if(!user)throw Object.assign(new Error('Sesión de cuenta caducada. Vuelve a entrar.'),{status:401});
   if(method==='POST'&&operation==='logout'){await accounts.logout(tokenValue);return {ok:true};}
@@ -202,7 +227,10 @@ async function accountRoute(operation,method,body,tokenValue){
 setInterval(() => {
   for (const [code, room] of rooms) {
     if (Date.now()-room.touched > 3600000) rooms.delete(code);
-    else if (tick(room.state)) {changed(room);settle(room).catch(()=>{});}
+    else {
+      if (markAway(room)) changed(room);
+      if (tick(room.state)) {changed(room);settle(room).catch(()=>{});}
+    }
   }
 },200).unref();
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

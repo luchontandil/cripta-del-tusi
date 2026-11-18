@@ -1842,6 +1842,8 @@ export function trainingChoices(player){
 }
 export function tick(s,rng=Math.random) {
   if(s.paused)return false;
+  // Si solo falta gente desconectada, no se la espera: se adelanta el reloj.
+  if(awayDue(s)&&(s.deadline==null||s.deadline>Date.now()))s.deadline=Date.now();
   if(s.deadline==null)return false;
   if(Date.now()<s.deadline)return false;
   if(s.phase==='reward'){
@@ -1898,8 +1900,34 @@ export function tick(s,rng=Math.random) {
       monsterAttack(s,unit,target,rng);
       retreat(s,unit,heroes);
     }
-  }else note(s,unit.name+' se quedó sin tiempo.');
+  }else note(s,unit.name+(playerOf(s,unit.id)?.away?' no está conectado: pasa el turno.':' se quedó sin tiempo.'));
   advance(s,rng);
+  return true;
+}
+/**
+ * Jugadores desconectados (el servidor marca player.away cuando dejan de dar señales). Mientras quede
+ * alguien conectado, no se les espera: su héroe pasa el turno y los votos o el «listo» se cierran sin ellos.
+ * Si se desconectan todos, la partida espera.
+ */
+const playerOf=(s,id)=>s.players.find(p=>p.id===id);
+function awayDue(s){
+  const here=s.players.filter(p=>!p.away);
+  if(!here.length||here.length===s.players.length)return false;
+  if(s.phase==='combat'){
+    const unit=s.units[s.turn];
+    return !!(unit&&!unit.enemy&&alive(unit)&&!s.enemyPlan&&playerOf(s,unit.id)?.away);
+  }
+  if((s.phase==='map'||s.phase==='event')&&s.vote)return here.every(p=>Object.hasOwn(s.vote.votes,p.id));
+  if(s.phase==='shop'||s.phase==='forge')return here.every(p=>s.ready.includes(p.id));
+  if(s.phase==='reward')return here.every(p=>s.picks.includes(p.id)&&(!s.training||p.trained));
+  return false;
+}
+/** El servidor avisa de quién se desconecta o vuelve. Devuelve true si cambió algo. */
+export function setAway(s,id,away){
+  const player=playerOf(s,id);
+  if(!player||!!player.away===away||s.phase==='lobby')return false;
+  if(away)player.away=true;else delete player.away;
+  note(s,player.name+(away?' se ha desconectado.':' ha vuelto.'));
   return true;
 }
 /** Ataque de un monstruo con sus rasgos: elemento, robo de vida y encanto. */

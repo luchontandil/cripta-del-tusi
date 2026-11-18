@@ -1396,3 +1396,7 @@ body:not(.in-expedition) .live-version.update{color:#1b1206;background:#ffd76a}
 .shard-badge:hover b,.shard-badge:focus-visible b{text-shadow:0 0 8px #7fd6ff88}
 .shard-art{display:grid;place-items:center;width:32px;height:32px;border-radius:6px;background:radial-gradient(circle,#1f5f7a,#0d1a24);border:1px solid #4fb7e0}
 .shard-art .icon{color:#9fe3ff;width:20px;height:20px}
+/* Jugadores desconectados en partida: no se les espera. */
+.turn-info .away-tag{justify-self:start;margin:0;white-space:nowrap}
+.away-tag{margin-left:6px;padding:0 6px;border-radius:99px;background:#e0605a22;color:#f08a84;font-size:.68rem;font-weight:600;letter-spacing:.02em;vertical-align:middle}
+#turns li.away .turn-art,.ready-chip.away canvas{opacity:.45;filter:grayscale(1)}

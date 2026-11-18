@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=92';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=92';
-import {setupSfx} from './music.js?v=92';
-import {icon} from './icons.js?v=92';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=93';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=93';
+import {setupSfx} from './music.js?v=93';
+import {icon} from './icons.js?v=93';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -123,7 +123,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=92').then(({createIso})=>{
+import('./isometric.js?v=93').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -203,15 +203,27 @@ setInterval(refreshAccount,10000);
 // Al cargar la página: comprobar la sesión enseguida (antes se esperaba a la primera consulta, a los 10 s).
 refreshAccount();
 // Invitaciones casi en tiempo real: consulta ligera cada 2,5 s mientras estás en la portada.
-setInterval(async()=>{
+async function ping(){
   if(!account.token||!account.user||state||document.hidden)return;
   try{
     const data=await accountCall('ping');
+    paintResume(data.room);
     const known=new Set((account.user.invites||[]).map(i=>i.from+i.code+i.at));
     const fresh=(data.invites||[]).filter(i=>!known.has(i.from+i.code+i.at));
     if(fresh.length){account.user.invites=[...fresh,...(account.user.invites||[])];showInvites();renderAccount();}
   }catch{}
-},2500);
+}
+setInterval(ping,2500);
+setTimeout(ping,600);
+/** Botón «Volver a tu partida» en la portada si tu cuenta tiene un héroe en una sala en curso. */
+function paintResume(room){
+  const button=el('resume');
+  const show=!!room&&!state&&!!account.user;
+  button.hidden=!show;
+  if(!show)return;
+  button.replaceChildren(icon('play'),'Volver a tu partida · '+room.code);
+  button.onclick=()=>{el('code').value=room.code;enter(false);};
+}
 function field(label,input){return h('label','field',label,input);}
 /** El campo «Nombre» solo hace falta sin cuenta: con sesión, el nombre es el nick. */
 function syncNameField(){
@@ -991,7 +1003,9 @@ function initiative(turn){
   return units.map(u=>{
     const li=h('li',u.enemy?'foe':'ally',h('span','turn-art',unitArt(u)));
     if(tintOf(u))li.style.setProperty('--player',tintOf(u).hex);
-    const info=h('span','turn-info',h('span','turn-name',u.name));
+    const away=!u.enemy&&state.players.find(p=>p.id===u.id)?.away;
+    if(away)li.classList.add('away');
+    const info=h('span','turn-info',h('span','turn-name',u.name),away?h('span','away-tag','sin conexión'):null);
     if(u.max){
       const bar=h('span','turn-hp',h('i'));
       bar.style.setProperty('--hp',Math.max(0,u.hp/u.max*100)+'%');
@@ -1417,7 +1431,7 @@ function renderShop(box){
   readyButton.className=me?'ready-button done':'primary ready-button';
   readyButton.append(icon(me?'check':'play'),me?'Listo · esperando al grupo':'Listo para seguir');
   const party=h('div','ready-party',...state.players.map(p=>{
-    const chip=h('span','ready-chip'+(ready.includes(p.id)?' on':''),unitArt(p),p.name);
+    const chip=h('span','ready-chip'+(ready.includes(p.id)?' on':'')+(p.away?' away':''),unitArt(p),p.name,p.away?h('span','away-tag','sin conexión'):null);
     return chip;
   }));
   const sellHint=h('div','shop-sell-hint',icon('gold'),'Arrastra aquí un objeto de tu mochila para venderlo');
@@ -1487,7 +1501,7 @@ function renderForge(box){
   const readyButton=btn('',()=>send({type:'ready'}));
   readyButton.className=me?'ready-button done':'primary ready-button';
   readyButton.append(icon(me?'check':'play'),me?'Listo · esperando al grupo':'Listo para seguir');
-  const party=h('div','ready-party',...state.players.map(p=>h('span','ready-chip'+(ready.includes(p.id)?' on':''),unitArt(p),p.name)));
+  const party=h('div','ready-party',...state.players.map(p=>h('span','ready-chip'+(ready.includes(p.id)?' on':'')+(p.away?' away':''),unitArt(p),p.name,p.away?h('span','away-tag','sin conexión'):null)));
   box.replaceChildren(
     h('div','journey-head',h('h3',null,icon('forge'),'Forja del herrero'),
       h('p',null,'Re-tira los PREFIJOS y SUFIJOS de tu equipo o sube su rareza a cambio de tusi. Re-tirar solo prefijos o solo sufijos cuesta algo más; mejorar un objeto normal es barato y cada rareza siguiente cuesta más.')),
@@ -2353,7 +2367,7 @@ async function enter(creating){
     if(epoch!==generation)return;
     if(!Array.isArray(result.state.glyphs))throw new Error('El servidor está actualizando el juego.');
     session={base,code:result.code,key:result.key,id:result.id};
-    sessionStorage.setItem('amber-session',JSON.stringify(session));
+    localStorage.setItem('amber-session',JSON.stringify(session));paintResume(null);
     localStorage.setItem('amber-server',base);
     rendered='';
     error('');
@@ -2372,7 +2386,7 @@ el('leave').onclick=()=>{
   resetAnimation();
   syncViewport();
   hideUnit();
-  sessionStorage.removeItem('amber-session');
+  localStorage.removeItem('amber-session');sessionStorage.removeItem('amber-session');
   error('');render();
 };
 /**
@@ -2402,7 +2416,8 @@ async function refresh(){
     }
   }finally{polling=false;}
 }
-try{session=JSON.parse(sessionStorage.getItem('amber-session'));}catch{session=null;}
+// La sesión de la sala se guarda en el navegador: sobrevive a recargar y a cerrarlo.
+try{session=JSON.parse(localStorage.getItem('amber-session')||sessionStorage.getItem('amber-session'));}catch{session=null;}
 refresh();
 setInterval(()=>{
   if(state&&!session.code&&state.deadline!=null&&['combat','reward','map','event','shop','forge'].includes(state.phase)&&Date.now()>=state.deadline){

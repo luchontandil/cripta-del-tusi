@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost,setAway} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -1319,4 +1319,51 @@ test('sala: «nada nuevo» si el estado no cambió y respuestas comprimidas',{ti
   const fresh=await call('/api/'+room.code+'?since='+full.version,null,room.key);
   assert.equal(fresh.state.players[0].classId,'mago');
   assert.equal(fresh.encoding,'gzip','el estado va comprimido');
+});
+test('desconectados: su héroe pasa el turno al momento y el voto se cierra sin ellos; si se van todos, se espera',()=>{
+  const s=battle('guardia','mago');
+  const hero=s.units.find(u=>u.id==='p1');
+  s.turn=s.units.indexOf(hero);s.deadline=Date.now()+60000;s.enemyPlan=null;
+  assert.equal(tick(s,rng),false,'conectado: se espera a que juegue');
+  assert.equal(setAway(s,'p1',true),true);
+  assert.equal(s.players[1].away,true);
+  assert.equal(tick(s,rng),true,'desconectado: pasa el turno');
+  assert.notEqual(s.units[s.turn],hero);
+  assert.ok(s.log.some(l=>l.includes('no está conectado')));
+  // Si se desconectan todos, no se adelanta nada.
+  setAway(s,'p0',true);
+  s.turn=s.units.indexOf(hero);s.deadline=Date.now()+60000;s.enemyPlan=null;
+  assert.equal(tick(s,rng),false);
+  // Voto en el mapa: basta con el voto de quien sigue conectado.
+  const m=create();join(m,'a','A','guardia');join(m,'b','B','mago');
+  act(m,'a',{type:'start'},rng);
+  setAway(m,'b',true);
+  act(m,'a',{type:'vote',option:0},rng);
+  assert.equal(m.phase,'map','con un voto de dos no se resuelve solo');
+  tick(m,rng);
+  assert.notEqual(m.phase,'map','el desconectado no bloquea el voto');
+  assert.equal(setAway(m,'b',false),true);
+  assert.equal(m.players[1].away,undefined);
+});
+test('sala: la cuenta con héroe en una partida empezada vuelve a él',{timeout:10000},async t=>{
+  const {server:app}=await import('./server.js');
+  if(!app.listening){app.listen(0,'127.0.0.1');await once(app,'listening');}
+  t.after(()=>app.close());
+  const base='http://127.0.0.1:'+app.address().port;
+  const call=async(path,body,key,account)=>{
+    const response=await fetch(base+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(key?{Authorization:'Bearer '+key}:{}),...(account?{'X-Account':account}:{})},body:body?JSON.stringify(body):undefined});
+    return {status:response.status,...await response.json()};
+  };
+  const nick='Vuelta'+Date.now().toString(36).slice(-5);
+  const reg=await call('/api/account/register',{nick,password:'secreto123'});
+  const room=await call('/api/rooms',{classId:'guardia'},null,reg.token);
+  await call('/api/'+room.code+'/action',{type:'start'},room.key);
+  const ping=await call('/api/account/ping',null,null,reg.token);
+  assert.equal(ping.room?.code,room.code,'el ping avisa de la partida en curso');
+  const back=await call('/api/'+room.code+'/join',{classId:'mago'},null,reg.token);
+  assert.equal(back.status,200);
+  assert.equal(back.id,room.id,'vuelve al mismo héroe');
+  assert.equal(back.state.players.length,1,'no se duplica');
+  const other=await call('/api/'+room.code+'/join',{name:'Intruso',classId:'mago'});
+  assert.equal(other.status,400,'sin héroe en la partida no se puede entrar');
 });

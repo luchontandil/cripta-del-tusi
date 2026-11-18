@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=78';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=78';
-import {setupSfx} from './music.js?v=78';
-import {icon} from './icons.js?v=78';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=79';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=79';
+import {setupSfx} from './music.js?v=79';
+import {icon} from './icons.js?v=79';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=78').then(({createIso})=>{
+import('./isometric.js?v=79').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -177,7 +177,14 @@ function paintVersion(data){
   box.textContent=parts.join(' · ');
   box.title='Página: v'+CLIENT_VERSION+(data?'\nServidor: commit '+(data.commit||'local')+', ficheros v'+(data.assets||'?'):'');
   box.classList.toggle('stale',!!(data&&data.assets&&data.assets!==CLIENT_VERSION));
+  // Si el servidor ya tiene una versión más nueva que esta página (caché del navegador), ofrecer recargar.
+  const newer=data?.assets&&Number(data.assets)>Number(CLIENT_VERSION);
+  box.onclick=newer?()=>location.reload():null;
+  box.classList.toggle('update',!!newer);
+  if(newer)box.textContent='Hay una versión nueva ('+data.assets+') · pulsa para recargar';
 }
+// Comprobar cada 2 minutos si hay versión nueva publicada.
+setInterval(()=>{if(!state||state.phase==='lobby')accountCall('status').then(paintVersion).catch(()=>{});},120000);
 // Mezcla de sonidos definida por el administrador (volumen, tono y variantes de cada categoría).
 let savedMix={};
 fetch(serverBase()+'/api/sfx/mix',{signal:AbortSignal.timeout(12000)}).then(r=>r.json()).then(d=>{savedMix=d.mix||{};sfx.setMix(savedMix,serverBase());}).catch(()=>{});

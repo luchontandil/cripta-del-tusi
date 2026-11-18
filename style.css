@@ -1255,3 +1255,5 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;bac
 .inventory-slot.just-equipped::after{content:'Equipado';position:absolute;left:50%;top:-10px;padding:1px 6px;background:#2a2014;border:1px solid var(--gold);color:var(--gold);font-size:.62rem;font-weight:800;white-space:nowrap;pointer-events:none;animation:gear-swap-tag 1.4s ease-out both;animation-delay:inherit}
 .inventory-slot.just-stowed{animation:gear-stowed 1.1s ease-out both}
 @media (prefers-reduced-motion:reduce){.inventory-slot.just-equipped,.inventory-slot.just-stowed{animation-duration:.01s}}
+.live-version.update{cursor:pointer;color:#1b1206;background:#ffd76a;font-weight:800;animation:version-pulse 1.6s ease-in-out infinite}
+@keyframes version-pulse{50%{box-shadow:0 0 12px #ffd76a}}

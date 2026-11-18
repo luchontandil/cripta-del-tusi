@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=75';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=75';
-import {setupSfx} from './music.js?v=75';
-import {icon} from './icons.js?v=75';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=76';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=76';
+import {setupSfx} from './music.js?v=76';
+import {icon} from './icons.js?v=76';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=75').then(({createIso})=>{
+import('./isometric.js?v=76').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1374,10 +1374,46 @@ function renderMap(box){
   const actNumber=state.route.act||1;
   box.replaceChildren(h('div','journey-head',h('h3',null,icon('crown'),'Acto '+actNumber+' de '+ACTS+' · '+actNames[actNumber-1]),h('p',null,'Cada jugador vota la siguiente sala. Cada camino cierra otros: pasa el ratón por una sala para ver lo que deja abierto. Tomaos el tiempo que necesitéis.')),map,legend,voteStatus());
 }
+/**
+ * Texto enriquecido: tusi, vida, PA, PM, armadura, crítico, daño, gemas, objetos y enemigos
+ * aparecen con su icono y su color (y la cantidad que los acompaña, si la hay).
+ */
+const richRules=[
+  {re:/objetos? legendarios?/,tone:'legendary',art:()=>icon('bag')},
+  {re:/objetos? raros?(?: o mejor(?:es)?)?/,tone:'rare',art:()=>icon('bag')},
+  {re:/objetos? poco comun(?:es)?(?: o mejor(?:es)?)?|objetos? poco común(?: o mejor)?/,tone:'uncommon',art:()=>icon('bag')},
+  {re:/(?:Rubí|Granate|Zafiro|Topacio|Amatista|Esmeralda|Ónice|Diamante|Ojo de tigre)(?= |\b|$)/,tone:'gem',art:m=>{const kind=Object.entries(gems).find(([,g])=>g.name===m)?.[0]||'ruby';return gemArt(kind);}},
+  {re:/gemas?/,tone:'gem',art:()=>gemArt('amethyst')},
+  {re:/(?:[+−-]?\d+ (?:de )?)?tusi/,tone:'gold',art:()=>icon('gold')},
+  {re:/(?:[+−-]?\d+ (?:de )?)?vida máxima/,tone:'hp',art:()=>icon('hp')},
+  {re:/vida/,tone:'hp',art:()=>icon('hp')},
+  {re:/(?:[+−-]?\d+ )?PA\b/,tone:'ap',art:()=>icon('ap')},
+  {re:/(?:[+−-]?\d+ )?PM\b/,tone:'mp',art:()=>icon('mp')},
+  {re:/(?:[+−-]?\d+ (?:de )?)?armadura/,tone:'ward',art:()=>icon('ward')},
+  {re:/(?:[+−-]?\d+ ?% de )?crítico/,tone:'critical',art:()=>icon('critical')},
+  {re:/(?:[+−-]?\d+ (?:de )?)?daño/,tone:'damage',art:()=>icon('attack')},
+  {re:/habilidad(?:es)?/,tone:'skill',art:()=>icon('level')},
+  {re:/enemigos?/,tone:'foe',art:()=>icon('skull')}
+];
+// Solo palabras completas (que «PA» no se cuele dentro de «mapa»).
+const richPattern=new RegExp('(?<!\\p{L})(?:'+richRules.map(r=>'('+r.re.source+')').join('|')+')(?!\\p{L})','giu');
+function gemArt(kind){const art=equipmentIcon('gem:'+kind+':3');art.classList.add('rich-gem');return art;}
+function richText(text){
+  const out=[];let last=0;
+  for(const match of String(text).matchAll(richPattern)){
+    const index=match.slice(1).findIndex(Boolean);
+    const rule=richRules[index];
+    if(match.index>last)out.push(String(text).slice(last,match.index));
+    out.push(h('span','rich rich-'+rule.tone,rule.art(match[0]),match[0]));
+    last=match.index+match[0].length;
+  }
+  if(last<String(text).length)out.push(String(text).slice(last));
+  return out;
+}
 function renderEvent(box){
   const myVote=state.vote?.votes?.[session.id];
   const options=state.event.options.map((option,i)=>{
-    const b=h('button','event-option'+(myVote===i?' voted':''),h('span','event-label',option.label),h('span','event-detail',option.detail),voters(i));
+    const b=h('button','event-option'+(myVote===i?' voted':''),h('span','event-label',...richText(option.label)),h('span','event-detail',...richText(option.detail)),voters(i));
     b.type='button';
     b.onclick=()=>send({type:'vote',option:i});
     return b;
@@ -1386,7 +1422,7 @@ function renderEvent(box){
     h('div','event-art',icon('question')),
     h('p','event-kicker','Evento · piso '+state.floor),
     h('h3',null,state.event.title),
-    h('p','event-text',state.event.text),
+    h('p','event-text',...richText(state.event.text)),
     h('div','event-options',...options),
     voteStatus()));
 }

@@ -1212,3 +1212,15 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;bac
 .affix-list .upgrade-ghost{list-style:none;margin-top:4px;color:#ffd76a;font-size:.76rem;font-weight:700}
 .forge-preview-upgrade .upgrade-ghost{visibility:visible}
 .forge-preview-socket .socket-ghost{visibility:visible;color:#ffd76a!important;text-shadow:0 0 6px #ffd76a}
+/* Texto enriquecido de los eventos: cada recurso con su icono y su color */
+.rich{display:inline-flex;align-items:baseline;gap:3px;font-weight:700;white-space:nowrap}
+.rich .icon,.rich .rich-gem{width:1.05em;height:1.05em;align-self:center;flex:none}
+.rich .rich-gem{image-rendering:auto}
+.rich-gold{color:#ffb3e4}.rich-gold .icon{color:#ff8fd6;filter:drop-shadow(0 0 3px #ff6fc8aa)}
+.rich-hp{color:#ff6b6b}.rich-hp .icon{color:#ff4f5e}
+.rich-ap{color:var(--pa)}.rich-mp{color:var(--pm)}
+.rich-ward{color:#bcd3e6}.rich-critical{color:#ffcf5a}
+.rich-damage{color:#ff9a72}.rich-skill{color:#d5b8ff}
+.rich-foe{color:#e98b8b}.rich-foe .icon{color:#d95b5b}
+.rich-gem{color:#d8b4ff}
+.rich-uncommon{color:#7fd88b}.rich-rare{color:#7fb6ff}.rich-legendary{color:#ffb347}

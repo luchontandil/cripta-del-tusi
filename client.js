@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
-  BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=79';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=79';
-import {setupSfx} from './music.js?v=79';
-import {icon} from './icons.js?v=79';
+  BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=80';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=80';
+import {setupSfx} from './music.js?v=80';
+import {icon} from './icons.js?v=80';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=79').then(({createIso})=>{
+import('./isometric.js?v=80').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -502,13 +502,14 @@ function heroStatRows(u){
     statRow('heal','Vida',(u.hp??u.max??'—')+(u.max?' / '+u.max:'')+' PV'),
     statRow('ap','Acción',(BASE_AP+(st.action||0))+' PA'),
     statRow('mp','Movimiento',(BASE_MP+(st.movement||0))+' PM'),
-    statRow('ward','Armadura',st.ward||0),
+    Object.assign(statRow('ward','Armadura',Math.min(75,st.ward||0)+' %'),{title:'Reduce el daño físico que recibes (máximo 75 %).'}),
     statRow('initiative','Iniciativa',u.initiative??'—'),
     statRow('critical','Crítico',Math.round(critChance(u)*100)+' % · ×1,5'),
     statRow('reach','Alcance extra',st.reach?'+'+st.reach:'0')
   ];
   if(st.leech)rows.push(statRow('leech','Vampirismo',st.leech+' % del daño'));
-  for(const key of Object.keys(elements))if(st[key])rows.push(statRow(key,'Daño '+elements[key].toLowerCase(),'+'+st[key],'element-'+key));
+  for(const key of Object.keys(elements))if(st[key])rows.push(statRow(key,'Daño '+elements[key].toLowerCase(),'+'+st[key]+' %','element-'+key));
+  if(st.damage)rows.push(statRow('attack','Daño plano','+'+st.damage+' a cada golpe'));
   return rows;
 }
 /** Casillas a las que puede llegar un enemigo en su turno (al pasarle el ratón). */
@@ -543,7 +544,7 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
   const stats=h('div','tip-stats');
   if(unit.enemy){
     stats.append(
-      statRow('ward','Armadura',unit.stats?.ward||0),
+      statRow('ward','Armadura',Math.min(75,unit.stats?.ward||0)+' %'),
       statRow('initiative','Iniciativa',unit.initiative),
       statRow('mp','Movimiento',Math.max(0,3+(unit.stats?.movement||0)-(unit.effects?.slow?.value||0))+' PM'),
       statRow('attack','Ataque',unit.damage+'–'+(unit.damage+2)),statRow('range','Alcance',unit.range+(unit.range===1?' casilla':' casillas')));
@@ -639,10 +640,12 @@ function skillFacts(unit,skill){
   const healing=['heal','cleanse'].includes(kind);
   const utility=['dash','shield','haste','swap'].includes(kind)||max<=0;
   const element=skillElement(unit,skill);
-  const bonus=healing?Math.floor((unit.level||1)/2):utility?0:damageBonus(unit,skill);
+  const heal=Math.floor((unit.level||1)/2);
+  const percent=healing||utility?0:damagePercent(unit,skill),flat=healing||utility?0:flatDamage(unit);
+  const low=healing?min+heal:utility?min:scaledDamage(unit,skill,min),high=healing?max+heal:utility?max:scaledDamage(unit,skill,max);
   const school=skillSchool(unit,skill);
   const crit=Math.min(100,Math.round(critChance(unit)*100)+(skillOptions(skill).crit||0));
-  return {cost,minRange,maxRange:range+reach,reach,healing,utility,element,school,bonus,low:min+bonus,high:max+bonus,kind,crit,modifiable:modifiableRange(skill)};
+  return {cost,minRange,maxRange:range+reach,reach,healing,utility,element,school,bonus:healing?heal:percent,flat,low,high,kind,crit,modifiable:modifiableRange(skill)};
 }
 /** De dónde sale el bonus de daño: físico, o mágico + elemento. */
 function bonusSource(unit,f){
@@ -695,7 +698,7 @@ function skillRows(unit,skill){
     if(f.element!=='physical'&&!(f.school==='magic'&&f.element==='magic'))rows.push(statRow(f.element,'Elemento',elements[f.element],'element-'+f.element));
     rows.push(h('div','tip-damage element-'+f.element,icon(f.element),
       h('b',null,String(f.low)),' a ',h('b',null,String(f.high)),' de daño '+(f.element==='physical'?'físico':f.element==='magic'?'mágico':f.element==='chaos'?'caótico':'de '+elements[f.element].toLowerCase()),
-      f.bonus?h('small',null,' (+'+f.bonus+' '+bonusSource(unit,f)+')'):null));
+      f.bonus||f.flat?h('small',null,' (base '+skill[3]+'–'+skill[4]+(f.flat?' +'+f.flat:'')+(f.bonus?' · +'+f.bonus+' % por '+bonusSource(unit,f):'')+')'):null));
     rows.push(statRow('critical','Crítico',f.crit+' % · ×1,5'));
   }
   const sketch=areaSketch(skill);
@@ -759,7 +762,7 @@ function panel(title,iconName){
   box.append(heading);
   return box;
 }
-const statValue=(key,value,signed=true)=>(signed?(value>0?'+':'−'):'')+Math.abs(value)+(key==='critical'||key==='leech'?' %':'');
+const statValue=(key,value,signed=true)=>(signed?(value>0?'+':'−'):'')+Math.abs(value)+(percentStats.has(key)?' %':'');
 /** Línea de atributo de objeto con icono, valor y nombre. */
 function statLine(key,value,tag='li'){
   const line=h(tag,'stat-line stat-'+key,icon(key),h('b',null,statValue(key,value)),' ');
@@ -1443,9 +1446,9 @@ const richRules=[
   {re:/vida/,tone:'hp',art:()=>icon('hp')},
   {re:/(?:[+−-]?\d+ )?PA\b/,tone:'ap',art:()=>icon('ap')},
   {re:/(?:[+−-]?\d+ )?PM\b/,tone:'mp',art:()=>icon('mp')},
-  {re:/(?:[+−-]?\d+ (?:de )?)?armadura/,tone:'ward',art:()=>icon('ward')},
+  {re:/(?:[+−-]?\d+ (?:% )?(?:de )?)?armadura/,tone:'ward',art:()=>icon('ward')},
   {re:/(?:[+−-]?\d+ ?% de )?crítico/,tone:'critical',art:()=>icon('critical')},
-  {re:/(?:[+−-]?\d+ (?:de )?)?daño/,tone:'damage',art:()=>icon('attack')},
+  {re:/(?:[+−-]?\d+ (?:% )?(?:de )?)?daño/,tone:'damage',art:()=>icon('attack')},
   {re:/habilidad(?:es)?/,tone:'skill',art:()=>icon('level')},
   {re:/enemigos?/,tone:'foe',art:()=>icon('skull')}
 ];
@@ -1648,8 +1651,11 @@ function impact(event){
   }
   const tag=document.createElement('span');
   const damage=event.kind!=='heal';
-  tag.className=['impact',event.kind,damage&&'damage-number',event.critical&&'critical'].filter(Boolean).join(' ');
+  const typed=damage&&event.element&&elements[event.element];
+  tag.className=['impact',event.kind,damage&&'damage-number',event.critical&&'critical',typed&&'el-'+event.element].filter(Boolean).join(' ');
   tag.textContent=(damage?'':'+')+event.amount+(event.critical?'!':'');
+  // El tipo de daño se ve de un vistazo: su icono delante y su color.
+  if(typed){tag.prepend(icon(event.element,'impact-type'));tag.title='Daño '+elements[event.element].toLowerCase();}
   Object.assign(tag.style,boardPoint(event.pos,damage?1.48:undefined));
   const stack=el('animations').querySelectorAll('.impact[data-cell="'+event.pos+'"]').length;
   tag.dataset.cell=event.pos;

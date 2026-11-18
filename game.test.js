@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -169,12 +169,16 @@ test('genera botín con afijos y permite equipar y engarzar runas permanentes',(
 test('la vista previa aplica el crítico ×1,5 y la armadura frena las habilidades físicas',()=>{
   const s=battle('guardia');
   const hero=s.units[0], foe=s.units[1];
-  hero.stats.physical=2;
-  foe.stats.ward=3;
-  assert.deepEqual(damagePreview(hero,foe,classes.guardia.skills[0]),{element:'physical',normal:[6,9],critical:[10,15],chance:.12});
+  // +20 % de daño físico contra un 30 % de armadura: (base × 1,2) × 0,7.
+  hero.stats.physical=20;
+  foe.stats.ward=30;foe.resist={};
+  const [,,,lo,hi]=classes.guardia.skills[0];
+  const net=(b,crit=1)=>Math.round(Math.floor(b*1.2)*crit*.7);
+  assert.deepEqual(damagePreview(hero,foe,classes.guardia.skills[0]),{element:'physical',normal:[net(lo),net(hi)],critical:[net(lo,1.5),net(hi,1.5)],chance:.12});
   // Golpe de brasas es físico aunque sea de fuego: suma el daño físico (no el de fuego) y la armadura lo frena.
-  hero.stats.fire=5;
-  assert.deepEqual(damagePreview(hero,foe,classes.guardia.skills.at(-1)).normal,[6,9]);
+  hero.stats.fire=50;
+  const embers=classes.guardia.skills.at(-1);
+  assert.deepEqual(damagePreview(hero,foe,embers).normal,[net(embers[3]),net(embers[4])]);
 });
 test('la IA avanza hacia el rival aunque un aliado cierre el único paso',()=>{
   const s=battle('tirador');
@@ -596,8 +600,8 @@ test('colores fijos por puesto y maestrías aplicadas a la partida',()=>{
   enterCombat(s);
   const [a,b]=['a','b'].map(id=>s.units.find(u=>u.id===id));
   assert.equal(a.max-b.max,8);
-  assert.equal(a.stats.physical-b.stats.physical,1);
-  assert.equal(a.stats.ward-b.stats.ward,3);
+  assert.equal(a.stats.physical-b.stats.physical,4,'fuerza: +4 % por rango');
+  assert.equal(a.stats.ward-b.stats.ward,12,'coraza: +4 % por rango');
   assert.equal(a.color,'red');
   assert.equal(masteryCost('fuerza',2),9);
 });
@@ -855,16 +859,17 @@ test('daño: físicas suman solo el físico; hechizos suman mágico + su element
   const stats={physical:3,magic:5,fire:7,ice:11,lightning:13,chaos:17};
   const archer={classId:'tirador',stats},mage={classId:'mago',stats};
   const skill=(cls,name)=>classes[cls].skills.find(sk=>sk[0]===name);
-  assert.equal(damageBonus(archer,skill('tirador','Flecha ígnea')),3);
-  assert.equal(damageBonus(mage,skill('mago','Bola de fuego')),5+7);
-  assert.equal(damageBonus(mage,skill('mago','Relámpago')),5+13);
-  assert.equal(damageBonus(mage,skill('mago','Descarga arcana')),5);
+  assert.equal(damagePercent(archer,skill('tirador','Flecha ígnea')),3);
+  assert.equal(damagePercent(mage,skill('mago','Bola de fuego')),5+7);
+  assert.equal(damagePercent(mage,skill('mago','Relámpago')),5+13);
+  assert.equal(damagePercent(mage,skill('mago','Descarga arcana')),5);
   assert.equal(skillSchool(archer,skill('tirador','Flecha ígnea')),'physical');
-  const target={stats:{ward:4},effects:{}};
+  // La armadura (en %) solo frena lo físico.
+  const target={stats:{ward:40},effects:{}};
   const phys=damagePreview(archer,target,skill('tirador','Flecha ígnea')).normal[0];
   const magic=damagePreview(mage,target,skill('mago','Bola de fuego')).normal[0];
-  assert.equal(phys,skill('tirador','Flecha ígnea')[3]+3-4);
-  assert.equal(magic,skill('mago','Bola de fuego')[3]+12);
+  assert.equal(phys,Math.round(Math.floor(skill('tirador','Flecha ígnea')[3]*1.03)*.6));
+  assert.equal(magic,Math.floor(skill('mago','Bola de fuego')[3]*1.12));
 });
 
 test('resistencias, debilidades, drenaje de PA/PM y variantes',()=>{
@@ -875,9 +880,9 @@ test('resistencias, debilidades, drenaje de PA/PM y variantes',()=>{
   const fireball=classes.mago.skills.find(sk=>sk[0]==='Bola de fuego');
   const base=damagePreview(hero,foe,fireball).normal;
   foe.resist={fire:50};
-  assert.deepEqual(damagePreview(hero,foe,fireball).normal,base.map(v=>Math.floor(v*.5)));
+  assert.deepEqual(damagePreview(hero,foe,fireball).normal,base.map(v=>Math.round(v*.5)));
   foe.resist={fire:-50};
-  assert.deepEqual(damagePreview(hero,foe,fireball).normal,base.map(v=>Math.floor(v*1.5)));
+  assert.deepEqual(damagePreview(hero,foe,fireball).normal,base.map(v=>Math.round(v*1.5)));
   // Cada especie normal tiene al menos una resistencia o debilidad.
   for(const [species,t] of Object.entries(monsterTraits))assert.ok(Object.keys(t.resist||{}).length,species);
   assert.ok(Object.keys(monsterVariants).length>=8);
@@ -1234,6 +1239,6 @@ test('vampirismo: el héroe recupera un % del daño que hace; pulir sube un tier
   s.players[0].gold=999;s.players[0].bag=[item];s.phase='forge';
   act(s,'p0',{type:'forge',item:900,mode:'polish'},rng);
   const fire=item.affixes.find(m=>m.stat==='fire');
-  assert.equal(fire.tier,3);assert.equal(fire.label,'Candente');assert.ok(fire.value>=3&&fire.value<=5);
+  assert.equal(fire.tier,3);assert.equal(fire.label,'Candente');assert.ok(fire.value>=9&&fire.value<=13,'T3 de fuego: 9–13 %');
   assert.ok(E.forgeBlock({...item,ilvl:1,affixes:[{type:'prefix',stat:'fire',tier:5,tiers:8,value:8,label:'Calcinante'}]},'polish'),'no se pule más allá de nivel+6');
 });

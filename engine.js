@@ -12,7 +12,7 @@ export const classes = {
     ['Empujón de escudo',2,1,4,6,'push','➶',0,{element:'physical',push:3,max:{push:1}}],
     ['Barrido',3,1,5,8,'damage','⚔',0,{element:'physical',area:'cone',max:{cost:-1}}],
     ['Gancho',2,4,2,4,'pull','↢',2,{element:'physical',pull:'melee',inLine:true,anyTarget:true,max:{range:1}}],
-    ['Muralla',2,3,0,0,'shield','⛨',0,{value:3,max:{value:1}}],
+    ['Muralla',2,3,0,0,'shield','⛨',0,{value:25,max:{value:10}}],
     ['Golpe de brasas',2,2,7,10,'damage','✹',0,{element:'fire',max:{modifiable:true}}]
   ]},
   tirador: {name:'Arquero', hp:31, initiative:14, skills:[
@@ -30,7 +30,7 @@ export const classes = {
     ['Restaurar',2,5,6,10,'heal','✚',0,{max:{range:1}}],
     ['Sello de fragilidad',1,4,1,3,'expose','✷',0,{element:'magic',value:3,max:{value:2}}],
     ['Purificar',2,3,3,6,'cleanse','❖',0,{max:{range:2}}],
-    ['Escudo sagrado',2,4,0,0,'shield','⛨',0,{value:3,max:{value:2}}],
+    ['Escudo sagrado',2,4,0,0,'shield','⛨',0,{value:25,max:{value:10}}],
     ['Celeridad divina',2,4,0,0,'haste','➝',0,{value:2,max:{range:2}}],
     ['Juicio',3,5,5,8,'blast','✹',2,{element:'fire',area:'cross',max:{crit:15}}],
     ['Alba radiante',3,4,8,12,'heal','✚',0,{area:'cross',max:{cost:-1}}]
@@ -122,11 +122,28 @@ export function skillSchool(unit,skill){
  *  - físicas: solo el daño físico, sea cual sea su elemento;
  *  - mágicas: daño mágico + el de su elemento (fuego, hielo, rayo o caótico).
  */
-export function damageBonus(unit,skill){
+/**
+ * Daño al estilo Dofus:
+ *   (tirada base + daño plano) × (1 + % de su escuela y elemento / 100)
+ * Físico: % físico. Hechizos: % mágico + % de su elemento (fuego, hielo, rayo o caótico).
+ */
+export const LEVEL_DAMAGE=8;
+export function damagePercent(unit,skill){
   const stats=unit.stats||{};
   if(skillSchool(unit,skill)==='physical')return stats.physical||0;
   const element=skillElement(unit,skill);
   return (stats.magic||0)+(elementalKeys.includes(element)?stats[element]||0:0);
+}
+/** Daño plano que se suma a la base (raro, de anillos y amuletos). */
+export const flatDamage=unit=>unit.stats?.damage||0;
+/** Daño de una tirada antes de armaduras y resistencias. */
+export function scaledDamage(unit,skill,base,scale=1){
+  return Math.max(1,Math.floor((base+flatDamage(unit))*(1+damagePercent(unit,skill)/100)*scale));
+}
+/** Compatibilidad: cuánto añade el bonus a la media de la habilidad (para estimaciones). */
+export function damageBonus(unit,skill){
+  const average=(skill[3]+skill[4])/2;
+  return scaledDamage(unit,skill,average)-average;
 }
 /** La armadura frena las habilidades físicas; los hechizos la atraviesan. */
 const armorType=(unit,skill)=>skillSchool(unit,skill)==='physical'?'physical':skillElement(unit,skill);
@@ -149,7 +166,9 @@ export function equipTarget(p,item,wanted){
 }
 export const statNames = {...Object.fromEntries(Object.entries(elements).map(([key,name])=>[key,'Daño '+name.toLowerCase()])),
   vitality:'Vida',reach:'Alcance (habilidades modificables)',ward:'Armadura',critical:'Crítico',movement:'PM',action:'PA',
-  leech:'Vampirismo'};
+  leech:'Vampirismo',damage:'Daño (todos los tipos)'};
+/** Estadísticas que se expresan en %: el daño por tipo, la armadura, el crítico y el vampirismo. */
+export const percentStats=new Set([...Object.keys(elements),'ward','critical','leech']);
 export const rarities = ['Normal','Poco común','Raro','Legendario'];
 const bases = {
   weapon:['Arco de tejo','Sable de cobre','Cetro de ónice','Lanza de vigía'],
@@ -169,13 +188,15 @@ const actionWeapons=new Set(['Cetro de ónice','Lanza de vigía']);
  */
 export const affixes={
   prefix:{
-    physical:[[1,1,2,'Cortante'],[2,2,3,'Brutal'],[3,3,5,'Implacable'],[5,5,7,'Feroz'],[7,7,9,'Letal'],[11,9,12,'Devastador'],[16,12,15,'Aniquilador'],[21,15,19,'Apocalíptico']],
-    fire:[[1,1,2,'Humeante'],[2,2,3,'Ardiente'],[3,3,5,'Candente'],[5,5,7,'Infernal'],[7,7,9,'Calcinante'],[11,9,12,'Volcánico'],[16,12,15,'Solar'],[21,15,19,'Primordial']],
-    ice:[[1,1,2,'Invernal'],[2,2,3,'Polar'],[3,3,5,'Glacial'],[5,5,7,'Boreal'],[7,7,9,'Hiemal'],[11,9,12,'Ártico'],[16,12,15,'Perpetuo'],[21,15,19,'Absoluto']],
-    magic:[[1,1,2,'Brillante'],[2,2,3,'Estelar'],[3,3,5,'Astral'],[5,5,7,'Celestial'],[7,7,9,'Sideral'],[11,9,12,'Cósmico'],[16,12,15,'Divino'],[21,15,19,'Infinito']],
-    lightning:[[1,1,2,'Chispeante'],[2,2,3,'Eléctrico'],[3,3,5,'Crepitante'],[5,5,7,'Tormentoso'],[7,7,9,'Fulminante'],[11,9,12,'Tronante'],[16,12,15,'Huracanado'],[21,15,19,'del Trueno Eterno']],
-    chaos:[[1,1,2,'Lúgubre'],[2,2,3,'Sepulcral'],[3,3,5,'Umbral'],[5,5,7,'Abisal'],[7,7,9,'Espectral'],[11,9,12,'Abismal'],[16,12,15,'Insondable'],[21,15,19,'Primigenio']],
-    ward:[[1,1,1,'Firme'],[3,1,2,'Resistente'],[5,2,3,'Inquebrantable'],[7,3,4,'Impenetrable'],[13,4,5,'Colosal'],[19,5,7,'Inmortal']]
+    physical:[[1,4,6,'Cortante'],[2,6,9,'Brutal'],[3,9,13,'Implacable'],[5,13,17,'Feroz'],[7,17,22,'Letal'],[11,22,28,'Devastador'],[16,28,35,'Aniquilador'],[21,35,44,'Apocalíptico']],
+    fire:[[1,4,6,'Humeante'],[2,6,9,'Ardiente'],[3,9,13,'Candente'],[5,13,17,'Infernal'],[7,17,22,'Calcinante'],[11,22,28,'Volcánico'],[16,28,35,'Solar'],[21,35,44,'Primordial']],
+    ice:[[1,4,6,'Invernal'],[2,6,9,'Polar'],[3,9,13,'Glacial'],[5,13,17,'Boreal'],[7,17,22,'Hiemal'],[11,22,28,'Ártico'],[16,28,35,'Perpetuo'],[21,35,44,'Absoluto']],
+    magic:[[1,4,6,'Brillante'],[2,6,9,'Estelar'],[3,9,13,'Astral'],[5,13,17,'Celestial'],[7,17,22,'Sideral'],[11,22,28,'Cósmico'],[16,28,35,'Divino'],[21,35,44,'Infinito']],
+    lightning:[[1,4,6,'Chispeante'],[2,6,9,'Eléctrico'],[3,9,13,'Crepitante'],[5,13,17,'Tormentoso'],[7,17,22,'Fulminante'],[11,22,28,'Tronante'],[16,28,35,'Huracanado'],[21,35,44,'del Trueno Eterno']],
+    chaos:[[1,4,6,'Lúgubre'],[2,6,9,'Sepulcral'],[3,9,13,'Umbral'],[5,13,17,'Abisal'],[7,17,22,'Espectral'],[11,22,28,'Abismal'],[16,28,35,'Insondable'],[21,35,44,'Primigenio']],
+    ward:[[1,3,5,'Firme'],[3,5,8,'Resistente'],[5,8,11,'Inquebrantable'],[7,11,14,'Impenetrable'],[13,14,18,'Colosal'],[19,18,23,'Inmortal']],
+    // Daño plano pequeño (se suma a la base de cualquier habilidad). Raro: solo anillos y amuletos.
+    damage:[[1,1,1,'Afilado'],[9,2,2,'Templado'],[17,3,3,'Magistral']]
   },
   suffix:{
     vitality:[[1,3,5,'del Zorro'],[2,5,8,'del Oso'],[3,8,12,'de la Ballena'],[5,12,16,'del Coloso'],[7,16,22,'del Titán'],[11,22,30,'del Leviatán'],[16,30,40,'del Behemot'],[21,40,52,'de los Dioses']],
@@ -201,8 +222,8 @@ const slotAffixes={
   gloves:{prefix:['ward'],suffix:['critical','vitality']},
   belt:{prefix:[],suffix:['vitality','critical']},
   boots:{prefix:['ward'],suffix:['movement','vitality']},
-  ring:{prefix:elementsAll,suffix:['critical','vitality']},
-  amulet:{prefix:elementsAll,suffix:['action','vitality','critical']},
+  ring:{prefix:[...elementsAll,'damage'],suffix:['critical','vitality']},
+  amulet:{prefix:[...elementsAll,'damage'],suffix:['action','vitality','critical']},
   charm:{prefix:elementsAll,suffix:['critical','vitality']}   // solo para talismanes antiguos
 };
 const rareFirst=['Lamento','Colmillo','Susurro','Ruina','Presagio','Garra','Aullido','Eco','Lamento','Fauces','Maldición','Grito'];
@@ -219,13 +240,13 @@ export const gemQualities=[
 ];
 export const gems={
   ruby:{name:'Rubí',female:false,stat:'vitality',values:[5,10,16,23,32],colors:['#c8213a','#ff8a9a','#6e0f22']},
-  garnet:{name:'Granate',female:false,stat:'fire',values:[2,4,6,8,11],colors:['#d4561e','#ffb27a','#7a2a10']},
-  sapphire:{name:'Zafiro',female:false,stat:'ice',values:[2,4,6,8,11],colors:['#2a5fd0','#9cc4ff','#122e70']},
-  topaz:{name:'Topacio',female:false,stat:'lightning',values:[2,4,6,8,11],colors:['#e3b422','#fff1a0','#7a5a0e']},
-  amethyst:{name:'Amatista',female:true,stat:'magic',values:[2,4,6,8,11],colors:['#8a4fd8','#dcb8ff','#43206e']},
-  emerald:{name:'Esmeralda',female:true,stat:'chaos',values:[2,4,6,8,11],colors:['#1f9d55','#8ff0b4','#0c4d28']},
-  onyx:{name:'Ónice',female:false,stat:'physical',values:[2,4,6,8,11],colors:['#4a4a55','#b7b7c4','#16161c']},
-  diamond:{name:'Diamante',female:false,stat:'ward',values:[1,2,3,4,5],colors:['#cfe6ef','#ffffff','#7b98a6']},
+  garnet:{name:'Granate',female:false,stat:'fire',values:[4,8,12,16,22],colors:['#d4561e','#ffb27a','#7a2a10']},
+  sapphire:{name:'Zafiro',female:false,stat:'ice',values:[4,8,12,16,22],colors:['#2a5fd0','#9cc4ff','#122e70']},
+  topaz:{name:'Topacio',female:false,stat:'lightning',values:[4,8,12,16,22],colors:['#e3b422','#fff1a0','#7a5a0e']},
+  amethyst:{name:'Amatista',female:true,stat:'magic',values:[4,8,12,16,22],colors:['#8a4fd8','#dcb8ff','#43206e']},
+  emerald:{name:'Esmeralda',female:true,stat:'chaos',values:[4,8,12,16,22],colors:['#1f9d55','#8ff0b4','#0c4d28']},
+  onyx:{name:'Ónice',female:false,stat:'physical',values:[4,8,12,16,22],colors:['#4a4a55','#b7b7c4','#16161c']},
+  diamond:{name:'Diamante',female:false,stat:'ward',values:[3,6,9,12,16],colors:['#cfe6ef','#ffffff','#7b98a6']},
   tigereye:{name:'Ojo de tigre',female:false,stat:'critical',values:[2,4,6,8,10],colors:['#b9782a','#ffd28a','#5a3510']}
 };
 /** Calidad de gema (0–4) para un nivel de objeto. */
@@ -455,15 +476,16 @@ const legacyStat={arcane:'magic',shadow:'chaos'};
 export function heroStats(p,level=p.level||1){
   const stats=sumStats(p.equipment);
   const m=p.mastery||{};
-  for(const key of damageKeys)stats[key]+=Math.floor(level/2)+(m.fuerza||0);
+  // Cada nivel: +8 % de daño de todos los tipos. Fuerza: +4 % por rango.
+  for(const key of damageKeys)stats[key]+=LEVEL_DAMAGE*(level-1)+4*(m.fuerza||0);
   stats.vitality+=4*(m.vigor||0);
   stats.critical+=3*(m.precision||0);
-  stats.ward+=m.coraza||0;
+  stats.ward+=4*(m.coraza||0);
   stats.movement+=m.celeridad||0;
   // Bendiciones (o maldiciones) permanentes de los eventos.
   const b=p.boons||{};
-  for(const key of damageKeys)stats[key]+=b.power||0;
-  stats.vitality+=b.vitality||0;stats.critical+=b.critical||0;stats.ward+=b.ward||0;
+  for(const key of damageKeys)stats[key]+=5*(b.power||0);   // cada punto de «poder»: +5 % de daño
+  stats.vitality+=b.vitality||0;stats.critical+=b.critical||0;stats.ward+=4*(b.ward||0);
   const max=Math.max(1,classes[p.classId].hp+stats.vitality+(level-1)*4);
   return {stats,max,initiative:classes[p.classId].initiative};
 }
@@ -506,9 +528,9 @@ export const playerColors=[
 /** Árbol de maestrías: se compran con los puntos de cuenta y se aplican a todas las partidas futuras. */
 export const masteryTree={
   vigor:{name:'Vigor',icon:'hp',max:5,cost:1,description:r=>'+'+4*r+' de vida máxima'},
-  fuerza:{name:'Fuerza',icon:'attack',max:5,cost:2,description:r=>'+'+r+' de daño de todos los elementos'},
+  fuerza:{name:'Fuerza',icon:'attack',max:5,cost:2,description:r=>'+'+4*r+' % de daño de todos los tipos'},
   precision:{name:'Precisión',icon:'critical',max:5,cost:1,description:r=>'+'+3*r+' % de crítico'},
-  coraza:{name:'Coraza',icon:'ward',max:3,cost:2,description:r=>'+'+r+' de armadura'},
+  coraza:{name:'Coraza',icon:'ward',max:3,cost:2,description:r=>'+'+4*r+' % de armadura'},
   fortuna:{name:'Fortuna',icon:'gold',max:5,cost:1,description:r=>'Empiezas con '+10*r+' tusi'},
   botin:{name:'Ojo para el botín',icon:'xp',max:3,cost:2,description:r=>'Botín de más rareza (+'+10*r+' %)'},
   sabiduria:{name:'Sabiduría',icon:'level',max:1,cost:5,description:()=>'Tu primera habilidad empieza en rango 2'},
@@ -586,16 +608,16 @@ const actBosses=[[['skeletonking'],['umbralking']],[['cerberus'],['sporemother']
 export const monsterTraits={
   bat:{movement:1,initiative:9,hamstring:true,resist:{lightning:-30,physical:-15}},
   skull:{element:'magic',drain:true,resist:{chaos:60,magic:30,physical:20}},
-  skeleton:{ward:2,initiative:7,resist:{chaos:50,ice:30,fire:-25}},
+  skeleton:{ward:15,initiative:7,resist:{chaos:50,ice:30,fire:-25}},
   succubus:{element:'chaos',charm:true,range:5,initiative:12,resist:{chaos:40,magic:25,ice:-25}},
   vampire:{lifesteal:.5,element:'chaos',initiative:10,drain:true,resist:{chaos:50,fire:-30}},
   imp:{element:'fire',range:6,initiative:13,resist:{fire:75,ice:-30}},
-  worm:{ward:2,resist:{physical:15,ice:-25}},
-  slimeking:{ward:1,resist:{physical:30,lightning:-30}},
+  worm:{ward:15,resist:{physical:15,ice:-25}},
+  slimeking:{ward:10,resist:{physical:30,lightning:-30}},
   slime:{resist:{physical:25,fire:-25}},
-  slug:{ward:1,slime:true,initiative:5,resist:{chaos:30,ice:-30}},
+  slug:{ward:10,slime:true,initiative:5,resist:{chaos:30,ice:-30}},
   plant:{range:4,movement:-2,poison:true,initiative:8,resist:{chaos:50,fire:-50}},
-  lavaslime:{element:'fire',ward:1,initiative:7,resist:{fire:80,ice:-50}}
+  lavaslime:{element:'fire',ward:10,initiative:7,resist:{fire:80,ice:-50}}
 };
 /** Resistencias de los jefes. */
 export const bossResist={skeletonking:{chaos:50,fire:-20},umbralking:{magic:30,lightning:-20},cerberus:{fire:30,ice:-20},
@@ -605,7 +627,7 @@ export const bossResist={skeletonking:{chaos:50,fire:-20},umbralking:{magic:30,l
  * Suman armadura, velocidad, daño, resistencias o efectos al golpear (−PA, −PM, robo de vida).
  */
 export const monsterVariants={
-  acorazado:{name:'acorazado',text:'+3 de armadura',apply:u=>{u.stats.ward+=3;}},
+  acorazado:{name:'acorazado',text:'+20 % de armadura',apply:u=>{u.stats.ward+=20;}},
   veloz:{name:'veloz',text:'+1 PM y más iniciativa',apply:u=>{u.stats.movement+=1;u.initiative+=4;}},
   furioso:{name:'furioso',text:'+25 % de daño',apply:u=>{u.damage=Math.ceil(u.damage*1.25);}},
   ignifugo:{name:'ignífugo',text:'Resiste el fuego (+50 %)',apply:u=>{u.resist.fire=(u.resist.fire||0)+50;}},
@@ -657,7 +679,7 @@ function monster(species,id,floor,{ranged=false,elite=false,solo=false}={}){
   return {id,name:monsterNames[species],look:species,boss:false,elite,enemy:true,resist:{...(trait.resist||{})},
     initiative:trait.initiative||(ranged?11:6),range:trait.range||(ranged?8:1),hp,
     damage:Math.max(1,Math.round((ranged?2+floor:3+floor)*(solo?.85:1))),
-    stats:{ward:(trait.ward||0)+(elite?2:0),movement:trait.movement||0},effects:{}};
+    stats:{ward:(trait.ward||0)+(elite?15:0),movement:trait.movement||0},effects:{}};
 }
 export function encounter(floor,size,options={}) {
   if(typeof options==='boolean')options={elite:options};
@@ -672,7 +694,7 @@ export function encounter(floor,size,options={}) {
       const info=bosses[boss];
       lineup.push({id:'enemy0',name:info.name,look:boss,boss:true,elite:false,enemy:true,initiative:info.initiative,range:info.range,
         hp:Math.round((48+floor*6+8*(size-1))*info.hp*(solo?.9:1)),damage:4+floor,element:info.element,
-        stats:{ward:3,movement:0},effects:{},cycle:0,resist:{...(bossResist[boss]||{})}});
+        stats:{ward:20,movement:0},effects:{},cycle:0,resist:{...(bossResist[boss]||{})}});
       continue;
     }
     const ranged=i%2===1&&local+(act-1)*8>1;
@@ -683,7 +705,7 @@ export function encounter(floor,size,options={}) {
   }
   if(!elite)return lineup;
   // Combate de élite: enemigos reforzados; en grupo, además, un refuerzo extra.
-  for(const u of lineup){u.hp=Math.round(u.hp*(solo?1.1:1.2));u.damage+=1;u.stats.ward+=1;}
+  for(const u of lineup){u.hp=Math.round(u.hp*(solo?1.1:1.2));u.damage+=1;u.stats.ward+=8;}
   if(!solo){
     const extra=monster(life.extra,'enemy'+count,floor,{elite:true});
     extra.hp=Math.round(extra.hp*1.3);extra.elite=true;
@@ -993,21 +1015,21 @@ export function heroOffense(hero){
     const skill=skillFor(hero,i);
     if(!skill||[...supportKinds,'dash','swap'].includes(skill[5])||!(skill[4]>0))return;
     const element=skillElement(hero,skill);
-    const average=(skill[3]+skill[4])/2+damageBonus(hero,skill);
+    const average=scaledDamage(hero,skill,(skill[3]+skill[4])/2);
     const area=skillOptions(skill).area?1.6:1;
     best=Math.max(best,average*area*Math.floor(ap/skill[1]));
   });
   return best*(1+critChance(hero)*.5);
 }
 /** Vida efectiva: la armadura reduce cada golpe físico. */
-export const heroDefense=hero=>hero.max*(1+(hero.stats?.ward||0)*.09);
+export const heroDefense=hero=>hero.max/(1-Math.min(ARMOR_CAP,hero.stats?.ward||0)/100*.6);
 /** Héroe "esperado" en un piso: nivel, una mejora de habilidad por piso y equipo medio. */
 function expectedHero(classId,floor){
   const ranks=skillRanks(classId);
   for(let i=1;i<floor;i++){const k=ranks.findIndex(r=>r<3);if(k>=0)ranks[k]++;}
-  const gear=Math.floor((floor-1)*.8);
-  const stats={action:0,ward:Math.floor((floor-1)/3),critical:(floor-1)*1.5};
-  for(const key of damageKeys)stats[key]=Math.floor(floor/2)+gear;
+  const stats={action:0,ward:Math.floor((floor-1)/3)*4,critical:(floor-1)*1.5};
+  // Equipo medio: +5 % de daño por piso, además del +8 % por nivel.
+  for(const key of damageKeys)stats[key]=LEVEL_DAMAGE*(floor-1)+5*(floor-1);
   const max=classes[classId].hp+(floor-1)*4+(floor-1)*3;
   return {classId,level:floor,skillRanks:ranks,stats,max};
 }
@@ -1132,20 +1154,26 @@ export function paths(s,unit,limit) {
   return routes;
 }
 export const reachable=(s,unit,limit)=>new Map([...paths(s,unit,limit)].map(([pos,path])=>[pos,path.length]));
+export const ARMOR_CAP=75;
+/** Reducción por armadura (en %) contra un tipo de daño: entera contra el físico; el escudo protege la mitad contra el resto. */
+export function armorPercent(target,element){
+  const shield=target.effects?.shield?.value||0;
+  const armor=element==='physical'?(target.stats?.ward||0)+shield:Math.floor(shield/2);
+  return Math.max(0,Math.min(ARMOR_CAP,armor));
+}
 function netDamage(target,raw,element,critical,extra=0){
-  const ward=(target.stats?.ward||0)+(target.effects?.shield?.value||0);
-  // Resistencia (o debilidad, si es negativa) al tipo de daño, en %.
+  // Resistencia (o debilidad, si es negativa) al tipo de daño y armadura: ambas en %.
   const resist=Math.max(-100,Math.min(90,target.resist?.[element]||0));
-  const base=Math.floor((raw+extra)*(critical?1.5:1)*(1-resist/100));
-  return Math.max(0,base-(element==='physical'?ward:Math.floor((target.effects?.shield?.value||0)/2)));
+  const total=(raw+extra)*(critical?1.5:1)*(1-resist/100)*(1-armorPercent(target,element)/100);
+  return Math.max(raw+extra>0?1:0,Math.round(total));
 }
 export const critChance=unit=>Math.min(1,.12+(unit.stats?.critical||0)/100);
 export function damagePreview(unit,target,skill,scale=1){
   if([...supportKinds,'dash','swap'].includes(skill[5])||!(skill[4]>0))return null;
   const element=skillElement(unit,skill);
-  const bonus=damageBonus(unit,skill),armor=armorType(unit,skill);
+  const armor=armorType(unit,skill);
   const extra=target.effects?.expose?.value||0;
-  const range=critical=>[skill[3],skill[4]].map(base=>netDamage(target,Math.max(1,Math.floor((base+bonus)*scale)),armor,critical,extra));
+  const range=critical=>[skill[3],skill[4]].map(base=>netDamage(target,scaledDamage(unit,skill,base,scale),armor,critical,extra));
   return {normal:range(false),critical:range(true),chance:Math.min(1,critChance(unit)+(skillOptions(skill).crit||0)/100),element};
 }
 function hit(s,actor,target,raw,kind='damage',critical=false,element='physical') {
@@ -1153,7 +1181,7 @@ function hit(s,actor,target,raw,kind='damage',critical=false,element='physical')
   const damage=Math.min(target.hp,netDamage(target,raw,element,critical,extra));
   target.hp-=damage;
   if(target.hp>0)target.lastHit=damage;
-  emit(s,{kind,unit:target.id,pos:target.pos,from:actor.pos,amount:damage,critical});
+  emit(s,{kind,unit:target.id,pos:target.pos,from:actor.pos,amount:damage,critical,element});
   // Vampirismo de los héroes: se acumula la fracción y se cura en puntos enteros.
   const leech=!actor.enemy&&kind==='damage'&&actor!==target?actor.stats?.leech||0:0;
   if(leech>0&&damage>0&&alive(actor)){
@@ -1383,9 +1411,9 @@ const reachOf=unit=>unit.look==='slug'&&skillReady(unit)?3:unit.range;
 /** Qué tan apetecible es un héroe: remata a quien pueda matar, va a por sanadores y frágiles. */
 function priority(s,unit,hero,pos){
   const ward=hero.stats?.ward||0;
-  const lethal=hero.hp<=Math.max(1,unit.damage-(unit.range>1?0:ward))?40:0;
+  const lethal=hero.hp<=Math.max(1,Math.round(unit.damage*(1-(unit.range>1?0:Math.min(ARMOR_CAP,ward))/100)))?40:0;
   const healer=hero.classId==='mistico'?5:0;
-  const fragile=Math.max(0,8-ward)*.6;
+  const fragile=Math.max(0,32-ward)*.15;
   return lethal+healer+fragile-hero.hp*.35-distance(s,pos,hero.pos)*.3;
 }
 function attackOptions(s,unit,heroes,pos){
@@ -1636,7 +1664,7 @@ export const events={
     {label:'Tónico amargo',detail:'+6 de vida máxima permanente para todos, pero empezáis el próximo combate con el 85 % de la vida.',apply:s=>{addBoon(s,'vitality',6);weaker(s,.85);}},
     {label:'Seguir',detail:'No ocurre nada.',apply:()=>{}}]},
   shrine:{title:'Santuario de los caídos',text:'Cientos de velas rodean las armaduras de antiguos héroes. Un silencio pesado lo cubre todo.',options:[
-    {label:'Arrodillarse',detail:'Todos pierden un 20 % de su vida actual y ganan +1 de armadura permanente.',apply:s=>{hurtParty(s,.2);addBoon(s,'ward',1);}},
+    {label:'Arrodillarse',detail:'Todos pierden un 20 % de su vida actual y ganan +4 % de armadura permanente.',apply:s=>{hurtParty(s,.2);addBoon(s,'ward',1);}},
     {label:'Tomar las ofrendas',detail:'Cada uno recibe 25 de tusi, pero los enemigos del próximo combate tendrán un 20 % más de vida.',apply:s=>{for(const p of s.players)p.gold+=25;tougher(s,1.2);}},
     {label:'Encender una vela',detail:'+1 PM en el próximo combate.',apply:s=>addMod(s,'mp',1)}]},
   dice:{title:'Los dados del esqueleto',text:'Un esqueleto con sombrero agita un cubilete. «¿Una partidita? Los vivos siempre pierden… casi siempre.»',options:[
@@ -1652,7 +1680,7 @@ export const events={
     {label:'Romperlo',detail:'Cada uno recibe una gema de una calidad mejor de la habitual, pero −1 PM en el próximo combate.',apply:(s,rng)=>{giveAll(s,()=>fineGem(s,rng));addMod(s,'mp',-1);}},
     {label:'Taparlo',detail:'No ocurre nada.',apply:()=>{}}]},
   anvil:{title:'Yunque de los enanos',text:'Un yunque todavía caliente y un martillo de runas. Quien lo usó se fue con prisa.',options:[
-    {label:'Afilar las armas',detail:'Cada uno paga 20 de tusi y gana +1 de daño permanente (todos los tipos).',apply:s=>{const payers=s.players.filter(p=>p.gold>=20);for(const p of payers)p.gold-=20;addBoon(s,'power',1,payers);
+    {label:'Afilar las armas',detail:'Cada uno paga 20 de tusi y gana +5 % de daño permanente (todos los tipos).',apply:s=>{const payers=s.players.filter(p=>p.gold>=20);for(const p of payers)p.gold-=20;addBoon(s,'power',1,payers);
       for(const p of s.players.filter(p=>!payers.includes(p)))note(s,p.name+' no tiene tusi para afilar su arma.');}},
     {label:'Fundir chatarra',detail:'Cada uno recibe 18 de tusi.',apply:s=>{for(const p of s.players)p.gold+=18;}}]},
   prisoner:{title:'Aventurero encadenado',text:'Un mercenario cuelga de unos grilletes. «Sacadme de aquí y os pagaré… o al menos os daré lo que llevo.»',options:[
@@ -1669,7 +1697,7 @@ export const events={
       note(s,p.name+' mejora '+choice.name+' a '+(choice.rank+1)+'/3.');}}},
     {label:'Marcharse',detail:'No ocurre nada.',apply:()=>{}}]},
   idol:{title:'Ídolo maldito',text:'Una estatuilla de obsidiana con los ojos de rubí. Susurra promesas en una lengua muerta.',options:[
-    {label:'Tomar el ídolo',detail:'+2 de daño permanente para todos, pero −8 de vida máxima permanente.',apply:s=>{addBoon(s,'power',2);addBoon(s,'vitality',-8);}},
+    {label:'Tomar el ídolo',detail:'+10 % de daño permanente para todos, pero −8 de vida máxima permanente.',apply:s=>{addBoon(s,'power',2);addBoon(s,'vitality',-8);}},
     {label:'Arrancarle los ojos',detail:'Cada uno recibe un Rubí de una calidad mejor de la habitual, pero los enemigos tendrán un 15 % más de vida.',apply:s=>{giveAll(s,()=>makeGem(++s.itemId,'ruby',gemQuality(itemLevel(s))+1));tougher(s,1.15);}},
     {label:'Dejarlo',detail:'No ocurre nada.',apply:()=>{}}]},
   mushrooms:{title:'Setas luminosas',text:'Un corro de setas que brillan con un azul enfermizo. Huelen a pan recién hecho.',needsHeroes:true,options:[
@@ -1993,8 +2021,8 @@ function bossPower(s,boss,heroes,rng){
     const minions=s.units.filter(u=>alive(u)&&u.minion===boss.id);
     // Invoca cada 3 ciclos (antes cada 2).
     if(cycle%3===0&&minions.length<4)minions.push(...summon(s,boss,'skeleton',2));
-    boss.stats.ward=3+2*minions.length;
-    if(minions.length)note(s,'Escudo de huesos: el Rey Osario tiene '+boss.stats.ward+' de armadura.');
+    boss.stats.ward=20+12*minions.length;
+    if(minions.length)note(s,'Escudo de huesos: el Rey Osario tiene un '+Math.min(ARMOR_CAP,boss.stats.ward)+' % de armadura.');
     return false;
   }
   if(boss.look==='umbralking'&&cycle%2===1){
@@ -2127,7 +2155,7 @@ function applySkill(s,unit,target,skill,rng,scale=1){
   const opts=skillOptions(skill);
   const value=opts.value;
   if(supportKinds.includes(kind)){
-    if(kind==='shield'){effect(target,'shield',value||3,2);note(s,name+' → '+target.name+': +'+(value||3)+' de armadura 2 turnos.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
+    if(kind==='shield'){effect(target,'shield',value||25,2);note(s,name+' → '+target.name+': +'+(value||25)+' % de armadura 2 turnos.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
     if(kind==='haste'){effect(target,'haste',value||2,target===unit?2:1);note(s,name+' → '+target.name+': +'+(value||2)+' PM en su próximo turno.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
     const amount=Math.min(target.max-target.hp,roll(min,max,rng)+Math.floor(unit.level/2));
     target.hp+=amount;
@@ -2149,7 +2177,7 @@ function applySkill(s,unit,target,skill,rng,scale=1){
     const element=skillElement(unit,skill);
     const critical=rng()<Math.min(1,critChance(unit)+(opts.crit||0)/100);
     const before=target.hp;
-    hit(s,unit,target,Math.max(1,Math.floor((roll(min,max,rng)+damageBonus(unit,skill))*scale)),'damage',critical,armorType(unit,skill));
+    hit(s,unit,target,scaledDamage(unit,skill,roll(min,max,rng),scale),'damage',critical,armorType(unit,skill));
     ignite(s,target,before-target.hp,element);
   }
   if(!alive(target))return;

@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { gzipSync } from 'node:zlib';
 import { create, join, act, tick, leave } from './engine.js';
 import * as accounts from './accounts.js';
 // Versión publicada: Render pone el commit en RENDER_GIT_COMMIT; la de los ficheros sale de index.html.
@@ -26,9 +27,18 @@ export const server = createServer(async (req,res) => {
   res.setHeader('Access-Control-Allow-Origin','*');
   res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization, X-Account');
+  // Respuestas comprimidas (gzip) cuando el navegador lo acepta: el estado de una partida avanzada
+  // pasa de ~36 KB a ~5 KB.
   const send = (status, data) => {
-    res.writeHead(status, {'Content-Type':'application/json','Cache-Control':'no-store'});
-    res.end(JSON.stringify(data));
+    const body = JSON.stringify(data);
+    const headers = {'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Accept-Encoding'};
+    if (body.length > 1024 && /\bgzip\b/.test(req.headers['accept-encoding'] || '')) {
+      res.writeHead(status, {...headers,'Content-Encoding':'gzip'});
+      res.end(gzipSync(body));
+    } else {
+      res.writeHead(status, headers);
+      res.end(body);
+    }
   };
   if (req.method === 'OPTIONS') { res.writeHead(204).end(); return; }
   const path = req.url.split('?')[0];
@@ -75,7 +85,7 @@ export const server = createServer(async (req,res) => {
     if (req.method === 'POST' && ((code === 'rooms' && !operation) || operation === 'join')) {
       const creating = code === 'rooms';
       if (creating && rooms.size >= 250) return send(503,{error:'Servidor lleno.'});
-      const room = creating ? {state:create(), keys:new Map(), touched:Date.now()} : rooms.get(code);
+      const room = creating ? {state:create(), keys:new Map(), touched:Date.now(), version:1} : rooms.get(code);
       if (!room) return send(404,{error:'Sala no encontrada.'});
       const id = token(5);
       const key = token(24);
@@ -85,6 +95,7 @@ export const server = createServer(async (req,res) => {
       if (user && room.state.phase === 'lobby') for (const old of room.state.players.filter(p => p.account === user.nick)) dropPlayer(room, old.id);
       // El mazo de cartas sale de la cuenta (sin cuenta: las cartas de inicio).
       join(room.state,id,user?.nick||body.name,body.classId,{loadouts:accounts.loadoutsOf(user),account:user?.nick||null});
+      changed(room);
       room.keys.set(key,id);
       (room.seen ||= new Map()).set(id,Date.now());
       room.touched = Date.now();
@@ -93,7 +104,7 @@ export const server = createServer(async (req,res) => {
         do { roomCode = token(3).toUpperCase(); } while (rooms.has(roomCode));
         rooms.set(roomCode,room);
       }
-      return send(200,{id,key,code:roomCode,state:snapshot(room)});
+      return send(200,{id,key,code:roomCode,state:snapshot(room),version:room.version});
     }
     const room = rooms.get(code);
     if (!room) return send(404,{error:'Sala no encontrada.'});
@@ -103,6 +114,7 @@ export const server = createServer(async (req,res) => {
     (room.seen ||= new Map()).set(id,Date.now());
     if (req.method === 'POST' && operation === 'leave') {
       dropPlayer(room,id);
+      changed(room);
       if (!room.state.players.length) rooms.delete(code);
       return send(200,{ok:true});
     }
@@ -116,12 +128,17 @@ export const server = createServer(async (req,res) => {
         body = {type:'loadout', loadouts:accounts.loadoutsOf(user), trusted:true};
       } else if (body && typeof body === 'object') delete body.trusted;
       act(room.state,id,body);
+      changed(room);
       if (room.state.phase === 'lobby') room.awarded = false;
       await settle(room);
     }
     else if (req.method !== 'GET' || operation) return send(404,{error:'Ruta desconocida.'});
     await settle(room);
-    return send(200,{state:snapshot(room)});
+    // Consulta periódica: si el estado no ha cambiado desde la versión que ya tiene el cliente,
+    // basta con decirlo (unos pocos bytes en lugar del estado entero).
+    const since = Number(new URL(req.url,'http://x').searchParams.get('since'));
+    if (req.method === 'GET' && since && since === room.version) return send(200,{same:true,version:room.version});
+    return send(200,{state:snapshot(room),version:room.version});
   } catch (error) {
     send(error.status || 400,{error:error.message});
   }
@@ -137,8 +154,10 @@ const LOBBY_IDLE = 15000;
 function pruneLobby(room){
   if (room.state.phase !== 'lobby') return;
   const now = Date.now();
-  for (const p of [...room.state.players]) if (now - (room.seen?.get(p.id) ?? now) > LOBBY_IDLE) dropPlayer(room,p.id);
+  for (const p of [...room.state.players]) if (now - (room.seen?.get(p.id) ?? now) > LOBBY_IDLE) {dropPlayer(room,p.id);changed(room);}
 }
+/** Cada cambio del estado de una sala sube su versión (así los clientes saben si hay algo nuevo). */
+function changed(room){room.version=(room.version||1)+1;}
 /** Al terminar una partida en sala, reparte los puntos a cada cuenta (una sola vez). */
 async function settle(room){
   const s=room.state;
@@ -183,7 +202,7 @@ async function accountRoute(operation,method,body,tokenValue){
 setInterval(() => {
   for (const [code, room] of rooms) {
     if (Date.now()-room.touched > 3600000) rooms.delete(code);
-    else if (tick(room.state)) settle(room).catch(()=>{});
+    else if (tick(room.state)) {changed(room);settle(room).catch(()=>{});}
   }
 },200).unref();
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

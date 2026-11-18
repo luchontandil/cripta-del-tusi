@@ -1299,3 +1299,24 @@ test('Mago nuevo: misil en línea 2 veces por turno, bola con alcance mínimo y 
   act(s,'p0',{type:'skill',skill:2,pos:4*w+7},()=>.1);
   assert.equal(foe.effects.slow?.value,1);
 });
+test('sala: «nada nuevo» si el estado no cambió y respuestas comprimidas',{timeout:10000},async t=>{
+  const {server:app}=await import('./server.js');
+  if(!app.listening){app.listen(0,'127.0.0.1');await once(app,'listening');}
+  t.after(()=>app.close());
+  const base='http://127.0.0.1:'+app.address().port;
+  const call=async(path,body,key)=>{
+    const response=await fetch(base+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','Accept-Encoding':'gzip',...(key?{Authorization:'Bearer '+key}:{})},body:body?JSON.stringify(body):undefined});
+    return {status:response.status,encoding:response.headers.get('content-encoding'),...await response.json()};
+  };
+  const room=await call('/api/rooms',{name:'Ana',classId:'guardia'});
+  assert.ok(room.version>0);
+  const full=await call('/api/'+room.code,null,room.key);
+  assert.ok(full.state);
+  const same=await call('/api/'+room.code+'?since='+full.version,null,room.key);
+  assert.equal(same.same,true);assert.equal(same.state,undefined);
+  const after=await call('/api/'+room.code+'/action',{type:'class',classId:'mago'},room.key);
+  assert.ok(after.version>full.version);
+  const fresh=await call('/api/'+room.code+'?since='+full.version,null,room.key);
+  assert.equal(fresh.state.players[0].classId,'mago');
+  assert.equal(fresh.encoding,'gzip','el estado va comprimido');
+});

@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=90';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=90';
-import {setupSfx} from './music.js?v=90';
-import {icon} from './icons.js?v=90';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=91';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=91';
+import {setupSfx} from './music.js?v=91';
+import {icon} from './icons.js?v=91';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=90').then(({createIso})=>{
+import('./isometric.js?v=91').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -2292,6 +2292,9 @@ async function request(base,path,body,key){
   });
   const result=await response.json().catch(()=>({error:'El servidor todavía no responde.'}));
   if(!response.ok||result.error)throw Object.assign(new Error(result.error),{status:response.status});
+  // «Nada nuevo»: el servidor solo confirma la versión.
+  if(result.same)return result;
+  if(result.version)roomVersion=result.version;
   if(!result.state?.players?.every(player=>Array.isArray(player.skillRanks))){
     throw new Error('La versión del servidor no coincide con la del juego.');
   }
@@ -2363,20 +2366,29 @@ el('leave').onclick=()=>{
   if(session?.code&&session.key)fetch(session.base+'/api/'+session.code+'/leave',{method:'POST',keepalive:true,
     headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.key},body:'{}'}).catch(()=>{});
   generation++;busy=false;state=null;session=null;selected=null;rendered='';
+  roomVersion=0;lastFullSync=0;
   resetAnimation();
   syncViewport();
   hideUnit();
   sessionStorage.removeItem('amber-session');
   error('');render();
 };
+/**
+ * Versión del estado de la sala que ya tenemos. Al consultar se manda: si no ha cambiado nada, el servidor
+ * responde «nada nuevo» (unos bytes) en lugar del estado entero. Cada 8 s se pide completo por si acaso.
+ */
+let roomVersion=0,lastFullSync=0;
 async function refresh(){
   if(busy||polling||!session?.code)return;
   const epoch=generation;
   const version=revision;
   polling=true;
   try{
-    const result=await request(session.base,'/api/'+session.code,null,session.key);
+    const full=Date.now()-lastFullSync>8000||!state;
+    const result=await request(session.base,'/api/'+session.code+(roomVersion&&!full?'?since='+roomVersion:''),null,session.key);
     if(epoch!==generation||version!==revision)return;
+    if(result.same)return;
+    lastFullSync=Date.now();
     if(!Array.isArray(result.state.glyphs))throw new Error('El servidor está actualizando el juego.');
     setState(result.state,!state);
   }catch(e){

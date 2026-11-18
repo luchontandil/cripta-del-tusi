@@ -1224,3 +1224,20 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;bac
 .rich-foe{color:#e98b8b}.rich-foe .icon{color:#d95b5b}
 .rich-gem{color:#d8b4ff}
 .rich-uncommon{color:#7fd88b}.rich-rare{color:#7fb6ff}.rich-legendary{color:#ffb347}
+/* Equipo alrededor de la silueta (Diablo / Path of Exile):
+   casco arriba, amuleto a su derecha; peto al centro, arma a la derecha;
+   cinturón bajo el peto con un anillo a cada lado; guantes abajo a la izquierda, botas abajo a la derecha. */
+.paper-doll{position:relative;grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-areas:". helmet amulet" ". armor weapon" "ring belt ring2" "gloves . boots";gap:6px;padding:6px 4px}
+.paper-doll>.doll-helmet{grid-area:helmet}.paper-doll>.doll-amulet{grid-area:amulet}
+.paper-doll>.doll-armor{grid-area:armor}.paper-doll>.doll-weapon{grid-area:weapon}
+.paper-doll>.doll-belt{grid-area:belt}.paper-doll>.doll-ring{grid-area:ring}.paper-doll>.doll-ring2{grid-area:ring2}
+.paper-doll>.doll-gloves{grid-area:gloves}.paper-doll>.doll-boots{grid-area:boots}
+.paper-doll>.doll-armor>summary,.paper-doll>.doll-armor>span{min-height:76px}
+.paper-doll>.doll-weapon>summary,.paper-doll>.doll-weapon>span{min-height:76px}
+.paper-doll>.doll-belt>summary,.paper-doll>.doll-belt>span{min-height:44px}
+.paper-doll>.doll-ring>summary,.paper-doll>.doll-ring>span,.paper-doll>.doll-ring2>summary,.paper-doll>.doll-ring2>span{min-height:44px}
+.doll-silhouette{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;z-index:0}
+.doll-silhouette svg{height:100%;max-height:100%;width:auto;fill:#3a2f47;opacity:.9;filter:drop-shadow(0 0 10px #000) drop-shadow(0 0 1px #6b5a80)}
+.paper-doll>.inventory-slot{position:relative;z-index:1}
+.paper-doll .inventory-slot:not([open])>summary,.paper-doll .inventory-slot>span{background-color:#120e14d9}

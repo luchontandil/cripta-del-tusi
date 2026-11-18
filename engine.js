@@ -135,20 +135,30 @@ export const modifiableRange=skill=>skillOptions(skill).modifiable??(skill[2]>1&
 export const supportKinds=['heal','cleanse','shield','haste'];
 /** ¿Se apunta a una casilla (área, teletransporte) en lugar de a una unidad? */
 export const castsOnCell=skill=>!!skillOptions(skill).area||skill[5]==='dash'||skill[5]==='blast';
-export const slots = {weapon:'Arma',helmet:'Casco',armor:'Armadura',gloves:'Guantes',belt:'Cinturón',boots:'Botas',ring:'Anillo',amulet:'Amuleto',charm:'Talismán'};
+/** Tipos de objeto de equipo (el talismán ya no existe). */
+export const slots = {weapon:'Arma',helmet:'Casco',armor:'Peto',gloves:'Guantes',belt:'Cinturón',boots:'Botas',ring:'Anillo',amulet:'Amuleto'};
+/** Ranuras del personaje: como el tipo de objeto, pero con dos anillos. */
+export const equipSlots = {weapon:'Arma',helmet:'Casco',amulet:'Amuleto',armor:'Peto',gloves:'Guantes',belt:'Cinturón',ring:'Anillo I',ring2:'Anillo II',boots:'Botas'};
+/** Tipo de objeto que admite cada ranura. */
+export const slotKind = key=>key==='ring2'?'ring':key;
+/** Ranura donde se pone un objeto: los anillos van al primer hueco libre (o a la ranura pedida). */
+export function equipTarget(p,item,wanted){
+  if(item.slot!=='ring')return item.slot;
+  if(wanted==='ring'||wanted==='ring2')return wanted;
+  return !p.equipment.ring?'ring':!p.equipment.ring2?'ring2':'ring';
+}
 export const statNames = {...Object.fromEntries(Object.entries(elements).map(([key,name])=>[key,'Daño '+name.toLowerCase()])),
   vitality:'Vida',reach:'Alcance (habilidades modificables)',ward:'Armadura',critical:'Crítico',movement:'PM',action:'PA'};
 export const rarities = ['Normal','Poco común','Raro','Legendario'];
 const bases = {
   weapon:['Arco de tejo','Sable de cobre','Cetro de ónice','Lanza de vigía'],
   helmet:['Yelmo del centinela','Capucha del eco','Corona de hollín'],
-  armor:['Coraza de escamas','Manto de ceniza','Jubón reforzado'],
+  armor:['Coraza de escamas','Manto de ceniza','Jubón reforzado'],   // el peto
   gloves:['Guantes de bruma','Guanteletes del vigía','Mitones de púas'],
   belt:['Cinturón del peregrino','Faja de cuero rojo','Cinto de eslabones'],
   boots:['Botas del umbral','Grebas de bronce','Botas de arena'],
   ring:['Anillo de obsidiana','Sello de cobre','Sortija de sal'],
-  amulet:['Amuleto de luna','Colgante de ámbar','Lágrima del alba'],
-  charm:['Ojo de la cripta','Diente de vigía','Llave de los ecos']
+  amulet:['Amuleto de luna','Colgante de ámbar','Lágrima del alba']
 };
 const actionWeapons=new Set(['Cetro de ónice','Lanza de vigía']);
 /**
@@ -175,16 +185,22 @@ export const affixes={
   }
 };
 const elementsAll=['physical','magic','fire','ice','lightning','chaos'];
+/**
+ * Qué puede salir en cada pieza:
+ * - Daño (prefijos elementales y físico): solo en armas, anillos y amuletos.
+ * - Armadura: solo en guantes, botas y peto.
+ * - Las armas nunca llevan armadura ni vida.
+ */
 const slotAffixes={
-  weapon:{prefix:elementsAll,suffix:['critical','vitality','action']},
-  helmet:{prefix:['ward','fire','ice','magic','lightning'],suffix:['vitality','critical','reach']},
-  armor:{prefix:['ward','physical','chaos'],suffix:['vitality','critical']},
-  gloves:{prefix:elementsAll,suffix:['critical','vitality']},
-  belt:{prefix:['ward','physical','fire','lightning'],suffix:['vitality','critical']},
-  boots:{prefix:['ward','ice','chaos'],suffix:['movement','vitality']},
+  weapon:{prefix:elementsAll,suffix:['critical','action']},
+  helmet:{prefix:[],suffix:['vitality','critical','reach']},
+  armor:{prefix:['ward'],suffix:['vitality','critical']},
+  gloves:{prefix:['ward'],suffix:['critical','vitality']},
+  belt:{prefix:[],suffix:['vitality','critical']},
+  boots:{prefix:['ward'],suffix:['movement','vitality']},
   ring:{prefix:elementsAll,suffix:['critical','vitality']},
-  amulet:{prefix:['magic','fire','lightning','chaos','ward'],suffix:['action','vitality']},
-  charm:{prefix:elementsAll,suffix:['critical','vitality']}
+  amulet:{prefix:elementsAll,suffix:['action','vitality','critical']},
+  charm:{prefix:elementsAll,suffix:['critical','vitality']}   // solo para talismanes antiguos
 };
 const rareFirst=['Lamento','Colmillo','Susurro','Ruina','Presagio','Garra','Aullido','Eco','Lamento','Fauces','Maldición','Grito'];
 const rareSecond=['sombrío','de hueso','carmesí','del ocaso','funesto','de la cripta','errante','voraz','silente','de ceniza','eterno','roto'];
@@ -274,6 +290,17 @@ function tierLevel(grade,level,rng){
 function affixPool(slot,base){
   return {prefix:[...slotAffixes[slot].prefix],suffix:slotAffixes[slot].suffix.filter(stat=>stat!=='action'||(slot==='amulet'||actionWeapons.has(base)))};
 }
+/**
+ * Si una pieza tiene pocos prefijos o sufijos posibles (p. ej. un casco no tiene prefijos),
+ * los huecos que no se pueden llenar pasan al otro tipo.
+ */
+function balanceCounts([pre,suf],pool,level){
+  const room=type=>pool[type].filter(stat=>affixes[type][stat].some(tier=>tier[0]<=level)).length;
+  const maxPre=Math.min(3,room('prefix')),maxSuf=Math.min(3,room('suffix'));
+  let p=Math.min(pre,maxPre),q=Math.min(suf,maxSuf),spare=pre+suf-p-q;
+  while(spare>0&&(p<maxPre||q<maxSuf)){if(q<maxSuf)q++;else p++;spare--;}
+  return [p,q];
+}
 /** Tira un modificador nuevo de un tipo, evitando los stats que ya lleva. */
 function rollMod(type,slot,base,level,taken,rng,grade=0){
   const available=affixPool(slot,base)[type].filter(stat=>!taken.includes(stat)&&affixes[type][stat].some(tier=>tier[0]<=level));
@@ -309,8 +336,8 @@ export function rollItem(s,rng,{bonus=0,gear=false,ilvl,minGrade=0}={}) {
   const slot=pick(Object.keys(slots),rng);
   const base=pick(bases[slot],rng);
   const grade=rollRarity(level,bonus,rng,minGrade);
-  const counts=[rng()<.5?[1,0]:[0,1],[1,1],rng()<.5?[2,1]:[1,2],[2,2]][grade];
-  const pool={prefix:[...slotAffixes[slot].prefix],suffix:slotAffixes[slot].suffix.filter(stat=>stat!=='action'||(slot==='amulet'||actionWeapons.has(base)))};
+  const pool=affixPool(slot,base);
+  const counts=balanceCounts([rng()<.5?[1,0]:[0,1],[1,1],rng()<.5?[2,1]:[1,2],[2,2]][grade],pool,level);
   const mods=[];
   for(const [type,count] of [['prefix',counts[0]],['suffix',counts[1]]]){
     for(let i=0;i<count;i++){
@@ -382,7 +409,9 @@ function forgeItem(item,mode,rng){
     item.grade++;
     const types=['prefix','suffix'].filter(type=>count(type)<(item.grade===1?1:2));
     const order=types.sort((a,b)=>count(a)-count(b)||rng()-.5);
-    for(const type of order){
+    // Si la pieza no admite más de ese tipo (p. ej. un casco no tiene prefijos), se prueba con el otro.
+    const fallback=['prefix','suffix'].filter(type=>!order.includes(type)&&count(type)<3);
+    for(const type of [...order,...fallback]){
       const mod=rollMod(type,item.slot,item.base,level,item.affixes.map(m=>m.stat),rng,item.grade);
       if(mod){item.affixes.push(mod);break;}
     }
@@ -2115,8 +2144,9 @@ function gearAction(s,p,a,rng) {
     const loot=choices.find(choice=>choice.id===a.item);
     if(!loot&&a.item!==null)fail('Botín inválido.');
     if(loot&&a.equip===true&&loot.kind==='gear'){
-      if(p.equipment[loot.slot])p.bag.push(p.equipment[loot.slot]);
-      p.equipment[loot.slot]=loot;
+      const key=equipTarget(p,loot,a.slot);
+      if(p.equipment[key])p.bag.push(p.equipment[key]);
+      p.equipment[key]=loot;
     }else if(loot)p.bag.push(loot);
     s.picks.push(p.id);
   }else if(a.type==='buy'){
@@ -2141,10 +2171,11 @@ function gearAction(s,p,a,rng) {
   }else{
     if(!item)fail('Objeto no encontrado.');
     if(a.type==='equip'&&item.kind==='gear'){
-      if(a.slot!==undefined&&a.slot!==item.slot)fail('Ese objeto no encaja en la ranura.');
+      if(a.slot!==undefined&&slotKind(a.slot)!==item.slot)fail('Ese objeto no encaja en la ranura.');
+      const key=equipTarget(p,item,a.slot);
       p.bag.splice(bagIndex,1);
-      if(p.equipment[item.slot])p.bag.push(p.equipment[item.slot]);
-      p.equipment[item.slot]=item;
+      if(p.equipment[key])p.bag.push(p.equipment[key]);
+      p.equipment[key]=item;
     }else if(a.type==='socket'&&item.kind==='rune'&&Object.hasOwn(p.equipment,a.slot)){
       const gear=p.equipment[a.slot];
       const set=runesOf(gear);

@@ -288,7 +288,7 @@ test('el botín se puede equipar al elegirlo y devuelve la pieza anterior a la m
   const p=s.players[0];
   const old={id:500,slot:'gloves',kind:'gear',stats:{power:1}};
   const item={id:501,slot:'gloves',kind:'gear',stats:{power:2}};
-  assert.equal(Object.keys(slots).length,9);
+  assert.equal(Object.keys(slots).length,8,'sin talismán');
   p.equipment.gloves=old;
   s.phase='reward';
   s.offers.p0=[item];
@@ -498,15 +498,18 @@ test('los objetos siguen las reglas de rareza, afijos/sufijos y tiers por nivel'
     return Array.from({length:n},()=>rollItem(s,random,{gear:true}));
   };
   const rules=[[1,0,1,0],[1,1,1,1],[3,3,1,2],[2,2,2,2]];
-  for(const item of sample(3)){
-    const pre=item.affixes.filter(a=>a.type==='prefix').length;
-    const suf=item.affixes.filter(a=>a.type==='suffix').length;
-    const [total,,maxPre,maxSuf]=[pre+suf,0,2,2];
-    if(item.grade===0)assert.equal(total,1);
-    if(item.grade===1)assert.deepEqual([pre,suf],[1,1]);
-    if(item.grade===2)assert.ok((pre===2&&suf===1)||(pre===1&&suf===2));
-    if(item.grade===3)assert.deepEqual([pre,suf],[2,2]);
+  const damage=new Set(['physical','magic','fire','ice','lightning','chaos']);
+  for(const item of [...sample(3),...sample(12,900)]){
+    const total=item.affixes.length;
+    // Normal 1 modificador, poco común 2, raro 3, legendario 4 (menos si la pieza no admite tantos).
+    assert.ok(total<=item.grade+1&&total>=Math.min(item.grade+1,2),item.slot+' '+item.grade+' '+total);
     assert.equal(new Set(item.affixes.map(a=>a.stat)).size,item.affixes.length);
+    for(const mod of item.affixes){
+      if(damage.has(mod.stat))assert.ok(['weapon','ring','amulet'].includes(item.slot),'daño en '+item.slot);
+      if(mod.stat==='ward')assert.ok(['gloves','boots','armor'].includes(item.slot),'armadura en '+item.slot);
+    }
+    if(item.slot==='weapon')assert.ok(!item.affixes.some(a=>a.stat==='ward'||a.stat==='vitality'),'arma con armadura o vida');
+    assert.notEqual(item.slot,'charm');
   }
   const avgTier=items=>{const t=items.flatMap(i=>i.affixes.map(a=>a.tier));return t.reduce((a,b)=>a+b,0)/t.length;};
   const early=sample(1),late=sample(6);
@@ -1190,4 +1193,21 @@ test('todos los eventos y sus opciones se aplican sin errores',async()=>{
     }
   }
   assert.ok(Object.keys(E.events).length>=15);
+});
+
+test('dos anillos: el segundo va al hueco libre y se puede elegir cuál reemplazar',async()=>{
+  const {heroStats:heroStatsOf}=await import('./engine.js');
+  const s=battle('guardia');
+  const p=s.players[0];
+  s.phase='map';
+  const ring=id=>({id,slot:'ring',kind:'gear',stats:{critical:1},affixes:[],grade:0,ilvl:1,price:5});
+  p.bag=[ring(601),ring(602),ring(603)];
+  act(s,'p0',{type:'equip',item:601},rng);
+  act(s,'p0',{type:'equip',item:602},rng);
+  assert.equal(p.equipment.ring.id,601);assert.equal(p.equipment.ring2.id,602);
+  act(s,'p0',{type:'equip',item:603,slot:'ring2'},rng);
+  assert.equal(p.equipment.ring2.id,603);
+  assert.deepEqual(p.bag.map(i=>i.id),[602]);
+  assert.throws(()=>act(s,'p0',{type:'equip',item:602,slot:'boots'},rng),/no encaja/);
+  assert.equal(heroStatsOf(p).stats.critical,2,'los dos anillos suman');
 });

@@ -1,9 +1,9 @@
-import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,statNames,onBoard,
+import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=76';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=76';
-import {setupSfx} from './music.js?v=76';
-import {icon} from './icons.js?v=76';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=77';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=77';
+import {setupSfx} from './music.js?v=77';
+import {icon} from './icons.js?v=77';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=76').then(({createIso})=>{
+import('./isometric.js?v=77').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -961,6 +961,13 @@ function inventorySlot(item,label,actions=[],fallback=''){
   if(item)tile.append(itemRow(item,'',actions));
   return tile;
 }
+/** Silueta del personaje detrás de las ranuras de equipo. */
+function paperDollSilhouette(){
+  const holder=h('div','doll-silhouette');
+  holder.setAttribute('aria-hidden','true');
+  holder.innerHTML='<svg viewBox="0 0 120 200" preserveAspectRatio="xMidYMid meet"><path d="M60 8c-11 0-19 9-19 20s8 21 19 21 19-10 19-21-8-20-19-20zM38 54c-9 2-15 8-18 17l-9 40c-1 5 2 9 6 10l6 1 8-38 3 30-2 36h-1l-5 34c-1 4 2 7 6 7h9c3 0 5-2 6-5l9-40 9 40c1 3 3 5 6 5h9c4 0 7-3 6-7l-5-34h-1l-2-36 3-30 8 38 6-1c4-1 7-5 6-10l-9-40c-3-9-9-15-18-17z"/></svg>';
+  return holder;
+}
 function renderInventory(player){
   const holder=el('inventory');
   const rewards=el('rewards');
@@ -980,15 +987,18 @@ function renderInventory(player){
   xp.setAttribute('aria-label','Experiencia');
   const xpLabel=h('small','xp-label',icon('xp'),(player.xp||0)+' / 100 XP');
   gear.append(h('div','xp-row',xp,xpLabel));
+  // Equipo al estilo Diablo / Path of Exile: las ranuras rodean la silueta del personaje.
   const gearGrid=document.createElement('div');
-  gearGrid.className='equipment-grid';
-  for(const [slot,label] of Object.entries(slots)){
+  gearGrid.className='equipment-grid paper-doll';
+  gearGrid.append(paperDollSilhouette());
+  for(const [slot,label] of Object.entries(equipSlots)){
     const item=player.equipment[slot];
     const actions=item&&trading?[actionButton('Quitar','unequip',{slot})]:[];
-    const tile=inventorySlot(item,label,actions,slot);
+    const tile=inventorySlot(item,label,actions,slotKind(slot));
+    tile.classList.add('doll-'+slot);
     if(trading){
       if(item)draggable(tile,{from:'gear',slot});
-      dropZone(tile,p=>p.from==='bag'&&(p.slot===slot||(p.kind==='rune'&&!!item&&runesOf(item).length<socketsOf(item))),
+      dropZone(tile,p=>p.from==='bag'&&(p.slot===slotKind(slot)||(p.kind==='rune'&&!!item&&runesOf(item).length<socketsOf(item))),
         p=>send({type:p.kind==='rune'?'socket':'equip',slot,item:p.item}));
     }
     gearGrid.append(tile);
@@ -1001,7 +1011,7 @@ function renderInventory(player){
     const actions=[];
     if(trading){
       if(item.kind==='gear')actions.push(actionButton('Equipar','equip',{item:item.id}));
-      else for(const [slot,label] of Object.entries(slots)){
+      else for(const [slot,label] of Object.entries(equipSlots)){
         if(player.equipment[slot]&&runesOf(player.equipment[slot]).length<socketsOf(player.equipment[slot]))actions.push(actionButton('Engastar en '+label.toLowerCase()+' (permanente)','socket',{item:item.id,slot}));
       }
       if(shopping){

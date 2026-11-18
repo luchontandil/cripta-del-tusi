@@ -1,8 +1,8 @@
-// Cuentas: registro, sesión, puntos, maestrías, amigos e invitaciones.
+// Cuentas: registro, sesión, Esquirlas, cartas y mazos, amigos e invitaciones.
 import {randomBytes,scrypt as scryptCallback,timingSafeEqual} from 'node:crypto';
 import {promisify} from 'node:util';
 import {getJSON,setJSON,remove} from './store.js';
-import {masteryTree,masteryCost,cleanMastery,runPoints} from './engine.js';
+import {runPoints,cards,classes,cleanLoadout,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE} from './engine.js';
 
 const scrypt=promisify(scryptCallback);
 const sessionDays=30;
@@ -25,10 +25,29 @@ export function isAdmin(nick){
   const list=[...builtInAdmins,...String(process.env.ADMIN_NICKS||'').split(',')].map(n=>n.trim().toLowerCase()).filter(Boolean);
   return !!nick&&list.includes(String(nick).trim().toLowerCase());
 }
+/**
+ * Progreso de cuenta (versión 2: Esquirlas y cartas). Las cuentas anteriores empiezan de cero:
+ * se conservan nick, contraseña y amigos; Esquirlas, cartas, maestrías y partidas se reinician.
+ */
+const PROGRESS=2;
+function ensureProgress(user){
+  if(user.progress===PROGRESS)return false;
+  Object.assign(user,{progress:PROGRESS,shards:0,cards:[],slots:{},loadouts:{},runs:0,best:0});
+  delete user.points;delete user.spent;delete user.mastery;
+  return true;
+}
+/** Huecos de carta activa de una clase (3, o 4 si se compró el extra). */
+export const slotsOf=(user,classId)=>Math.min(MAX_ACTIVE_SLOTS,user?.slots?.[classId]||ACTIVE_SLOTS);
+/** Mazos de todas las clases, validados contra lo que tiene la cuenta (sin cuenta: los de inicio). */
+export function loadoutsOf(user){
+  return Object.fromEntries(Object.keys(classes).map(classId=>[classId,user
+    ?cleanLoadout(classId,user.loadouts?.[classId]||defaultLoadout(classId),user.cards,slotsOf(user,classId))
+    :defaultLoadout(classId)]));
+}
 /** Datos públicos de la cuenta (sin contraseña). */
 export function publicUser(user){
-  return {admin:isAdmin(user.nick),nick:user.nick,points:user.points,spent:user.spent,mastery:user.mastery,friends:user.friends,
-    invites:(user.invites||[]).filter(i=>Date.now()-i.at<600000),runs:user.runs||0,best:user.best||0};
+  return {admin:isAdmin(user.nick),nick:user.nick,shards:user.shards||0,cards:user.cards||[],slots:user.slots||{},loadouts:loadoutsOf(user),
+    friends:user.friends,invites:(user.invites||[]).filter(i=>Date.now()-i.at<600000),runs:user.runs||0,best:user.best||0};
 }
 async function newSession(nick){
   const token=randomBytes(24).toString('hex');
@@ -40,7 +59,7 @@ export async function register(nick,password){
   if(String(password||'').length<6)fail('La contraseña debe tener al menos 6 caracteres.');
   if(await getJSON(nickKey(nick)))fail('Ese nick ya existe.');
   const {salt,hash}=await hashPassword(password);
-  const user={nick,salt,hash,points:0,spent:0,mastery:{},friends:[],invites:[],runs:0,best:0,created:Date.now(),seen:Date.now()};
+  const user={nick,salt,hash,progress:PROGRESS,shards:0,cards:[],slots:{},loadouts:{},friends:[],invites:[],runs:0,best:0,created:Date.now(),seen:Date.now()};
   await setJSON(nickKey(nick),user);
   return {token:await newSession(nick),user:publicUser(user)};
 }
@@ -49,6 +68,7 @@ export async function login(nick,password){
   if(!user)fail('Nick o contraseña incorrectos.');
   const {hash}=await hashPassword(password,user.salt);
   if(!timingSafeEqual(Buffer.from(hash,'hex'),Buffer.from(user.hash,'hex')))fail('Nick o contraseña incorrectos.');
+  if(ensureProgress(user))await setJSON(nickKey(user.nick),user);
   return {token:await newSession(user.nick),user:publicUser(user)};
 }
 export async function logout(token){if(token){sessionCache.delete(token);await remove('session:'+token);}}
@@ -58,34 +78,49 @@ export async function userFromToken(token,touch=true){
   const session=await getJSON('session:'+token);
   if(!session)return null;
   const user=await getJSON(nickKey(session.nick));
-  if(user&&touch&&Date.now()-(user.seen||0)>15000){user.seen=Date.now();await setJSON(nickKey(user.nick),user);}
+  if(!user)return null;
+  const reset=ensureProgress(user);
+  if(reset||(touch&&Date.now()-(user.seen||0)>15000)){user.seen=Date.now();await setJSON(nickKey(user.nick),user);}
   return user;
 }
 async function save(user){await setJSON(nickKey(user.nick),user);}
-export async function buyMastery(user,key){
-  const node=masteryTree[key];
-  if(!node)fail('Maestría desconocida.');
-  const rank=user.mastery[key]||0;
-  if(rank>=node.max)fail('Esa maestría ya está al máximo.');
-  if(node.requires&&!(user.mastery[node.requires]>0))fail('Primero necesitas '+masteryTree[node.requires].name+'.');
-  const cost=masteryCost(key,rank);
-  if(user.points-user.spent<cost)fail('No tienes puntos suficientes.');
-  user.mastery[key]=rank+1;
-  user.spent+=cost;
+/** Comprar una carta con Esquirlas. */
+export async function buyCard(user,id){
+  const card=cards[id];
+  if(!card)fail('Esa carta no existe.');
+  if(card.starter||user.cards.includes(id))fail('Ya tienes esa carta.');
+  if((user.shards||0)<card.price)fail('No tienes Esquirlas suficientes.');
+  user.shards-=card.price;
+  user.cards.push(id);
   await save(user);
   return publicUser(user);
 }
-export async function resetMastery(user){
-  user.mastery={};user.spent=0;
+/** Comprar el hueco extra de carta activa para una clase. */
+export async function buySlot(user,classId){
+  if(!Object.hasOwn(classes,classId))fail('Clase desconocida.');
+  if(slotsOf(user,classId)>=MAX_ACTIVE_SLOTS)fail('Esa clase ya tiene el hueco extra.');
+  if((user.shards||0)<EXTRA_SLOT_PRICE)fail('No tienes Esquirlas suficientes.');
+  user.shards-=EXTRA_SLOT_PRICE;
+  user.slots={...user.slots,[classId]:MAX_ACTIVE_SLOTS};
   await save(user);
   return publicUser(user);
 }
-/** Suma los puntos de una partida terminada. */
+/** Guardar el mazo de una clase (se valida contra las cartas que se tienen). */
+export async function saveLoadout(user,classId,loadout){
+  if(!Object.hasOwn(classes,classId))fail('Clase desconocida.');
+  const actives=(loadout?.actives||[]).filter(id=>cards[id]?.kind==='active');
+  if(!actives.length)fail('Equipa al menos una carta activa.');
+  user.loadouts={...user.loadouts,[classId]:cleanLoadout(classId,{actives,passive:loadout?.passive||null},user.cards,slotsOf(user,classId))};
+  await save(user);
+  return publicUser(user);
+}
+/** Suma las Esquirlas de una partida terminada. */
 export async function awardRun(nick,summary){
   const user=await getJSON(nickKey(nick));
   if(!user)return 0;
+  ensureProgress(user);
   const points=runPoints(summary);
-  user.points+=points;
+  user.shards=(user.shards||0)+points;
   user.runs=(user.runs||0)+1;
   user.best=Math.max(user.best||0,Math.floor(Number(summary.floor)||0));
   await save(user);
@@ -96,7 +131,7 @@ export async function awardSolo(user,summary){
   if(Date.now()-(user.lastAward||0)<30000)fail('Puntos ya guardados.');
   const points=runPoints(summary);
   user.lastAward=Date.now();
-  user.points+=points;
+  user.shards=(user.shards||0)+points;
   user.runs=(user.runs||0)+1;
   user.best=Math.max(user.best||0,Math.floor(Number(summary.floor)||0));
   await save(user);
@@ -157,7 +192,6 @@ export async function dismissInvite(user,from){
   await save(user);
   return publicUser(user);
 }
-export {cleanMastery};
 
 // ───────────── Mezcla de sonidos (editor de SFX, solo administradores) ─────────────
 const mixKey='sfx:mix';

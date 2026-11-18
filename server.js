@@ -83,7 +83,8 @@ export const server = createServer(async (req,res) => {
       const user = await accounts.userFromToken(accountToken);
       // La misma cuenta que vuelve a entrar sustituye a su hueco anterior (no se duplica).
       if (user && room.state.phase === 'lobby') for (const old of room.state.players.filter(p => p.account === user.nick)) dropPlayer(room, old.id);
-      join(room.state,id,user?.nick||body.name,body.classId,user?{mastery:user.mastery,account:user.nick}:{});
+      // El mazo de cartas sale de la cuenta (sin cuenta: las cartas de inicio).
+      join(room.state,id,user?.nick||body.name,body.classId,{loadouts:accounts.loadoutsOf(user),account:user?.nick||null});
       room.keys.set(key,id);
       (room.seen ||= new Map()).set(id,Date.now());
       room.touched = Date.now();
@@ -107,12 +108,12 @@ export const server = createServer(async (req,res) => {
     }
     pruneLobby(room);
     if (req.method === 'POST' && operation === 'action') {
-      // Maestrías en la sala: se leen de la cuenta del jugador, no de lo que mande el cliente.
-      if (body.type === 'mastery') {
+      // Cartas en la sala: se leen de la cuenta del jugador, no de lo que mande el cliente.
+      if (body.type === 'loadout') {
         const user = await accounts.userFromToken(accountToken);
         const player = room.state.players.find(p => p.id === id);
-        if (!user || !player || (player.account && player.account !== user.nick)) return send(400,{error:'Entra con tu cuenta para usar maestrías.'});
-        body = {type:'mastery', mastery:user.mastery, trusted:true};
+        if (!user || !player || (player.account && player.account !== user.nick)) return send(400,{error:'Entra con tu cuenta para usar tus cartas.'});
+        body = {type:'loadout', loadouts:accounts.loadoutsOf(user), trusted:true};
       } else if (body && typeof body === 'object') delete body.trusted;
       act(room.state,id,body);
       if (room.state.phase === 'lobby') room.awarded = false;
@@ -159,8 +160,9 @@ async function accountRoute(operation,method,body,tokenValue){
   if(method==='POST'&&operation==='logout'){await accounts.logout(tokenValue);return {ok:true};}
   if(method==='GET'&&operation==='me')return {user:accounts.publicUser(user),friends:await accounts.friendList(user)};
   if(method!=='POST')throw new Error('Ruta desconocida.');
-  if(operation==='mastery')return {user:await accounts.buyMastery(user,body.key)};
-  if(operation==='mastery-reset')return {user:await accounts.resetMastery(user)};
+  if(operation==='buy-card')return {user:await accounts.buyCard(user,body.card)};
+  if(operation==='buy-slot')return {user:await accounts.buySlot(user,body.classId)};
+  if(operation==='loadout')return {user:await accounts.saveLoadout(user,body.classId,body.loadout)};
   if(operation==='friend')return {user:await accounts.addFriend(user,body.nick),friends:await accounts.friendList(user)};
   if(operation==='unfriend'){const updated=await accounts.removeFriend(user,body.nick);return {user:updated,friends:await accounts.friendList({...user,friends:updated.friends})};}
   if(operation==='invite'){

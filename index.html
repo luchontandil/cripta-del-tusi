@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="./style.css?v=83">
+  <link rel="stylesheet" href="./style.css?v=84">
 </head>
 <body><main>
   <header class="brand">
@@ -88,12 +88,8 @@
   <p class="credits">Sonidos: packs CC0 de OpenGameArt (rubberduck, artisticdude, Kenney, qubodup, Ogrebane, JaggedStone) y <i>Fantasy Sound Effects Library</i> de <a href="https://www.littlerobotsoundfactory.com" target="_blank" rel="noopener">Little Robot Sound Factory</a> (<a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC-BY 3.0</a>). <a href="./sfx/CREDITS.md" target="_blank" rel="noopener">Lista completa</a>.</p>
 </main>
 <dialog id="training" aria-labelledby="training-title"><aside id="training-compare" class="training-compare" aria-live="polite" hidden></aside><h2 id="training-title"></h2><p>Aprende una habilidad o mejora una que ya conoces. Pasa el ratón por una opción para ver cómo cambia.</p><div id="training-choices"></div></dialog>
-<dialog id="masteries" class="masteries" aria-labelledby="masteries-title">
-  <div class="masteries-head"><h2 id="masteries-title">Maestrías</h2><span id="mastery-points" class="mastery-points"></span><button id="masteries-close" class="ghost">Cerrar</button></div>
-  <p class="hint">Se compran con los puntos que ganas al terminar cada partida y se aplican a todas las partidas futuras.</p>
-  <div id="mastery-grid" class="mastery-grid"></div>
-  <button id="mastery-reset" class="ghost small-button">Reiniciar maestrías (devuelve los puntos)</button>
-</dialog>
+<dialog id="deck" class="masteries deck-dialog" aria-labelledby="deck-title"></dialog>
+<dialog id="shard-shop" class="masteries deck-dialog" aria-labelledby="shop-title"></dialog>
 <div id="invite-toast" class="invite-toast" hidden></div>
 <dialog id="sfx-editor" class="sfx-editor" aria-labelledby="sfx-editor-title"></dialog>
 <dialog id="gameover" class="gameover" aria-labelledby="gameover-title">
@@ -105,5 +101,5 @@
   <p id="gameover-points" class="gameover-points" hidden></p>
   <button id="gameover-home" class="primary big">Volver al inicio</button>
 </dialog>
-<script type="module" src="./client.js?v=83"></script></body>
+<script type="module" src="./client.js?v=84"></script></body>
 </html>

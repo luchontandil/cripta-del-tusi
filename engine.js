@@ -144,7 +144,9 @@ export function damagePercent(unit,skill){
 export const flatDamage=unit=>unit.stats?.damage||0;
 /** Daño de una tirada antes de armaduras y resistencias. */
 export function scaledDamage(unit,skill,base,scale=1){
-  return Math.max(1,Math.floor((base+flatDamage(unit))*(1+damagePercent(unit,skill)/100)*scale));
+  const pe=passiveEffects(unit);
+  const dealt=(pe.dealtAll||0)+(skillSchool(unit,skill)==='magic'?pe.dealtMagic||0:0);
+  return Math.max(1,Math.floor((base+flatDamage(unit))*(1+damagePercent(unit,skill)/100)*(1+dealt/100)*scale));
 }
 /** Compatibilidad: cuánto añade el bonus a la media de la habilidad (para estimaciones). */
 export function damageBonus(unit,skill){
@@ -478,21 +480,19 @@ function startForge(s){
   note(s,'Piso '+s.floor+' · Forja del herrero.');
 }
 const legacyStat={arcane:'magic',shadow:'chaos'};
-/** Estadísticas de un héroe a partir de su equipo, maestrías y nivel (también fuera de combate). */
+/** Estadísticas de un héroe a partir de su equipo, su pasiva y su nivel (también fuera de combate). */
 export function heroStats(p,level=p.level||1){
   const stats=sumStats(p.equipment);
-  const m=p.mastery||{};
-  // Cada nivel: +8 % de daño de todos los tipos. Fuerza: +4 % por rango.
-  for(const key of damageKeys)stats[key]+=LEVEL_DAMAGE*(level-1)+4*(m.fuerza||0);
-  stats.vitality+=4*(m.vigor||0);
-  stats.critical+=3*(m.precision||0);
-  stats.ward+=4*(m.coraza||0);
-  stats.movement+=m.celeridad||0;
+  // Cada nivel: +8 % de daño de todos los tipos.
+  for(const key of damageKeys)stats[key]+=LEVEL_DAMAGE*(level-1);
+  // Pasiva del mazo.
+  const pe=passiveEffects(p);
+  stats.critical+=pe.critical||0;stats.ward+=pe.ward||0;stats.reach+=pe.reach||0;stats.movement+=pe.movement||0;
   // Bendiciones (o maldiciones) permanentes de los eventos.
   const b=p.boons||{};
   for(const key of damageKeys)stats[key]+=5*(b.power||0);   // cada punto de «poder»: +5 % de daño
   stats.vitality+=b.vitality||0;stats.critical+=b.critical||0;stats.ward+=4*(b.ward||0);
-  const max=Math.max(1,classes[p.classId].hp+stats.vitality+(level-1)*4);
+  const max=Math.max(1,Math.round((classes[p.classId].hp+stats.vitality+(level-1)*4)*(1+(pe.maxHpPct||0)/100)));
   return {stats,max,initiative:classes[p.classId].initiative};
 }
 function sumStats(equipment) {
@@ -531,37 +531,64 @@ export const playerColors=[
   {id:'green',name:'Verde',hex:'#46a758',dark:'#1d5a2a',light:'#a3e0ae'},
   {id:'yellow',name:'Amarillo',hex:'#f5c542',dark:'#7a5a10',light:'#ffe49a'}
 ];
-/** Árbol de maestrías: se compran con los puntos de cuenta y se aplican a todas las partidas futuras. */
-export const masteryTree={
-  vigor:{name:'Vigor',icon:'hp',max:5,cost:1,description:r=>'+'+4*r+' de vida máxima'},
-  fuerza:{name:'Fuerza',icon:'attack',max:5,cost:2,description:r=>'+'+4*r+' % de daño de todos los tipos'},
-  precision:{name:'Precisión',icon:'critical',max:5,cost:1,description:r=>'+'+3*r+' % de crítico'},
-  coraza:{name:'Coraza',icon:'ward',max:3,cost:2,description:r=>'+'+4*r+' % de armadura'},
-  fortuna:{name:'Fortuna',icon:'gold',max:5,cost:1,description:r=>'Empiezas con '+10*r+' tusi'},
-  botin:{name:'Ojo para el botín',icon:'xp',max:3,cost:2,description:r=>'Botín de más rareza (+'+10*r+' %)'},
-  sabiduria:{name:'Sabiduría',icon:'level',max:1,cost:5,description:()=>'Tu primera habilidad empieza en rango 2'},
-  celeridad:{name:'Celeridad',icon:'mp',max:1,cost:8,requires:'vigor',description:()=>'+1 PM en todos los combates'}
+// ───────────── Cartas (sustituyen a las maestrías) ─────────────
+/**
+ * Cada clase tiene cartas activas (sus habilidades) y pasivas. Antes de la partida se equipa un mazo:
+ * 3 activas y 1 pasiva (+1 hueco de activa que se compra con Esquirlas). Las 3 primeras activas de
+ * cada clase vienen de inicio; el resto se compran en la tienda de Esquirlas.
+ */
+export const ACTIVE_SLOTS=3,MAX_ACTIVE_SLOTS=4,EXTRA_SLOT_PRICE=1000;
+const slug=text=>String(text).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+/** Pasivas por clase: cambian cómo se juega (siempre con un coste). */
+export const passiveCards={
+  mago:[{id:'mago.furia-magica',name:'Furia mágica',text:'Recibes un 30 % más de daño físico, pero haces un 15 % más de daño mágico.',price:600,effects:{takenPhysical:30,dealtMagic:15}}],
+  guardia:[{id:'guardia.baluarte',name:'Baluarte',text:'+15 % de vida máxima, pero −1 PM.',price:500,effects:{maxHpPct:15,movement:-1}}],
+  tirador:[{id:'tirador.ojo-de-halcon',name:'Ojo de halcón',text:'+1 de alcance en las habilidades de alcance modificable, pero −15 % de vida máxima.',price:500,effects:{reach:1,maxHpPct:-15}}],
+  mistico:[{id:'mistico.fe-ardiente',name:'Fe ardiente',text:'Tus curas curan un 25 % más, pero haces un 10 % menos de daño.',price:500,effects:{healPct:25,dealtAll:-10}}],
+  sombra:[{id:'sombra.sombra-letal',name:'Sombra letal',text:'+12 % de crítico, pero −15 % de armadura.',price:500,effects:{critical:12,ward:-15}}]
 };
-/** Coste del siguiente rango de una maestría. */
-export const masteryCost=(key,rank)=>Math.ceil(masteryTree[key].cost*(rank+1)*1.5);
-export function cleanMastery(input={}){
-  const out={};
-  for(const [key,node] of Object.entries(masteryTree)){
-    const rank=Math.floor(Number(input?.[key])||0);
-    if(rank>0)out[key]=Math.min(node.max,rank);
-  }
-  return out;
+/** Catálogo completo de cartas. */
+export const cards=Object.fromEntries(Object.entries(classes).flatMap(([classId,cls])=>[
+  ...cls.skills.map((skill,index)=>{
+    const id=classId+'.'+slug(skill[0]);
+    return [id,{id,classId,kind:'active',index,name:skill[0],starter:index<ACTIVE_SLOTS,price:index<ACTIVE_SLOTS?0:250+(index-ACTIVE_SLOTS)*75}];
+  }),
+  ...(passiveCards[classId]||[]).map(card=>[card.id,{...card,classId,kind:'passive',starter:false}])
+]));
+export const starterCards=Object.values(cards).filter(c=>c.starter).map(c=>c.id);
+/** Mazo por defecto de una clase: sus 3 activas de inicio, sin pasiva. */
+export const defaultLoadout=classId=>({actives:Object.values(cards).filter(c=>c.classId===classId&&c.starter).map(c=>c.id),passive:null});
+/**
+ * Mazo válido: solo cartas de esa clase que se tengan, hasta los huecos disponibles y al menos una activa.
+ * owned: lista de cartas compradas (las de inicio siempre se tienen); null = sin cuenta (solo las de inicio).
+ */
+export function cleanLoadout(classId,loadout,owned=null,slots=ACTIVE_SLOTS){
+  const have=new Set([...starterCards,...(owned||[])]);
+  const fit=id=>cards[id]&&cards[id].classId===classId&&have.has(id);
+  const actives=[...new Set((loadout?.actives||[]).filter(id=>fit(id)&&cards[id].kind==='active'))].slice(0,Math.min(MAX_ACTIVE_SLOTS,slots));
+  const passive=fit(loadout?.passive)&&cards[loadout.passive].kind==='passive'?loadout.passive:null;
+  return actives.length?{actives,passive}:defaultLoadout(classId);
 }
+/** Efectos de la pasiva de un jugador o una unidad. */
+export const passiveEffects=unit=>cards[unit?.passive]?.effects||{};
+/** Rangos iniciales según el mazo: las activas equipadas empiezan aprendidas (rango 1). */
+function ranksFor(classId,loadout){
+  const equipped=new Set(loadout.actives.map(id=>cards[id].index));
+  return classes[classId].skills.map((_,i)=>equipped.has(i)?1:0);
+}
+/**
+ * Entrar en la sala. extra.loadouts: mazos por clase ya validados (los pone el servidor desde la cuenta;
+ * sin cuenta, los de inicio).
+ */
 export function join(s,id,name,classId,extra={}) {
   if(s.phase!=='lobby'||s.players.length>=4) fail('La sala no admite más jugadores.');
   if(!Object.hasOwn(classes,classId)) fail('Elige una clase válida.');
-  const mastery=cleanMastery(extra.mastery);
-  const ranks=skillRanks(classId);
-  if(mastery.sabiduria)ranks[0]=Math.min(3,ranks[0]+1);
   const used=new Set(s.players.map(p=>p.color));
   const color=playerColors.find(c=>!used.has(c.id)).id;
-  s.players.push({id,name:String(name||'Aventurero').trim().slice(0,22)||'Aventurero',classId,bag:[],equipment:{},
-    gold:(mastery.fortuna||0)*10,level:1,xp:0,skillRanks:ranks,trained:true,color,mastery,account:extra.account||null});
+  const player={id,name:String(name||'Aventurero').trim().slice(0,22)||'Aventurero',classId,bag:[],equipment:{},
+    gold:0,level:1,xp:0,skillRanks:[],trained:true,color,loadouts:extra.loadouts||{},passive:null,account:extra.account||null};
+  lobbyLoadout(player);
+  s.players.push(player);
 }
 /** Saca a un jugador de la sala de espera (se fue, cerró la pestaña o volvió a entrar). */
 export function leave(s,id){
@@ -570,19 +597,20 @@ export function leave(s,id){
   s.players=s.players.filter(p=>p.id!==id);
   return s.players.length<before;
 }
-/** Rehace lo que depende de la clase y las maestrías mientras se espera en la sala. */
+/** Aplica el mazo de la clase elegida: habilidades iniciales y pasiva. */
 function lobbyLoadout(player){
-  const ranks=skillRanks(player.classId);
-  if(player.mastery?.sabiduria)ranks[0]=Math.min(3,ranks[0]+1);
-  player.skillRanks=ranks;
-  player.gold=(player.mastery?.fortuna||0)*10;
+  const loadout=player.loadouts?.[player.classId]||defaultLoadout(player.classId);
+  player.skillRanks=ranksFor(player.classId,loadout);
+  player.passive=loadout.passive||null;
+  player.gold=0;
 }
 /** Puntos de cuenta al terminar la partida: según lo lejos que se llegó. */
 export function runPoints(summary){
   const floor=Math.max(0,Math.min(ACTS*FLOORS_PER_ACT,Math.floor(Number(summary.floor)||0)));
   const kills=Math.max(0,Math.min(6,Math.floor(Number(summary.bossKills)||0)));
   const acts=Math.max(0,actOf(floor)-1)+(summary.won?1:0);
-  return Math.floor(floor/2)+kills*2+acts*5+(summary.won?15:0);
+  // Esquirlas: 10 por piso, 40 por jefe, 100 por acto superado y 300 por ganar.
+  return floor*10+kills*40+acts*100+(summary.won?300:0);
 }
 export const monsterNames={slime:'Limo',bat:'Murciélago',skull:'Calavera flotante',worm:'Gusano de cripta',slimeking:'Limo colosal',
   skeleton:'Esqueleto',succubus:'Súcubo',vampire:'Vampiro',imp:'Diablillo',slug:'Babosa',plant:'Planta escupidora',lavaslime:'Limo de lava'};
@@ -1098,7 +1126,7 @@ function openFloor(s,rng,elite=false,boss=null) {
     p.xp=0;
     p.trained=true;
     const {stats,max}=heroStats(p,level);
-    return {id:p.id,name:p.name,classId:p.classId,color:p.color,level,skillRanks:[...p.skillRanks],initiative:classes[p.classId].initiative,stats,max,
+    return {id:p.id,name:p.name,classId:p.classId,color:p.color,level,skillRanks:[...p.skillRanks],passive:p.passive||null,initiative:classes[p.classId].initiative,stats,max,
       // La vida NO se recupera de sala a sala: se conserva la que quedaba (más lo que suba la vida máxima).
       // Quien cayó vuelve con el 10 %.
       hp:!previous?max:previous.hp>0?Math.max(1,Math.min(max,previous.hp+Math.max(0,max-(previous.max||max)))):Math.ceil(max*.1),
@@ -1170,7 +1198,8 @@ export function armorPercent(target,element){
 function netDamage(target,raw,element,critical,extra=0){
   // Resistencia (o debilidad, si es negativa) al tipo de daño y armadura: ambas en %.
   const resist=Math.max(-100,Math.min(90,target.resist?.[element]||0));
-  const total=(raw+extra)*(critical?1.5:1)*(1-resist/100)*(1-armorPercent(target,element)/100);
+  const taken=element==='physical'?passiveEffects(target).takenPhysical||0:0;
+  const total=(raw+extra)*(critical?1.5:1)*(1-resist/100)*(1-armorPercent(target,element)/100)*(1+taken/100);
   return Math.max(raw+extra>0?1:0,Math.round(total));
 }
 export const critChance=unit=>Math.min(1,.12+(unit.stats?.critical||0)/100);
@@ -1338,7 +1367,7 @@ function finish(s,rng) {
       p.trained=p.trainOffer.length===0;
       p.gold+=Math.round((10+s.floor*4)*(elite?1.5:1));
       const ilvl=itemLevel(s,(elite?1:0)+(bossFight?2:0));
-      const luck=(elite?.35:0)+.1*(p.mastery?.botin||0);
+      const luck=elite?.35:0;
       s.offers[p.id]=Array.from({length:3},(_,i)=>rollItem(s,rng,{ilvl,bonus:luck,gear:elite&&i===0}));
     }
     s.stock=[];
@@ -2196,7 +2225,7 @@ function applySkill(s,unit,target,skill,rng,scale=1){
   if(supportKinds.includes(kind)){
     if(kind==='shield'){effect(target,'shield',value||25,2);note(s,name+' → '+target.name+': +'+(value||25)+' % de armadura 2 turnos.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
     if(kind==='haste'){effect(target,'haste',value||2,target===unit?2:1);note(s,name+' → '+target.name+': +'+(value||2)+' PM en su próximo turno.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
-    const amount=Math.min(target.max-target.hp,roll(min,max,rng)+Math.floor(unit.level/2));
+    const amount=Math.min(target.max-target.hp,Math.round((roll(min,max,rng)+Math.floor(unit.level/2))*(1+(passiveEffects(unit).healPct||0)/100)));
     target.hp+=amount;
     if(kind==='cleanse')for(const key of ['poison','burn','slow','expose','weak'])delete target.effects[key];
     emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount});
@@ -2307,9 +2336,9 @@ export function act(s,id,a,rng=Math.random) {
     lobbyLoadout(player);
     return;
   }
-  if(a.type==='mastery'&&s.phase==='lobby'){
-    if(!a.trusted)fail('Las maestrías se cargan desde tu cuenta.');
-    player.mastery=cleanMastery(a.mastery);
+  if(a.type==='loadout'&&s.phase==='lobby'){
+    if(!a.trusted)fail('Las cartas se cargan desde tu cuenta.');
+    player.loadouts=a.loadouts||{};
     lobbyLoadout(player);
     return;
   }
@@ -2392,9 +2421,9 @@ export function act(s,id,a,rng=Math.random) {
   }
   if(a.type==='restart'&&['won','lost'].includes(s.phase)&&host){
     Object.assign(s,create(),{players:s.players.map(p=>{
-      const ranks=skillRanks(p.classId);
-      if(p.mastery?.sabiduria)ranks[0]=Math.min(3,ranks[0]+1);
-      return {...p,equipment:{},bag:[],gold:(p.mastery?.fortuna||0)*10,level:1,xp:0,skillRanks:ranks,trained:true};
+      const fresh={...p,equipment:{},bag:[],level:1,xp:0,trained:true,boons:{}};
+      lobbyLoadout(fresh);
+      return fresh;
     }),seq:s.seq});
     return;
   }

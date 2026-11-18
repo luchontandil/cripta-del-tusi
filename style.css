@@ -1270,3 +1270,41 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;bac
 .ability.spent{filter:grayscale(1) brightness(.55);opacity:.8}
 .ability.spent .ability-cost{color:var(--muted)!important}
 .ability-spent{position:absolute;inset:auto 0 50% 0;transform:translateY(50%);text-align:center;font-size:.6rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:#000a;padding:1px 0;pointer-events:none}
+/* ───────── Cartas: mazo y tienda de Esquirlas ───────── */
+.deck-dialog{width:min(96vw,900px)}
+.deck-dialog .masteries-head{flex-wrap:wrap}
+.deck-dialog .masteries-head h2{display:flex;align-items:center;gap:8px;margin:0;margin-right:auto}
+.shard-chip{color:#9fe3ff;border-color:#4fb7e0}.shard-chip .icon{color:#7fd6ff}
+.deck-tabs .tab-art{display:inline-grid;width:22px;height:22px;place-items:center}
+.deck-tabs .tab-art canvas{width:20px;image-rendering:pixelated}
+.deck-title{display:flex;align-items:center;gap:6px;margin:12px 0 6px;color:var(--gold);font-size:.95rem}
+.deck-slots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.deck-slots.passive-row{grid-template-columns:minmax(0,1fr) 3fr}
+.deck-slot{min-height:116px;display:grid;place-items:center;align-content:center;gap:4px;border:2px dashed #3a2d3e;background:#120e14;padding:6px;text-align:center}
+.deck-slot.locked{border-style:solid;border-color:#2a2130;opacity:.85}
+.deck-slot.locked>.icon{color:#7fd6ff}
+.deck-slot>.card-tile{width:100%}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.card-tile{position:relative;display:grid;justify-items:center;align-content:start;gap:4px;padding:10px 8px;background:linear-gradient(180deg,#221a29,#151018);border:2px solid #3a2d3e;cursor:pointer;text-align:center;min-height:116px}
+.card-tile strong{font-size:.86rem;color:var(--paper);line-height:1.15}
+.card-tile .card-kind{font-size:.68rem;color:var(--muted)}
+.card-tile .spell-icon,.card-tile .passive-art{width:40px;height:40px;display:grid;place-items:center}
+.passive-art{border-radius:50%;background:radial-gradient(circle,#4a3360,#1a1222);border:1px solid #b48cff}
+.passive-art .icon{color:#e2c6ff;width:22px;height:22px}
+.card-tile.kind-passive{border-color:#5a4072}
+.card-tile.equipped,.card-tile.in-deck{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold-glow),0 0 14px #f2cd8a33}
+.card-tile.in-deck::after{content:'En el mazo';position:absolute;top:4px;right:4px;font-size:.58rem;font-weight:800;color:#1b1206;background:var(--gold);padding:0 4px}
+.card-tile.locked{filter:grayscale(.85) brightness(.7)}
+.card-tile.owned:not(.in-deck):not(.equipped):hover{border-color:#8a6dab}
+.card-price{display:inline-flex;align-items:center;gap:3px;font-weight:800;color:#9fe3ff;font-size:.8rem}
+.card-tile .small-button{margin-top:auto}
+.card-tile.kind-slot{border-color:#2f6f8a}
+.coming-soon{display:grid;justify-items:center;gap:8px;padding:40px 20px;text-align:center;border:2px dashed #3a2d3e;color:var(--muted)}
+.coming-soon>.icon{width:40px;height:40px;color:var(--gold)}
+.coming-soon strong{font-size:1.4rem;color:var(--gold)}
+.preview-skills .passive-line .passive-art{width:22px;height:22px}
+.preview-skills .passive-line .passive-art .icon{width:13px;height:13px}
+.deck-open{margin-left:auto}
+/* Portada: la versión, en blanco, abajo a la derecha */
+body:not(.in-expedition) .live-version{left:auto;right:10px;bottom:8px;color:#fff;background:#000a;font-size:.74rem;padding:3px 9px}
+body:not(.in-expedition) .live-version.update{color:#1b1206;background:#ffd76a}

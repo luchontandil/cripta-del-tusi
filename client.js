@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=83';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=83';
-import {setupSfx} from './music.js?v=83';
-import {icon} from './icons.js?v=83';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,passiveEffects} from './engine.js?v=84';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=84';
+import {setupSfx} from './music.js?v=84';
+import {icon} from './icons.js?v=84';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=83').then(({createIso})=>{
+import('./isometric.js?v=84').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -151,14 +151,15 @@ function setAccountToken(token){
   account.token=token;
   if(token)localStorage.setItem('cripta-account',token);else{localStorage.removeItem('cripta-account');account.user=null;account.friends=[];}
 }
-const available=()=>account.user?account.user.points-account.user.spent:0;
+const available=()=>account.user?.shards||0;
 async function refreshAccount(){
   if(!account.token)return;
   try{
     const data=await accountCall('me');
     account.user=data.user;account.friends=data.friends;
     renderAccount();showInvites();
-    if(masteriesDialog.open)renderMasteries();
+    if(deckDialog.open)renderDeck();
+    if(shopDialog.open)renderShardShop();
     if(state?.phase==='lobby')renderJourney();
   }catch{}
 }
@@ -232,14 +233,16 @@ function renderAccount(){
     pass.onkeydown=e=>{if(e.key==='Enter'){if(account.mode==='login')go.click();else repeat.focus();}};
     repeat.onkeydown=e=>{if(e.key==='Enter')go.click();};
     box.replaceChildren(
-      h('div','account-head',h('h2',null,icon('level'),'Tu cuenta'),h('p','hint','Guarda tus puntos y maestrías, agrega amigos e invítalos a tu sala.')),
+      h('div','account-head',h('h2',null,icon('level'),'Tu cuenta'),h('p','hint','Guarda tus Esquirlas y tus cartas, agrega amigos e invítalos a tu sala.')),
       h('div','account-form',...[field('Nick',nick),field('Contraseña',pass),account.mode==='login'?null:field('Repite la contraseña',repeat),go,swap].filter(Boolean)),
       ...(account.persistent?[]:[h('p','hint warn','Servidor sin base de datos configurada: las cuentas se borrarán al reiniciarlo.')]));
     return;
   }
   const u=account.user;
-  const masteryButton=btn('',()=>openMasteries());masteryButton.className='primary';
-  masteryButton.append(icon('xp'),'Maestrías');
+  const deckButton=btn('',()=>openDeck(el('class').value));deckButton.className='primary';
+  deckButton.append(icon('level'),'Mazo');
+  const shopButton=btn('',()=>openShardShop(el('class').value));shopButton.className='primary';
+  shopButton.append(icon('shop'),'Tienda');
   const out=btn('',async()=>{try{await accountCall('logout',{});}catch{}setAccountToken(null);renderAccount();classPreview();});
   out.className='ghost';out.append(icon('exit'),'Salir');
   const nickInput=document.createElement('input');nickInput.placeholder='Nick de tu amigo';nickInput.maxLength=16;
@@ -258,8 +261,8 @@ function renderAccount(){
   });
   box.replaceChildren(
     h('div','account-head',h('h2',null,icon('level'),u.nick),
-      h('div','account-stats',h('span','chip',icon('xp'),available()+' puntos'),h('span','chip',icon('crown'),'Mejor piso: '+(u.best||0)),h('span','chip',icon('clock'),(u.runs||0)+' partidas')),
-      h('div','account-actions',masteryButton,u.admin?sfxEditorButton():null,out)),
+      h('div','account-stats',shardChip(available()),h('span','chip',icon('crown'),'Mejor piso: '+(u.best||0)),h('span','chip',icon('clock'),(u.runs||0)+' partidas')),
+      h('div','account-actions',deckButton,shopButton,u.admin?sfxEditorButton():null,out)),
     ...invites,
     h('div','friends',h('h3',null,icon('users'),'Amigos'),h('div','add-friend',nickInput,add),friends));
 }
@@ -283,35 +286,131 @@ function showInvites(){
   sfx('heal');
 }
 function hideInviteToast(){el('invite-toast').hidden=true;}
-const masteriesDialog=el('masteries');
-el('masteries-close').onclick=()=>masteriesDialog.close();
-el('mastery-reset').onclick=async()=>{try{const d=await accountCall('mastery-reset',{});account.user=d.user;renderMasteries();renderAccount();syncLobbyMastery();}catch(e){error(e.message);}};
-/** En la sala de espera, el servidor vuelve a leer las maestrías de tu cuenta. */
-function syncLobbyMastery(){if(session?.code&&state?.phase==='lobby')send({type:'mastery'});}
-function openMasteries(){renderMasteries();masteriesDialog.showModal();}
-function renderMasteries(){
-  const u=account.user;if(!u)return;
-  el('mastery-points').replaceChildren(icon('xp'),available()+' puntos disponibles');
-  el('mastery-grid').replaceChildren(...Object.entries(masteryTree).map(([key,node])=>{
-    const rank=u.mastery[key]||0;
-    const maxed=rank>=node.max;
-    const cost=maxed?0:masteryCost(key,rank);
-    const locked=node.requires&&!(u.mastery[node.requires]>0);
-    const buy=btn('',async()=>{try{const d=await accountCall('mastery',{key});account.user=d.user;renderMasteries();renderAccount();syncLobbyMastery();}catch(e){error(e.message);}});
-    buy.className=maxed?'ghost':'primary';
-    buy.disabled=maxed||locked||available()<cost;
-    buy.append(maxed?'Máximo':locked?'Requiere '+masteryTree[node.requires].name:'Mejorar · '+cost+' pts');
-    const pips=h('span','pips',...Array.from({length:node.max},(_,i)=>h('i',i<rank?'on':null)));
-    return h('article','mastery'+(rank?' owned':'')+(maxed?' maxed':''),
-      h('div','mastery-icon',icon(node.icon)),
-      h('div','mastery-body',h('strong',null,node.name),pips,
-        h('p',null,rank?'Ahora: '+node.description(rank):'Sin aprender'),
-        maxed?null:h('p','next','Siguiente: '+node.description(rank+1))),
-      buy);
-  }));
+// ───────────── Cartas: mazo por clase y tienda de Esquirlas ─────────────
+const shardChip=n=>h('span','chip shard-chip',icon('cube'),h('b',null,String(n)),' Esquirlas');
+/** Mazo de una clase: el de la cuenta o, sin cuenta, el de inicio. */
+const myLoadout=classId=>account.user?.loadouts?.[classId]||defaultLoadout(classId);
+const ownsCard=id=>cards[id]?.starter||!!account.user?.cards?.includes(id);
+const slotsFor=classId=>Math.min(MAX_ACTIVE_SLOTS,account.user?.slots?.[classId]||ACTIVE_SLOTS);
+/** En la sala de espera, el servidor vuelve a leer tus cartas. */
+function syncLobbyDeck(){if(session?.code&&state?.phase==='lobby')send({type:'loadout'});}
+/** Carta en miniatura (activa: su habilidad; pasiva: su efecto). */
+function cardTile(card,extra=''){
+  const skill=card.kind==='active'?classes[card.classId].skills[card.index]:null;
+  const art=skill?spellIcon(skill[5],skill[6]):h('span','passive-art',icon('crown'));
+  const tile=h('article','card-tile kind-'+card.kind+' '+extra,art,h('strong',null,card.name),
+    h('small','card-kind',card.kind==='active'?(skill[1]+' PA · '+(skill[2]>1?'alcance '+skill[2]:'cuerpo a cuerpo')):'Pasiva'));
+  const show=()=>{
+    const rect=tile.getBoundingClientRect();
+    const nodes=skill?skillTipNodes({classId:card.classId,stats:{},level:1},card.index,skill,1)
+      :[tipHead(h('span','passive-art',icon('crown')),card.name,'Carta pasiva · '+classes[card.classId].name,null),h('p','tip-lore',card.text)];
+    showTip(nodes,{left:rect.right+6,top:rect.top,bottom:rect.bottom},'tip-skill');
+  };
+  tile.addEventListener('pointerenter',show);tile.addEventListener('pointerleave',hideUnit);
+  return tile;
 }
-renderAccount();
-refreshAccount();
+function classTabs(current,onPick){
+  const tabs=h('div','forge-tabs deck-tabs',...Object.keys(classes).map(id=>{
+    const b=btn('',()=>onPick(id));b.className='forge-tab'+(id===current?' on':'');
+    b.append(h('span','tab-art',portrait(id)),classes[id].name);return b;
+  }));
+  return tabs;
+}
+/** Diálogo del mazo: 3 activas (+1 si se compró el hueco) y 1 pasiva por clase. */
+const deckDialog=el('deck');
+let deckClass='guardia';
+function openDeck(classId=deckClass){deckClass=classId;renderDeck();if(!deckDialog.open)deckDialog.showModal();}
+async function saveDeck(loadout){
+  if(!account.user){error('Crea una cuenta para cambiar tus cartas: sin cuenta se juega con las de inicio.');return;}
+  try{const d=await accountCall('loadout',{classId:deckClass,loadout});account.user=d.user;error('');renderDeck();renderAccount();classPreview();syncLobbyDeck();}
+  catch(e){error(e.message);}
+}
+function renderDeck(){
+  const loadout=myLoadout(deckClass),slots=slotsFor(deckClass);
+  const all=Object.values(cards).filter(c=>c.classId===deckClass);
+  const activeSlots=Array.from({length:MAX_ACTIVE_SLOTS},(_,i)=>{
+    const id=loadout.actives[i];
+    if(i>=slots){
+      const buy=btn('',()=>buyExtraSlot(deckClass));buy.className='primary small-button';
+      buy.append(icon('plus'),'Desbloquear · '+EXTRA_SLOT_PRICE);
+      buy.disabled=!account.user||available()<EXTRA_SLOT_PRICE;
+      return h('div','deck-slot locked',icon('cube'),h('small',null,'Hueco extra'),buy);
+    }
+    if(!id)return h('div','deck-slot empty',h('small',null,'Activa '+(i+1)),h('span','hint','Vacío'));
+    const tile=cardTile(cards[id],'equipped');
+    tile.onclick=()=>{if(loadout.actives.length<=1)return error('Necesitas al menos una carta activa.');saveDeck({...loadout,actives:loadout.actives.filter(x=>x!==id)});};
+    tile.title='Clic para quitarla del mazo';
+    return h('div','deck-slot',tile);
+  });
+  const passiveSlot=loadout.passive?(()=>{const t=cardTile(cards[loadout.passive],'equipped');t.onclick=()=>saveDeck({...loadout,passive:null});t.title='Clic para quitarla';return h('div','deck-slot passive',t);})()
+    :h('div','deck-slot passive empty',h('small',null,'Pasiva'),h('span','hint','Vacío'));
+  const collection=all.map(card=>{
+    const owned=ownsCard(card.id),equipped=loadout.actives.includes(card.id)||loadout.passive===card.id;
+    const tile=cardTile(card,(owned?'owned':'locked')+(equipped?' in-deck':''));
+    if(!owned){tile.append(h('span','card-price',icon('cube'),String(card.price)));tile.onclick=()=>openShardShop(card.classId);tile.title='Se compra en la tienda de Esquirlas';}
+    else if(!equipped){
+      tile.onclick=()=>{
+        if(card.kind==='passive')return saveDeck({...loadout,passive:card.id});
+        if(loadout.actives.length>=slots)return error('Mazo lleno: quita una carta activa primero.');
+        saveDeck({...loadout,actives:[...loadout.actives,card.id]});
+      };
+      tile.title='Clic para equiparla';
+    }
+    return tile;
+  });
+  const close=btn('Cerrar',()=>deckDialog.close());close.className='ghost';
+  const shop=btn('',()=>openShardShop(deckClass));shop.className='primary';shop.append(icon('shop'),'Tienda de Esquirlas');
+  deckDialog.replaceChildren(
+    h('div','masteries-head',Object.assign(h('h2',null,icon('level'),'Mazo · '+classes[deckClass].name),{id:'deck-title'}),account.user?shardChip(available()):null,shop,close),
+    classTabs(deckClass,id=>openDeck(id)),
+    h('p','hint',account.user?'Equipa hasta '+slots+' cartas activas (tus habilidades al empezar) y 1 pasiva. En la partida puedes descubrir y aprender más al subir de nivel.'
+      :'Sin cuenta juegas con las cartas de inicio. Crea una cuenta para comprar cartas y montar tu mazo.'),
+    h('h3','deck-title',icon('play'),'Activas · '+loadout.actives.length+'/'+slots),h('div','deck-slots',...activeSlots),
+    h('h3','deck-title',icon('crown'),'Pasiva'),h('div','deck-slots passive-row',passiveSlot),
+    h('h3','deck-title',icon('bag'),'Colección de '+classes[deckClass].name),h('div','card-grid',...collection));
+}
+async function buyExtraSlot(classId){
+  try{const d=await accountCall('buy-slot',{classId});account.user=d.user;error('');renderDeck();renderShardShop();renderAccount();}catch(e){error(e.message);}
+}
+/** Tienda de Esquirlas: cartas por clase, huecos extra y aspectos («Próximamente»). */
+const shopDialog=el('shard-shop');
+let shopTab='guardia';
+function openShardShop(classId=shopTab){shopTab=classId;renderShardShop();if(!shopDialog.open)shopDialog.showModal();}
+function renderShardShop(){
+  if(!shopDialog.open&&!shopDialog.isConnected)return;
+  const close=btn('Cerrar',()=>shopDialog.close());close.className='ghost';
+  const tabs=classTabs(shopTab,id=>openShardShop(id));
+  const skins=btn('',()=>openShardShop('skins'));skins.className='forge-tab'+(shopTab==='skins'?' on':'');skins.append(icon('crown'),'Aspectos');
+  tabs.append(skins);
+  let body;
+  if(shopTab==='skins'){
+    body=h('div','coming-soon',icon('crown'),h('strong',null,'Próximamente'),h('p',null,'Aspectos para tus personajes, nuevas animaciones y más. ¡Ve guardando Esquirlas!'));
+  }else{
+    const forSale=Object.values(cards).filter(c=>c.classId===shopTab&&!c.starter);
+    const tiles=forSale.map(card=>{
+      const owned=ownsCard(card.id);
+      const tile=cardTile(card,owned?'owned':'for-sale');
+      const buy=btn('',async()=>{try{const d=await accountCall('buy-card',{card:card.id});account.user=d.user;error('');sfx('coins');renderShardShop();renderDeck();renderAccount();}catch(e){error(e.message);}});
+      buy.className=owned?'ghost small-button':'primary small-button';
+      buy.disabled=owned||!account.user||available()<card.price;
+      buy.append(owned?'Comprada':h('span',null,icon('cube'),' '+card.price));
+      tile.append(buy);
+      return tile;
+    });
+    const slotOwned=slotsFor(shopTab)>=MAX_ACTIVE_SLOTS;
+    const slotBuy=btn('',()=>buyExtraSlot(shopTab));slotBuy.className=slotOwned?'ghost small-button':'primary small-button';
+    slotBuy.disabled=slotOwned||!account.user||available()<EXTRA_SLOT_PRICE;
+    slotBuy.append(slotOwned?'Comprado':h('span',null,icon('cube'),' '+EXTRA_SLOT_PRICE));
+    const slotTile=h('article','card-tile kind-slot '+(slotOwned?'owned':'for-sale'),h('span','passive-art',icon('plus')),h('strong',null,'4.º hueco de activa'),
+      h('small','card-kind','Para '+classes[shopTab].name+': empieza con 4 habilidades'),slotBuy);
+    body=h('div','card-grid',slotTile,...tiles);
+    if(!forSale.length)body.append(h('p','hint','Pronto habrá más cartas para esta clase.'));
+  }
+  shopDialog.replaceChildren(
+    h('div','masteries-head',Object.assign(h('h2',null,icon('shop'),'Tienda de Esquirlas'),{id:'shop-title'}),account.user?shardChip(available()):null,close),
+    h('p','hint',account.user?'Las Esquirlas se ganan al terminar cada partida: 10 por piso, 40 por jefe, 100 por acto superado y 300 por ganar.':'Crea una cuenta para ganar Esquirlas y comprar cartas.'),
+    tabs,body);
+}
 function classPreview(){
   const kind=el('class').value;
   const cls=classes[kind];
@@ -321,24 +420,25 @@ function classPreview(){
     card.tabIndex=on?0:-1;
   }
   const sample={classId:kind,stats:{},level:1};
-  const skills=h('ul','preview-skills',...cls.skills.map((skill,index)=>{
-    const locked=index===cls.skills.length-1;
-    const item=h('li',locked?'locked':null,spellIcon(skill[5],skill[6]),h('span',null,skill[0]),h('small',locked?'unlock':'stat-pa',locked?'Nivel 2+':skill[1]+' PA'));
+  // Tu mazo para esta clase: las activas con las que empiezas y la pasiva.
+  const loadout=myLoadout(kind);
+  const skills=h('ul','preview-skills',...loadout.actives.map(id=>{
+    const index=cards[id].index,skill=cls.skills[index];
+    const item=h('li',null,spellIcon(skill[5],skill[6]),h('span',null,skill[0]),h('small','stat-pa',skill[1]+' PA'));
     item.tabIndex=0;
     const show=()=>{
       const rect=item.getBoundingClientRect();
-      const nodes=skillTipNodes(sample,locked?null:index,skill,locked?0:1);
-      if(locked)nodes.push(h('p','tip-note','Se puede aprender al subir de nivel.'));
-      showTip(nodes,{left:rect.left,top:rect.top,bottom:rect.bottom},'tip-skill');
+      showTip(skillTipNodes(sample,index,skill,1),{left:rect.left,top:rect.top,bottom:rect.bottom},'tip-skill');
     };
     item.onpointerenter=item.onfocus=show;
     item.onpointerleave=item.onblur=hideUnit;
     return item;
-  }));
+  }),...(loadout.passive?[h('li','passive-line',h('span','passive-art',icon('crown')),h('span',null,cards[loadout.passive].name),h('small','stat-pa','Pasiva'))]:[]));
+  const deck=btn('',()=>openDeck(kind));deck.className='ghost small-button deck-open';deck.append(icon('level'),'Preparar cartas');
   el('class-preview').replaceChildren(
     h('div','preview-head',h('strong',null,cls.name),h('span','role-tag',roles[kind])),
     h('p',null,specs[kind]),
-    h('div','preview-stats',h('span','mini-stat',icon('hp'),cls.hp+' PV'),h('span','mini-stat',icon('initiative'),'Iniciativa '+cls.initiative)),
+    h('div','preview-stats',h('span','mini-stat',icon('hp'),cls.hp+' PV'),h('span','mini-stat',icon('initiative'),'Iniciativa '+cls.initiative),deck),
     skills);
 }
 el('class').onchange=classPreview;
@@ -1320,8 +1420,8 @@ function updateGameOver(){
   const line=el('gameover-points');
   line.hidden=false;
   // Solo las cuentas registradas ganan puntos de maestría.
-  if(account.user)line.replaceChildren(icon('xp'),'+'+points+' puntos de maestría');
-  else line.replaceChildren(icon('xp'),'Sin cuenta no se ganan puntos de maestría. Regístrate para empezar a acumularlos.');
+  if(account.user)line.replaceChildren(icon('cube'),'+'+points+' Esquirlas');
+  else line.replaceChildren(icon('cube'),'Sin cuenta no se ganan Esquirlas. Regístrate para empezar a acumularlas y comprar cartas.');
   if(account.user&&!session.code&&!soloAwarded){
     soloAwarded=true;
     accountCall('award',{floor:state.floor,bossKills:state.bossKills||0,won}).then(d=>{account.user=d.user;renderAccount();}).catch(()=>{});
@@ -1520,12 +1620,12 @@ function renderLobby(box){
       b.onclick=()=>{if(me.classId===kind)return;send({type:'class',classId:kind});const select=el('class');if(select){select.value=kind;classPreview();}};
       return b;
     }));
-    const ranks=Object.values(me.mastery||{}).reduce((a,b)=>a+b,0);
+    const learned=me.skillRanks.filter(r=>r>0).length;
     const masteryLine=account.user
-      ?h('div','lobby-mastery',h('span',null,icon('xp'),ranks?ranks+' rangos de maestría activos':'Sin maestrías activas'),
-        Object.assign(btn('',()=>openMasteries()),{className:'primary'}))
-      :h('p','hint','Entra con tu cuenta para usar tus maestrías.');
-    masteryLine.querySelector?.('button')?.append(icon('xp'),'Editar maestrías');
+      ?h('div','lobby-mastery',h('span',null,icon('level'),learned+' cartas activas'+(me.passive?' · '+cards[me.passive]?.name:' · sin pasiva')),
+        Object.assign(btn('',()=>openDeck(me.classId)),{className:'primary'}))
+      :h('p','hint','Sin cuenta juegas con las cartas de inicio.');
+    masteryLine.querySelector?.('button')?.append(icon('level'),'Preparar cartas');
     setup.push(h('div','lobby-setup',h('h3',null,icon('level'),'Tu personaje'),picks,masteryLine));
   }
   box.replaceChildren(
@@ -2070,7 +2170,7 @@ el('solo').onclick=()=>{
   const p=profile();
   const next=create();
   session={id:'local'};
-  join(next,session.id,account.user?.nick||p.name,p.classId,account.user?{mastery:account.user.mastery}:{});
+  join(next,session.id,account.user?.nick||p.name,p.classId,{loadouts:Object.fromEntries(Object.keys(classes).map(c=>[c,myLoadout(c)]))});
   soloAwarded=false;
   act(next,session.id,{type:'start'});
   error('');

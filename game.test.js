@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,masteryCost,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -588,29 +588,45 @@ test('una partida completa recorre los 3 actos y termina en victoria',()=>{
   assert.equal(s.bossKills,6);
 });
 
-test('colores fijos por puesto y maestrías aplicadas a la partida',()=>{
+test('colores fijos por puesto y mazo de cartas aplicado a la partida',()=>{
   const s=create();
-  join(s,'a','Uno','tirador',{mastery:{vigor:2,fuerza:1,fortuna:3,sabiduria:1,coraza:9}});
+  // Mazo del tirador: 2 de inicio + una comprada, y la pasiva Ojo de halcón (+1 alcance, −15 % de vida).
+  const deck={actives:['tirador.flecha-precisa','tirador.flecha-perforante','tirador.lluvia-de-flechas'],passive:'tirador.ojo-de-halcon'};
+  join(s,'a','Uno','tirador',{loadouts:{tirador:cleanLoadout('tirador',deck,['tirador.lluvia-de-flechas','tirador.ojo-de-halcon'])}});
   join(s,'b','Dos','tirador');
   assert.deepEqual(s.players.map(p=>p.color),['red','blue']);
-  assert.equal(s.players[0].gold,30);
-  assert.equal(s.players[0].mastery.coraza,3);
-  assert.equal(s.players[0].skillRanks[0],2);
+  const [a0,b0]=s.players;
+  assert.equal(a0.gold,0);
+  const names=p=>classes.tirador.skills.filter((_,i)=>p.skillRanks[i]>0).map(sk=>sk[0]);
+  assert.deepEqual(names(a0),['Flecha precisa','Flecha perforante','Lluvia de flechas']);
+  assert.deepEqual(names(b0),['Flecha precisa','Flecha de lastre','Flecha perforante'],'sin cuenta: las de inicio');
   act(s,'a',{type:'start'},rng);
   enterCombat(s);
   const [a,b]=['a','b'].map(id=>s.units.find(u=>u.id===id));
-  assert.equal(a.max-b.max,8);
-  assert.equal(a.stats.physical-b.stats.physical,4,'fuerza: +4 % por rango');
-  assert.equal(a.stats.ward-b.stats.ward,12,'coraza: +4 % por rango');
+  assert.equal(a.stats.reach-b.stats.reach,1);
+  assert.equal(a.max,Math.round(b.max*.85));
   assert.equal(a.color,'red');
-  assert.equal(masteryCost('fuerza',2),9);
+  // Un mazo con cartas que no se tienen se limpia: quedan las de inicio.
+  assert.deepEqual(cleanLoadout('mago',{actives:['mago.misil-magico'],passive:'mago.furia-magica'},[]),{actives:['mago.misil-magico'],passive:null});
+  assert.deepEqual(cleanLoadout('mago',{actives:[]},[]),defaultLoadout('mago'));
+  assert.equal(cleanLoadout('guardia',{actives:Object.values(cards).filter(c=>c.classId==='guardia'&&c.kind==='active').map(c=>c.id)},null).actives.length,3,'sin cuenta: solo las de inicio, hasta 3');
 });
-test('los puntos de cuenta crecen con lo lejos que se llega',()=>{
+test('Esquirlas: crecen con lo lejos que se llega',()=>{
   assert.ok(runPoints({floor:3})<runPoints({floor:9,bossKills:2}));
   assert.ok(runPoints({floor:24,bossKills:6,won:true})>runPoints({floor:24,bossKills:5}));
-  assert.equal(runPoints({floor:999,bossKills:99,won:true}),12+12+15+15);
+  assert.equal(runPoints({floor:999,bossKills:99,won:true}),240+240+300+300);
 });
-test('cuentas: registro, maestrías, amigos, invitaciones y puntos al terminar la partida en sala', {timeout:10000}, async t=>{
+test('pasiva Furia mágica: recibe más daño físico y hace más daño mágico',async()=>{
+  const {scaledDamage}=await import('./engine.js');
+  const mage={classId:'mago',stats:{},passive:'mago.furia-magica',effects:{}};
+  const plain={classId:'mago',stats:{},effects:{}};
+  const missile=classes.mago.skills[0];
+  assert.equal(scaledDamage(mage,missile,20),23);
+  assert.equal(scaledDamage(plain,missile,20),20);
+  const hit=(target)=>damagePreview({classId:'guardia',stats:{},effects:{}},target,classes.guardia.skills[0]).normal[0];
+  assert.equal(hit({...mage,stats:{ward:0}}),Math.round(hit({...plain,stats:{ward:0}})*1.3));
+});
+test('cuentas: registro, cartas, mazos, amigos, invitaciones y Esquirlas al terminar la partida en sala', {timeout:10000}, async t=>{
   const {server:app}=await import('./server.js');
   if(!app.listening){app.listen(0,'127.0.0.1');await once(app,'listening');}
   t.after(()=>app.close());
@@ -629,30 +645,38 @@ test('cuentas: registro, maestrías, amigos, invitaciones y puntos al terminar l
   const friends=await call('/api/account/friend',{nick:'bob'},ana.token);
   assert.deepEqual(friends.user.friends,['Bob']);
   assert.equal(friends.friends[0].online,true);
+  assert.equal(ana.user.shards,0,'las cuentas nuevas empiezan sin Esquirlas');
   const solo=await call('/api/account/award',{floor:9,bossKills:2,won:false},ana.token);
-  assert.equal(solo.points,4+4+5);
+  assert.equal(solo.points,90+80+100);
   assert.equal((await call('/api/account/award',{floor:9},ana.token)).status,400);
-  const bought=await call('/api/account/mastery',{key:'vigor'},ana.token);
-  assert.equal(bought.user.mastery.vigor,1);
-  assert.equal(bought.user.spent,2);
-  assert.equal((await call('/api/account/mastery',{key:'celeridad'},bob.token)).status,400);
+  // Comprar una carta y equiparla
+  const bought=await call('/api/account/buy-card',{card:'guardia.empujon-de-escudo'},ana.token);
+  assert.equal(bought.status,200);
+  assert.equal(bought.user.shards,270-250);
+  assert.ok(bought.user.cards.includes('guardia.empujon-de-escudo'));
+  assert.equal((await call('/api/account/buy-card',{card:'guardia.gancho'},ana.token)).status,400,'sin Esquirlas suficientes');
+  assert.equal((await call('/api/account/buy-slot',{classId:'guardia'},ana.token)).status,400,'el hueco extra cuesta 1000');
+  assert.equal((await call('/api/account/loadout',{classId:'guardia',loadout:{actives:[]}},ana.token)).status,400,'al menos una activa');
+  const saved=await call('/api/account/loadout',{classId:'guardia',loadout:{actives:['guardia.tajo','guardia.empujon-de-escudo','guardia.gancho']}},ana.token);
+  assert.deepEqual(saved.user.loadouts.guardia.actives,['guardia.tajo','guardia.empujon-de-escudo'],'el Gancho no se tiene: se descarta');
   const room=await call('/api/rooms',{classId:'guardia'},ana.token);
   assert.equal(room.state.players[0].name,'Ana');
-  assert.equal(room.state.players[0].mastery.vigor,1);
+  const ranks=room.state.players[0].skillRanks;
+  assert.deepEqual(classes.guardia.skills.filter((_,i)=>ranks[i]>0).map(sk=>sk[0]),['Tajo','Empujón de escudo']);
   assert.equal((await call('/api/account/invite',{nick:'Bob',code:room.code},ana.token)).status,200);
   const bobMe=await call('/api/account/me',null,bob.token);
   assert.equal(bobMe.user.invites[0].code,room.code);
   const joined=await call('/api/'+room.code+'/join',{classId:'mago'},bob.token);
   assert.deepEqual(joined.state.players.map(p=>p.color),['red','blue']);
-  const before=(await call('/api/account/me',null,bob.token)).user.points;
+  const before=(await call('/api/account/me',null,bob.token)).user.shards;
   const {rooms}=await import('./server.js');
   await call('/api/'+room.code+'/action',{type:'start'},null,room.key);
   const live=rooms.get(room.code);
   live.state.floor=5;live.state.bossKills=1;live.state.phase='lost';
   await call('/api/'+room.code,null,null,room.key);
   await call('/api/'+room.code,null,null,joined.key);
-  const after=(await call('/api/account/me',null,bob.token)).user.points;
-  assert.equal(after-before,2+2);
+  const after=(await call('/api/account/me',null,bob.token)).user.shards;
+  assert.equal(after-before,50+40);
   assert.ok(before>=0);
 });
 
@@ -1099,9 +1123,10 @@ test('sala: cambiar de clase, maestrías desde la cuenta, salir y no duplicar al
   assert.equal(changed.state.players.find(p=>p.id===first.id).classId,'sombra');
   assert.equal((await call('/api/'+room.code+'/action',{type:'class',classId:'dragón'},carla.token,first.key)).status,400);
   // Las maestrías salen de la cuenta: lo que mande el cliente no cuenta
-  const cheat=await call('/api/'+room.code+'/action',{type:'mastery',mastery:{fuerza:3},trusted:true},carla.token,first.key);
-  assert.deepEqual(cheat.state.players.find(p=>p.id===first.id).mastery,{});
-  assert.equal((await call('/api/'+room.code+'/action',{type:'mastery'},null,room.key)).status,400);
+  // Las cartas salen de la cuenta: lo que mande el cliente no cuenta
+  const cheat=await call('/api/'+room.code+'/action',{type:'loadout',loadouts:{sombra:{actives:['sombra.corte-glacial'],passive:'sombra.sombra-letal'}},trusted:true},carla.token,first.key);
+  assert.equal(cheat.state.players.find(p=>p.id===first.id).passive,null);
+  assert.equal((await call('/api/'+room.code+'/action',{type:'loadout'},null,room.key)).status,400);
   // Volver a entrar con la misma cuenta sustituye el hueco anterior
   const again=await call('/api/'+room.code+'/join',{classId:'tirador'},carla.token);
   assert.equal(again.state.players.length,2);

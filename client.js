@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=91';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=91';
-import {setupSfx} from './music.js?v=91';
-import {icon} from './icons.js?v=91';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=92';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=92';
+import {setupSfx} from './music.js?v=92';
+import {icon} from './icons.js?v=92';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -28,6 +28,8 @@ const iconName={expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',burn:'Que
 const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo'};
 const specs={guardia:'Primera línea · debilita al enemigo',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
 const roles={guardia:'Tanque',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
+// Editor de SFX desactivado por ahora; poner true para volver a mostrarlo al admin.
+const SFX_EDITOR=false;
 const sfx=setupSfx(el('field-sfx'));
 // Pausa: botón en el tablero y tecla P.
 const pauseButton=el('field-pause');
@@ -121,7 +123,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=91').then(({createIso})=>{
+import('./isometric.js?v=92').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -283,7 +285,7 @@ function renderAccount(){
   box.replaceChildren(
     h('div','account-head',h('div','account-title',h('h2',null,icon('level'),u.nick),shardBadge(available())),
       h('div','account-stats',h('span','chip',icon('crown'),'Mejor piso: '+(u.best||0)),h('span','chip',icon('clock'),(u.runs||0)+' partidas')),
-      h('div','account-actions',deckButton,shopButton,u.admin?sfxEditorButton():null,out)),
+      h('div','account-actions',deckButton,shopButton,SFX_EDITOR&&u.admin?sfxEditorButton():null,out)),
     ...invites,
     friendBox);
 }

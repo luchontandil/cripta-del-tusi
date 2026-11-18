@@ -1,9 +1,9 @@
-import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,statNames,onBoard,
+import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=77';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=77';
-import {setupSfx} from './music.js?v=77';
-import {icon} from './icons.js?v=77';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,masteryTree,masteryCost,runPoints,cleanMastery,actOf,monsterTraits} from './engine.js?v=78';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=78';
+import {setupSfx} from './music.js?v=78';
+import {icon} from './icons.js?v=78';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=77').then(({createIso})=>{
+import('./isometric.js?v=78').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -500,6 +500,7 @@ function heroStatRows(u){
     statRow('critical','Crítico',Math.round(critChance(u)*100)+' % · ×1,5'),
     statRow('reach','Alcance extra',st.reach?'+'+st.reach:'0')
   ];
+  if(st.leech)rows.push(statRow('leech','Vampirismo',st.leech+' % del daño'));
   for(const key of Object.keys(elements))if(st[key])rows.push(statRow(key,'Daño '+elements[key].toLowerCase(),'+'+st[key],'element-'+key));
   return rows;
 }
@@ -751,7 +752,7 @@ function panel(title,iconName){
   box.append(heading);
   return box;
 }
-const statValue=(key,value,signed=true)=>(signed?(value>0?'+':'−'):'')+Math.abs(value)+(key==='critical'?' %':'');
+const statValue=(key,value,signed=true)=>(signed?(value>0?'+':'−'):'')+Math.abs(value)+(key==='critical'||key==='leech'?' %':'');
 /** Línea de atributo de objeto con icono, valor y nombre. */
 function statLine(key,value,tag='li'){
   const line=h(tag,'stat-line stat-'+key,icon(key),h('b',null,statValue(key,value)),' ');
@@ -968,7 +969,37 @@ function paperDollSilhouette(){
   holder.innerHTML='<svg viewBox="0 0 120 200" preserveAspectRatio="xMidYMid meet"><path d="M60 8c-11 0-19 9-19 20s8 21 19 21 19-10 19-21-8-20-19-20zM38 54c-9 2-15 8-18 17l-9 40c-1 5 2 9 6 10l6 1 8-38 3 30-2 36h-1l-5 34c-1 4 2 7 6 7h9c3 0 5-2 6-5l9-40 9 40c1 3 3 5 6 5h9c4 0 7-3 6-7l-5-34h-1l-2-36 3-30 8 38 6-1c4-1 7-5 6-10l-9-40c-3-9-9-15-18-17z"/></svg>';
   return holder;
 }
+/**
+ * Aviso al cambiar equipo: se recuerda qué había en cada ranura y, si cambia, la ranura destella
+ * (y la pieza que vuelve a la mochila parpadea). Se guarda la hora para que el destello no se corte
+ * aunque el inventario se vuelva a dibujar mientras dura.
+ */
+let lastGear=null;
+const gearFlash=new Map(),stowFlash=new Map();
+const FLASH_MS=1400;
+function trackGearChanges(player){
+  const now=Date.now();
+  const current=Object.fromEntries(Object.keys(equipSlots).map(slot=>[slot,player.equipment[slot]?.id??null]));
+  if(lastGear&&lastGear.player===player.id){
+    for(const [slot,id] of Object.entries(current)){
+      const before=lastGear.slots[slot];
+      if(id!==null&&id!==before){
+        gearFlash.set(slot,now);
+        if(before!==null&&player.bag.some(item=>item.id===before))stowFlash.set(before,now);
+      }
+    }
+  }
+  lastGear={player:player.id,slots:current};
+}
+function flash(tile,started,className){
+  if(!started)return;
+  const elapsed=Date.now()-started;
+  if(elapsed>FLASH_MS)return;
+  tile.classList.add(className);
+  tile.style.animationDelay=-elapsed+'ms';
+}
 function renderInventory(player){
+  trackGearChanges(player);
   const holder=el('inventory');
   const rewards=el('rewards');
   const shopping=state.phase==='shop';
@@ -996,6 +1027,7 @@ function renderInventory(player){
     const actions=item&&trading?[actionButton('Quitar','unequip',{slot})]:[];
     const tile=inventorySlot(item,label,actions,slotKind(slot));
     tile.classList.add('doll-'+slot);
+    flash(tile,gearFlash.get(slot),'just-equipped');
     if(trading){
       if(item)draggable(tile,{from:'gear',slot});
       dropZone(tile,p=>p.from==='bag'&&(p.slot===slotKind(slot)||(p.kind==='rune'&&!!item&&runesOf(item).length<socketsOf(item))),
@@ -1027,6 +1059,7 @@ function renderInventory(player){
       }
     }
     const tile=inventorySlot(item,'',actions);
+    flash(tile,stowFlash.get(item.id),'just-stowed');
     if(trading)draggable(tile,{from:'bag',item:item.id,slot:item.slot,kind:item.kind});
     bagGrid.append(tile);
   }
@@ -1147,6 +1180,10 @@ function renderForge(box){
     card.classList.add('forge-card');
     // Prefijos y sufijos agrupados y con título, para ver qué se va a re-tirar.
     card.querySelector('.affix-list')?.replaceWith(affixList(item,'stat-list',true));
+    // Marcar los modificadores que «Pulir» puede subir de tier.
+    const sorted=[...item.affixes].sort((a,b)=>a.type===b.type?0:a.type==='prefix'?-1:1);
+    const canPolish=new Set(polishable(item));
+    card.querySelectorAll('.affix-list li.affix').forEach((li,i)=>{if(canPolish.has(sorted[i]))li.classList.add('can-polish');});
     // Huecos de la vista previa ya reservados (invisibles): al pasar el ratón solo se iluminan, la carta no cambia de alto.
     const list=card.querySelector('.affix-list');
     if(list)list.append(h('li','forge-ghost upgrade-ghost',forgeBlock(item,'upgrade')?'\u00a0':'+ 1 prefijo o sufijo nuevo'));

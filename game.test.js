@@ -506,10 +506,12 @@ test('los objetos siguen las reglas de rareza, afijos/sufijos y tiers por nivel'
     assert.equal(new Set(item.affixes.map(a=>a.stat)).size,item.affixes.length);
     for(const mod of item.affixes){
       if(damage.has(mod.stat))assert.ok(['weapon','ring','amulet'].includes(item.slot),'daño en '+item.slot);
-      if(mod.stat==='ward')assert.ok(['gloves','boots','armor'].includes(item.slot),'armadura en '+item.slot);
+      if(mod.stat==='ward')assert.ok(['helmet','gloves','boots','armor'].includes(item.slot),'armadura en '+item.slot);
+      if(mod.stat==='leech'){assert.equal(item.slot,'weapon');assert.ok(mod.value>=1&&mod.value<=5);}
     }
     if(item.slot==='weapon')assert.ok(!item.affixes.some(a=>a.stat==='ward'||a.stat==='vitality'),'arma con armadura o vida');
     assert.notEqual(item.slot,'charm');
+    assert.ok(item.affixes.filter(a=>a.type==='prefix').length<=2&&item.affixes.filter(a=>a.type==='suffix').length<=2,'máximo 2 y 2');
   }
   const avgTier=items=>{const t=items.flatMap(i=>i.affixes.map(a=>a.tier));return t.reduce((a,b)=>a+b,0)/t.length;};
   const early=sample(1),late=sample(6);
@@ -1210,4 +1212,28 @@ test('dos anillos: el segundo va al hueco libre y se puede elegir cuál reemplaz
   assert.deepEqual(p.bag.map(i=>i.id),[602]);
   assert.throws(()=>act(s,'p0',{type:'equip',item:602,slot:'boots'},rng),/no encaja/);
   assert.equal(heroStatsOf(p).stats.critical,2,'los dos anillos suman');
+});
+
+test('vampirismo: el héroe recupera un % del daño que hace; pulir sube un tier',async()=>{
+  const E=await import('./engine.js');
+  const s=battle('guardia');
+  s.walls=[];s.water=[];s.traps=[];
+  const hero=s.units.find(u=>!u.enemy);
+  const foe=s.units.find(u=>u.enemy);
+  hero.stats.leech=5;hero.hp=10;
+  foe.pos=hero.pos-1;foe.hp=foe.max=200;foe.resist={};
+  s.turn=s.units.indexOf(hero);s.ap=6;
+  for(let i=0;i<3;i++){try{act(s,'p0',{type:'skill',skill:0,pos:foe.pos},rng);}catch{}}
+  const dealt=200-foe.hp;
+  assert.ok(dealt>0);
+  assert.equal(hero.hp,10+Math.floor(dealt*.05),'cura '+Math.floor(dealt*.05)+' de '+dealt);
+  // Pulir
+  const item={id:900,kind:'gear',slot:'ring',base:'Anillo de obsidiana',grade:1,ilvl:6,sockets:0,runes:[],
+    affixes:[{type:'prefix',stat:'fire',tier:2,tiers:8,value:2,label:'Ardiente'},{type:'suffix',stat:'critical',tier:6,tiers:6,value:20,label:'del Apocalipsis'}]};
+  assert.deepEqual(E.polishable(item).map(m=>m.stat),['fire'],'el crítico ya está al máximo');
+  s.players[0].gold=999;s.players[0].bag=[item];s.phase='forge';
+  act(s,'p0',{type:'forge',item:900,mode:'polish'},rng);
+  const fire=item.affixes.find(m=>m.stat==='fire');
+  assert.equal(fire.tier,3);assert.equal(fire.label,'Candente');assert.ok(fire.value>=3&&fire.value<=5);
+  assert.ok(E.forgeBlock({...item,ilvl:1,affixes:[{type:'prefix',stat:'fire',tier:5,tiers:8,value:8,label:'Calcinante'}]},'polish'),'no se pule más allá de nivel+6');
 });

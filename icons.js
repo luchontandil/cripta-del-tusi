@@ -1,6 +1,7 @@
 // Conjunto de iconos vectoriales (24×24, trazo) para estadísticas y controles.
 const paths={
   hp:'<path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2Z" fill="currentColor" fill-opacity=".25"/>',
+  leech:'<path d="M12 3.5c3 4.2 5.5 7.4 5.5 10.6a5.5 5.5 0 0 1-11 0C6.5 10.9 9 7.7 12 3.5Z" fill="currentColor" fill-opacity=".3"/><path d="M9.4 13.2l1.3 2.4 1.3-2.4 1.3 2.4 1.3-2.4"/>',
   ward:'<path d="M12 3.2 19 6v5.4c0 4.6-3 7.9-7 9.4-4-1.5-7-4.8-7-9.4V6Z" fill="currentColor" fill-opacity=".2"/><path d="M12 7v10"/>',
   initiative:'<path d="M13.5 2.8 6 13.2h5.2L10 21.2l8-11h-5.3Z" fill="currentColor" fill-opacity=".25"/>',
   mp:'<path d="M8 4.5c1.6 0 2.4 1.6 2.4 3.6S9.6 12 8 12 5.6 10 5.6 8.1 6.4 4.5 8 4.5Z" fill="currentColor" fill-opacity=".25"/><path d="M6 14.5h4"/><path d="M16 9.5c1.6 0 2.4 1.6 2.4 3.6S17.6 17 16 17s-2.4-2-2.4-3.9.8-3.6 2.4-3.6Z" fill="currentColor" fill-opacity=".25"/><path d="M14 19.5h4"/>',

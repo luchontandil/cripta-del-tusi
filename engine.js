@@ -148,7 +148,8 @@ export function equipTarget(p,item,wanted){
   return !p.equipment.ring?'ring':!p.equipment.ring2?'ring2':'ring';
 }
 export const statNames = {...Object.fromEntries(Object.entries(elements).map(([key,name])=>[key,'Daño '+name.toLowerCase()])),
-  vitality:'Vida',reach:'Alcance (habilidades modificables)',ward:'Armadura',critical:'Crítico',movement:'PM',action:'PA'};
+  vitality:'Vida',reach:'Alcance (habilidades modificables)',ward:'Armadura',critical:'Crítico',movement:'PM',action:'PA',
+  leech:'Vampirismo'};
 export const rarities = ['Normal','Poco común','Raro','Legendario'];
 const bases = {
   weapon:['Arco de tejo','Sable de cobre','Cetro de ónice','Lanza de vigía'],
@@ -181,19 +182,21 @@ export const affixes={
     critical:[[1,3,5,'del Halcón'],[2,5,8,'del Cazador'],[4,8,11,'del Asesino'],[6,11,15,'del Verdugo'],[11,15,19,'de la Carnicería'],[17,19,24,'del Apocalipsis']],
     reach:[[3,1,1,'del Vigía'],[9,2,2,'del Horizonte']],
     movement:[[1,1,1,'de la Liebre'],[7,2,2,'del Viento']],
-    action:[[3,1,1,'del Erudito']]
+    action:[[3,1,1,'del Erudito']],
+    // Vampirismo «omni»: recupera un % de todo el daño que haces (cualquier tipo). Solo en armas.
+    leech:[[2,1,1,'del Murciélago'],[6,2,2,'de la Sanguijuela'],[11,3,3,'del Vampiro'],[16,4,4,'del Strigoi'],[21,5,5,'del Nosferatu']]
   }
 };
 const elementsAll=['physical','magic','fire','ice','lightning','chaos'];
 /**
  * Qué puede salir en cada pieza:
  * - Daño (prefijos elementales y físico): solo en armas, anillos y amuletos.
- * - Armadura: solo en guantes, botas y peto.
+ * - Armadura: solo en casco, guantes, botas y peto.
  * - Las armas nunca llevan armadura ni vida.
  */
 const slotAffixes={
-  weapon:{prefix:elementsAll,suffix:['critical','action']},
-  helmet:{prefix:[],suffix:['vitality','critical','reach']},
+  weapon:{prefix:elementsAll,suffix:['critical','action','leech']},
+  helmet:{prefix:['ward'],suffix:['vitality','critical','reach']},
   armor:{prefix:['ward'],suffix:['vitality','critical']},
   gloves:{prefix:['ward'],suffix:['critical','vitality']},
   belt:{prefix:[],suffix:['vitality','critical']},
@@ -296,7 +299,8 @@ function affixPool(slot,base){
  */
 function balanceCounts([pre,suf],pool,level){
   const room=type=>pool[type].filter(stat=>affixes[type][stat].some(tier=>tier[0]<=level)).length;
-  const maxPre=Math.min(3,room('prefix')),maxSuf=Math.min(3,room('suffix'));
+  // Como mucho 2 prefijos y 2 sufijos.
+  const maxPre=Math.min(2,room('prefix')),maxSuf=Math.min(2,room('suffix'));
   let p=Math.min(pre,maxPre),q=Math.min(suf,maxSuf),spare=pre+suf-p-q;
   while(spare>0&&(p<maxPre||q<maxSuf)){if(q<maxSuf)q++;else p++;spare--;}
   return [p,q];
@@ -367,13 +371,21 @@ export const forgeModes={
   prefix:{name:'Re-tirar prefijos',text:'Vuelve a tirar solo los PREFIJOS; los sufijos se quedan igual.',factor:1.35},
   suffix:{name:'Re-tirar sufijos',text:'Vuelve a tirar solo los SUFIJOS; los prefijos se quedan igual.',factor:1.35},
   upgrade:{name:'Mejorar rareza',text:'Sube un grado de rareza y añade el prefijo o sufijo que le corresponde.',factor:2.6},
-  socket:{name:'Añadir hueco',text:'Abre un hueco más para gemas (máximo 2).',factor:1.8}
+  socket:{name:'Añadir hueco',text:'Abre un hueco más para gemas (máximo 2).',factor:1.8},
+  polish:{name:'Pulir',text:'Sube un tier un PREFIJO o SUFIJO al azar (de los que aún pueden mejorar).',factor:1.6}
 };
+/** Modificadores de un objeto que todavía pueden subir de tier. */
+// Como mucho hasta tiers de 6 niveles por encima del objeto (no se puede llevar un objeto de nivel 1 al tier máximo).
+export const polishable=item=>(item?.affixes||[]).filter(mod=>{
+  const tiers=affixes[mod.type]?.[mod.stat];
+  return tiers&&mod.tier<tiers.length&&tiers[mod.tier][0]<=(item.ilvl||1)+6;
+});
 /** Precio de una operación de forja: crece con el nivel y la rareza del objeto. */
 export function forgeCost(item,mode){
   const base=12+item.ilvl*3+item.grade*10;
   // Mejorar rareza: subir un objeto normal es barato; cada grado siguiente cuesta bastante más.
-  const factor=mode==='upgrade'?[1.1,2.2,3.2][item.grade]??3.2:forgeModes[mode]?.factor||1;
+  const avgTier=item.affixes?.length?item.affixes.reduce((sum,m)=>sum+m.tier,0)/item.affixes.length:1;
+  const factor=mode==='upgrade'?[1.1,2.2,3.2][item.grade]??3.2:mode==='polish'?1.2+.3*avgTier:forgeModes[mode]?.factor||1;
   return Math.round(base*factor);
 }
 /** ¿Se puede hacer esta operación sobre este objeto? Devuelve el motivo si no. */
@@ -383,6 +395,7 @@ export function forgeBlock(item,mode){
   if(mode==='socket'&&socketsOf(item)>=MAX_SOCKETS)return 'Ya tiene el máximo de huecos ('+MAX_SOCKETS+').';
   if(mode==='prefix'&&!item.affixes.some(m=>m.type==='prefix'))return 'No tiene prefijos.';
   if(mode==='suffix'&&!item.affixes.some(m=>m.type==='suffix'))return 'No tiene sufijos.';
+  if(mode==='polish'&&!polishable(item).length)return 'Todos sus modificadores ya están en su tier máximo.';
   return null;
 }
 function forgeItem(item,mode,rng){
@@ -400,7 +413,15 @@ function forgeItem(item,mode,rng){
     item.price+=4;
     return item;
   }
-  if(mode==='reroll'){reroll('prefix');reroll('suffix');}
+  if(mode==='polish'){
+    // Pulir: un modificador al azar sube un tier y vuelve a tirar su valor en el rango nuevo.
+    const mod=pick(polishable(item),rng);
+    const tiers=affixes[mod.type][mod.stat];
+    const [need,low,high,label]=tiers[mod.tier];
+    mod.tier++;mod.value=roll(low,high,rng);mod.label=label;
+    if(need>level)mod.ascended=true;
+  }
+  else if(mode==='reroll'){reroll('prefix');reroll('suffix');}
   else if(mode==='prefix')reroll('prefix');
   else if(mode==='suffix')reroll('suffix');
   else if(mode==='upgrade'){
@@ -410,7 +431,7 @@ function forgeItem(item,mode,rng){
     const types=['prefix','suffix'].filter(type=>count(type)<(item.grade===1?1:2));
     const order=types.sort((a,b)=>count(a)-count(b)||rng()-.5);
     // Si la pieza no admite más de ese tipo (p. ej. un casco no tiene prefijos), se prueba con el otro.
-    const fallback=['prefix','suffix'].filter(type=>!order.includes(type)&&count(type)<3);
+    const fallback=['prefix','suffix'].filter(type=>!order.includes(type)&&count(type)<2);
     for(const type of [...order,...fallback]){
       const mod=rollMod(type,item.slot,item.base,level,item.affixes.map(m=>m.stat),rng,item.grade);
       if(mod){item.affixes.push(mod);break;}
@@ -1133,6 +1154,16 @@ function hit(s,actor,target,raw,kind='damage',critical=false,element='physical')
   target.hp-=damage;
   if(target.hp>0)target.lastHit=damage;
   emit(s,{kind,unit:target.id,pos:target.pos,from:actor.pos,amount:damage,critical});
+  // Vampirismo de los héroes: se acumula la fracción y se cura en puntos enteros.
+  const leech=!actor.enemy&&kind==='damage'&&actor!==target?actor.stats?.leech||0:0;
+  if(leech>0&&damage>0&&alive(actor)){
+    actor.leechPool=(actor.leechPool||0)+damage*leech/100;
+    const heal=Math.min(actor.max-actor.hp,Math.floor(actor.leechPool));
+    if(Math.floor(actor.leechPool)>=1){
+      actor.leechPool-=Math.floor(actor.leechPool);
+      if(heal>0){actor.hp+=heal;emit(s,{kind:'heal',unit:actor.id,from:actor.pos,pos:actor.pos,amount:heal});note(s,actor.name+' recupera '+heal+' PV por vampirismo.');}
+    }
+  }
   note(s,actor.name+' → '+target.name+' · −'+damage+' PV'+(extra?' (+'+extra+' vulnerabilidad)':'')+(critical?' · crítico':''));
   if(target.hp<=0)releaseMinions(s,target);
   // Golpes de fuego (monstruos, glifos, hechizos) prenden; el hielo apaga.

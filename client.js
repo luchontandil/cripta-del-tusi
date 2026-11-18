@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=89';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=89';
-import {setupSfx} from './music.js?v=89';
-import {icon} from './icons.js?v=89';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=90';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=90';
+import {setupSfx} from './music.js?v=90';
+import {icon} from './icons.js?v=90';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=89').then(({createIso})=>{
+import('./isometric.js?v=90').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -134,7 +134,13 @@ import('./isometric.js?v=89').then(({createIso})=>{
   }
 }).catch(()=>{syncViewport();});
 // ───────────── Cuentas, maestrías, amigos e invitaciones ─────────────
-let account={token:localStorage.getItem('cripta-account')||null,user:null,friends:[],persistent:true,mode:'login',busy:false};
+/**
+ * Cuenta. Se guarda una copia de los datos públicos (nick, Esquirlas, cartas…; nunca la contraseña) para
+ * mostrarte conectado al recargar, sin esperar a que el servidor (que puede estar despertando) responda.
+ */
+const cachedUser=(()=>{try{return localStorage.getItem('cripta-account')?JSON.parse(localStorage.getItem('cripta-account-user')||'null'):null;}catch{return null;}})();
+let account={token:localStorage.getItem('cripta-account')||null,user:cachedUser,friends:[],persistent:true,mode:'login',busy:false,cached:!!cachedUser};
+function rememberUser(){try{if(account.token&&account.user)localStorage.setItem('cripta-account-user',JSON.stringify(account.user));}catch{}}
 const serverBase=()=>{try{return new URL(el('server').value).origin;}catch{return location.origin;}};
 async function accountCall(operation,body){
   const response=await fetch(serverBase()+'/api/account/'+operation,{
@@ -149,7 +155,7 @@ async function accountCall(operation,body){
 }
 function setAccountToken(token){
   account.token=token;
-  if(token)localStorage.setItem('cripta-account',token);else{localStorage.removeItem('cripta-account');account.user=null;account.friends=[];}
+  if(token)localStorage.setItem('cripta-account',token);else{localStorage.removeItem('cripta-account');localStorage.removeItem('cripta-account-user');account.user=null;account.friends=[];}
 }
 const available=()=>account.user?.shards||0;
 async function refreshAccount(){
@@ -158,7 +164,7 @@ async function refreshAccount(){
     const data=await accountCall('me');
     // Si hay cambios del mazo sin guardar, manda lo que se ve en pantalla (la respuesta puede venir de antes).
     if(deckPending>0&&account.user)data.user.loadouts=account.user.loadouts;
-    account.user=data.user;account.friends=data.friends;
+    account.user=data.user;account.friends=data.friends;account.cached=false;rememberUser();
     renderAccount();showInvites();
     if(deckDialog.open)renderDeck();
     if(shopDialog.open)renderShardShop();
@@ -192,6 +198,8 @@ setInterval(()=>{if(!state||state.phase==='lobby')accountCall('status').then(pai
 let savedMix={};
 fetch(serverBase()+'/api/sfx/mix',{signal:AbortSignal.timeout(12000)}).then(r=>r.json()).then(d=>{savedMix=d.mix||{};sfx.setMix(savedMix,serverBase());}).catch(()=>{});
 setInterval(refreshAccount,10000);
+// Al cargar la página: comprobar la sesión enseguida (antes se esperaba a la primera consulta, a los 10 s).
+refreshAccount();
 // Invitaciones casi en tiempo real: consulta ligera cada 2,5 s mientras estás en la portada.
 setInterval(async()=>{
   if(!account.token||!account.user||state||document.hidden)return;
@@ -210,9 +218,14 @@ function syncNameField(){
   field.hidden=!!account.user;
 }
 function renderAccount(){
+  rememberUser();
   syncNameField();
   const box=el('account');
   if(!box)return;
+  if(account.token&&!account.user){
+    box.replaceChildren(h('div','account-head',h('h2',null,icon('level'),'Tu cuenta'),h('p','hint connecting',icon('clock'),'Conectando con tu cuenta…')));
+    return;
+  }
   if(!account.token||!account.user){
     const nick=document.createElement('input');nick.maxLength=16;nick.autocomplete='username';nick.placeholder='Tu nick';
     const pass=document.createElement('input');pass.type='password';pass.autocomplete=account.mode==='login'?'current-password':'new-password';pass.placeholder='Contraseña';
@@ -225,7 +238,7 @@ function renderAccount(){
       try{
         go.disabled=true;go.replaceChildren(icon('clock'),account.mode==='login'?'Entrando…':'Creando cuenta…');
         const data=await accountCall(account.mode==='login'?'login':'register',{nick:nick.value,password:pass.value});
-        setAccountToken(data.token);account.user=data.user;
+        setAccountToken(data.token);account.user=data.user;rememberUser();
         // Se entra ya; los amigos y el resto se cargan después, sin esperar.
         error('');renderAccount();classPreview();refreshAccount();
       }catch(e){error(e.message);go.disabled=false;renderAccount();}finally{account.busy=false;}

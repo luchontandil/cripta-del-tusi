@@ -649,7 +649,8 @@ const actBosses=[[['skeletonking'],['umbralking']],[['cerberus'],['sporemother']
 /** Rasgos de cada monstruo: elemento de su ataque, robo de vida, encanto, armadura, movimiento. */
 export const monsterTraits={
   bat:{movement:1,initiative:9,hamstring:true,resist:{lightning:-30,physical:-15}},
-  skull:{element:'magic',drain:true,resist:{chaos:60,magic:30,physical:20}},
+  // Calavera: quita PA solo con su Maldición (cada 3 turnos), no con cada golpe; alcance algo menor.
+  skull:{element:'magic',range:5,resist:{chaos:60,magic:30,physical:20}},
   skeleton:{ward:15,initiative:7,resist:{chaos:50,ice:30,fire:-25}},
   succubus:{element:'chaos',charm:true,range:5,initiative:12,resist:{chaos:40,magic:25,ice:-25}},
   vampire:{lifesteal:.5,element:'chaos',initiative:10,drain:true,resist:{chaos:50,fire:-30}},
@@ -719,7 +720,7 @@ function monster(species,id,floor,{ranged=false,elite=false,solo=false}={}){
   const factor=(ranged?.75:elite?1.15:1)*(solo?.85:1);
   const hp=Math.round((12+4*floor)*factor);   // (antes 16+4·piso: los primeros combates se alargaban con la IA nueva)
   return {id,name:monsterNames[species],look:species,boss:false,elite,enemy:true,resist:{...(trait.resist||{})},
-    initiative:trait.initiative||(ranged?11:6),range:trait.range||(ranged?8:1),hp,
+    initiative:trait.initiative||(ranged?11:6),range:trait.range||(ranged?6:1),hp,
     damage:Math.max(1,Math.round((ranged?2+floor:3+floor)*(solo?.85:1))),
     stats:{ward:(trait.ward||0)+(elite?15:0),movement:trait.movement||0},effects:{}};
 }
@@ -1332,7 +1333,8 @@ function beginTurn(s) {
   s.casts={};
   s.ap=Math.max(1,(u.enemy?4:BASE_AP)+(u.stats?.action||0)+(bonus.ap||0)-(u.effects.weak?.value||0));
   // Los enemigos tienen 4 PM de base (uno más que los héroes).
-  s.mp=Math.max(0,(u.enemy?ENEMY_MP:BASE_MP)+(u.stats?.movement||0)+(bonus.mp||0)+(u.effects.haste?.value||0)-(u.effects.slow?.value||0));
+  // Los de distancia, 3 PM (si no, disparan y huyen sin que se les pueda alcanzar).
+  s.mp=Math.max(0,(u.enemy?(archetypeOf(u)==='ranged'?ENEMY_MP-1:ENEMY_MP):BASE_MP)+(u.stats?.movement||0)+(bonus.mp||0)+(u.effects.haste?.value||0)-(u.effects.slow?.value||0));
   s.turnStarted=Date.now();
   s.deadline=s.turnStarted+(u.enemy?350:60000);
   if(u.effects.poison)hit(s,{name:'Veneno',pos:u.pos},u,u.effects.poison.value,'poison',false,'chaos');
@@ -1511,8 +1513,8 @@ function retreat(s,unit,heroes){
   if(!living.length)return;
   const nearest=pos=>Math.min(...living.map(h=>distance(s,pos,h.pos)));
   const here=nearest(unit.pos);
-  // Ya está lejos (más de lo que un héroe recorre en un turno): no hace falta huir.
-  if(here>BASE_MP+1)return;
+  // Solo se aleja si tiene a un héroe encima (a 2 casillas o menos).
+  if(here>2)return;
   const options=[...paths(s,unit,s.mp)].filter(([pos,path])=>!hazardsOn(s,path)&&nearest(pos)>here);
   options.sort(([a,pa],[b,pb])=>nearest(b)-nearest(a)||pa.length-pb.length);
   if(options[0])move(s,unit,options[0][1]);

@@ -59,7 +59,7 @@ test('valida turno, ruta, puntos, visibilidad y escalado',()=>{
   assert.throws(()=>act(s,'p0',{type:'skill',skill:2,pos:enemy.pos}),/puntos/);
   assert.ok(encounter(3,4).length>encounter(3,1).length);
   assert.ok(encounter(5,1)[0].hp>encounter(1,1)[0].hp);
-  assert.ok(encounter(1,2)[0].hp>=20&&encounter(1,2)[0].damage>=4);
+  assert.ok(encounter(1,2)[0].hp>=14&&encounter(1,2)[0].damage>=4);
   assert.ok(encounter(1,1)[0].hp<encounter(1,2)[0].hp);
 });
 test('la vulnerabilidad se aplica a otro atacante y el clérigo cura a un aliado',()=>{

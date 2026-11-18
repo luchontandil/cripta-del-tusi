@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=88';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=88';
-import {setupSfx} from './music.js?v=88';
-import {icon} from './icons.js?v=88';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=89';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=89';
+import {setupSfx} from './music.js?v=89';
+import {icon} from './icons.js?v=89';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=88').then(({createIso})=>{
+import('./isometric.js?v=89').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -268,8 +268,8 @@ function renderAccount(){
   friendBox.open=friendsOpen;
   friendBox.addEventListener('toggle',()=>{friendsOpen=friendBox.open;});
   box.replaceChildren(
-    h('div','account-head',h('h2',null,icon('level'),u.nick),
-      h('div','account-stats',shardChip(available()),h('span','chip',icon('crown'),'Mejor piso: '+(u.best||0)),h('span','chip',icon('clock'),(u.runs||0)+' partidas')),
+    h('div','account-head',h('div','account-title',h('h2',null,icon('level'),u.nick),shardBadge(available())),
+      h('div','account-stats',h('span','chip',icon('crown'),'Mejor piso: '+(u.best||0)),h('span','chip',icon('clock'),(u.runs||0)+' partidas')),
       h('div','account-actions',deckButton,shopButton,u.admin?sfxEditorButton():null,out)),
     ...invites,
     friendBox);
@@ -297,6 +297,17 @@ function showInvites(){
 function hideInviteToast(){el('invite-toast').hidden=true;}
 // ───────────── Cartas: mazo por clase y tienda de Esquirlas ─────────────
 const shardChip=n=>h('span','chip shard-chip',icon('cube'),h('b',null,String(n)),' Esquirlas');
+/** Esquirlas junto al nick: solo icono y número en su color; al pasar el ratón, qué son. */
+function shardBadge(n){
+  const badge=h('span','shard-badge',icon('cube'),h('b',null,String(n)));
+  badge.tabIndex=0;
+  badge.setAttribute('aria-label',n+' Esquirlas');
+  hoverTip(badge,()=>[tipHead(h('span','shard-art',icon('cube')),'Esquirlas',n+' disponibles',null),
+    h('p','tip-lore','Fragmentos de la cripta que ganas al terminar cada partida, llegues hasta donde llegues.'),
+    statRow('level','Por piso alcanzado','10'),statRow('skull','Por jefe derrotado','40'),statRow('crown','Por acto superado','100'),statRow('play','Por ganar la partida','300'),
+    h('p','tip-note','Se gastan en la Tienda: cartas nuevas, huecos extra para tu mazo y, próximamente, aspectos.')],250);
+  return badge;
+}
 /** Mazo de una clase: el de la cuenta o, sin cuenta, el de inicio. */
 const myLoadout=classId=>account.user?.loadouts?.[classId]||defaultLoadout(classId);
 const ownsCard=id=>cards[id]?.starter||!!account.user?.cards?.includes(id);

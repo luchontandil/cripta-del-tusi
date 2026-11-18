@@ -1388,3 +1388,11 @@ body:not(.in-expedition) .live-version.update{color:#1b1206;background:#ffd76a}
 .deck-subtitle{display:flex;align-items:center;gap:6px;margin:10px 0 6px;font-size:.8rem;color:#b9a98a;text-transform:uppercase;letter-spacing:.08em}
 .deck-subtitle .icon{width:14px;height:14px}
 .deck-backdrop{color:#241e2a}
+/* Esquirlas al otro lado del nick: icono y número en su color */
+.account-title{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%}
+.account-title h2{margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shard-badge{display:inline-flex;align-items:center;gap:5px;color:#7fd6ff;font-weight:800;font-size:1.05rem;cursor:help;flex:none}
+.shard-badge .icon{width:18px;height:18px;color:#7fd6ff;filter:drop-shadow(0 0 4px #4fb7e099)}
+.shard-badge:hover b,.shard-badge:focus-visible b{text-shadow:0 0 8px #7fd6ff88}
+.shard-art{display:grid;place-items:center;width:32px;height:32px;border-radius:6px;background:radial-gradient(circle,#1f5f7a,#0d1a24);border:1px solid #4fb7e0}
+.shard-art .icon{color:#9fe3ff;width:20px;height:20px}

@@ -607,7 +607,8 @@ test('colores fijos por puesto y mazo de cartas aplicado a la partida',()=>{
   assert.equal(a.max,Math.round(b.max*.85));
   assert.equal(a.color,'red');
   // Un mazo con cartas que no se tienen se limpia: quedan las de inicio.
-  assert.deepEqual(cleanLoadout('mago',{actives:['mago.misil-magico'],passive:'mago.furia-magica'},[]),{actives:['mago.misil-magico'],passive:null});
+  assert.deepEqual(cleanLoadout('mago',{actives:['mago.misil-magico'],passives:['mago.furia-magica']},[]),{actives:['mago.misil-magico'],passives:[]});
+  assert.deepEqual(cleanLoadout('mago',{actives:['mago.misil-magico'],passive:'mago.furia-magica'},['mago.furia-magica']).passives,['mago.furia-magica'],'formato antiguo');
   assert.deepEqual(cleanLoadout('mago',{actives:[]},[]),defaultLoadout('mago'));
   assert.equal(cleanLoadout('guardia',{actives:Object.values(cards).filter(c=>c.classId==='guardia'&&c.kind==='active').map(c=>c.id)},null).actives.length,3,'sin cuenta: solo las de inicio, hasta 3');
 });
@@ -618,7 +619,7 @@ test('Esquirlas: crecen con lo lejos que se llega',()=>{
 });
 test('pasiva Furia mágica: recibe más daño físico y hace más daño mágico',async()=>{
   const {scaledDamage}=await import('./engine.js');
-  const mage={classId:'mago',stats:{},passive:'mago.furia-magica',effects:{}};
+  const mage={classId:'mago',stats:{},passives:['mago.furia-magica'],effects:{}};
   const plain={classId:'mago',stats:{},effects:{}};
   const missile=classes.mago.skills[0];
   assert.equal(scaledDamage(mage,missile,20),23);
@@ -1125,7 +1126,7 @@ test('sala: cambiar de clase, maestrías desde la cuenta, salir y no duplicar al
   // Las maestrías salen de la cuenta: lo que mande el cliente no cuenta
   // Las cartas salen de la cuenta: lo que mande el cliente no cuenta
   const cheat=await call('/api/'+room.code+'/action',{type:'loadout',loadouts:{sombra:{actives:['sombra.corte-glacial'],passive:'sombra.sombra-letal'}},trusted:true},carla.token,first.key);
-  assert.equal(cheat.state.players.find(p=>p.id===first.id).passive,null);
+  assert.deepEqual(cheat.state.players.find(p=>p.id===first.id).passives,[]);
   assert.equal((await call('/api/'+room.code+'/action',{type:'loadout'},null,room.key)).status,400);
   // Volver a entrar con la misma cuenta sustituye el hueco anterior
   const again=await call('/api/'+room.code+'/join',{classId:'tirador'},carla.token);

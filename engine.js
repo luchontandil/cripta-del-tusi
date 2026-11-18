@@ -538,6 +538,8 @@ export const playerColors=[
  * cada clase vienen de inicio; el resto se compran en la tienda de Esquirlas.
  */
 export const ACTIVE_SLOTS=3,MAX_ACTIVE_SLOTS=4,EXTRA_SLOT_PRICE=1000;
+/** Huecos de pasiva: 1, y un 2.º muy caro. */
+export const PASSIVE_SLOTS=1,MAX_PASSIVE_SLOTS=2,PASSIVE_SLOT_PRICE=2500;
 const slug=text=>String(text).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 /** Pasivas por clase: cambian cómo se juega (siempre con un coste). */
 export const passiveCards={
@@ -557,20 +559,26 @@ export const cards=Object.fromEntries(Object.entries(classes).flatMap(([classId,
 ]));
 export const starterCards=Object.values(cards).filter(c=>c.starter).map(c=>c.id);
 /** Mazo por defecto de una clase: sus 3 activas de inicio, sin pasiva. */
-export const defaultLoadout=classId=>({actives:Object.values(cards).filter(c=>c.classId===classId&&c.starter).map(c=>c.id),passive:null});
+export const defaultLoadout=classId=>({actives:Object.values(cards).filter(c=>c.classId===classId&&c.starter).map(c=>c.id),passives:[]});
 /**
  * Mazo válido: solo cartas de esa clase que se tengan, hasta los huecos disponibles y al menos una activa.
  * owned: lista de cartas compradas (las de inicio siempre se tienen); null = sin cuenta (solo las de inicio).
  */
-export function cleanLoadout(classId,loadout,owned=null,slots=ACTIVE_SLOTS){
+export function cleanLoadout(classId,loadout,owned=null,slots=ACTIVE_SLOTS,passiveSlots=PASSIVE_SLOTS){
   const have=new Set([...starterCards,...(owned||[])]);
   const fit=id=>cards[id]&&cards[id].classId===classId&&have.has(id);
   const actives=[...new Set((loadout?.actives||[]).filter(id=>fit(id)&&cards[id].kind==='active'))].slice(0,Math.min(MAX_ACTIVE_SLOTS,slots));
-  const passive=fit(loadout?.passive)&&cards[loadout.passive].kind==='passive'?loadout.passive:null;
-  return actives.length?{actives,passive}:defaultLoadout(classId);
+  // «passive» (una sola) es el formato antiguo; ahora «passives» es una lista.
+  const wanted=loadout?.passives||(loadout?.passive?[loadout.passive]:[]);
+  const passives=[...new Set(wanted.filter(id=>fit(id)&&cards[id].kind==='passive'))].slice(0,Math.min(MAX_PASSIVE_SLOTS,passiveSlots));
+  return actives.length?{actives,passives}:{...defaultLoadout(classId),passives};
 }
-/** Efectos de la pasiva de un jugador o una unidad. */
-export const passiveEffects=unit=>cards[unit?.passive]?.effects||{};
+/** Efectos sumados de las pasivas de un jugador o una unidad. */
+export function passiveEffects(unit){
+  const total={};
+  for(const id of unit?.passives||[])for(const [key,value] of Object.entries(cards[id]?.effects||{}))total[key]=(total[key]||0)+value;
+  return total;
+}
 /** Rangos iniciales según el mazo: las activas equipadas empiezan aprendidas (rango 1). */
 function ranksFor(classId,loadout){
   const equipped=new Set(loadout.actives.map(id=>cards[id].index));
@@ -586,7 +594,7 @@ export function join(s,id,name,classId,extra={}) {
   const used=new Set(s.players.map(p=>p.color));
   const color=playerColors.find(c=>!used.has(c.id)).id;
   const player={id,name:String(name||'Aventurero').trim().slice(0,22)||'Aventurero',classId,bag:[],equipment:{},
-    gold:0,level:1,xp:0,skillRanks:[],trained:true,color,loadouts:extra.loadouts||{},passive:null,account:extra.account||null};
+    gold:0,level:1,xp:0,skillRanks:[],trained:true,color,loadouts:extra.loadouts||{},passives:[],account:extra.account||null};
   lobbyLoadout(player);
   s.players.push(player);
 }
@@ -601,7 +609,7 @@ export function leave(s,id){
 function lobbyLoadout(player){
   const loadout=player.loadouts?.[player.classId]||defaultLoadout(player.classId);
   player.skillRanks=ranksFor(player.classId,loadout);
-  player.passive=loadout.passive||null;
+  player.passives=[...(loadout.passives||[])];
   player.gold=0;
 }
 /** Puntos de cuenta al terminar la partida: según lo lejos que se llegó. */
@@ -1126,7 +1134,7 @@ function openFloor(s,rng,elite=false,boss=null) {
     p.xp=0;
     p.trained=true;
     const {stats,max}=heroStats(p,level);
-    return {id:p.id,name:p.name,classId:p.classId,color:p.color,level,skillRanks:[...p.skillRanks],passive:p.passive||null,initiative:classes[p.classId].initiative,stats,max,
+    return {id:p.id,name:p.name,classId:p.classId,color:p.color,level,skillRanks:[...p.skillRanks],passives:[...(p.passives||[])],initiative:classes[p.classId].initiative,stats,max,
       // La vida NO se recupera de sala a sala: se conserva la que quedaba (más lo que suba la vida máxima).
       // Quien cayó vuelve con el 10 %.
       hp:!previous?max:previous.hp>0?Math.max(1,Math.min(max,previous.hp+Math.max(0,max-(previous.max||max)))):Math.ceil(max*.1),

@@ -2,7 +2,7 @@
 import {randomBytes,scrypt as scryptCallback,timingSafeEqual} from 'node:crypto';
 import {promisify} from 'node:util';
 import {getJSON,setJSON,remove} from './store.js';
-import {runPoints,cards,classes,cleanLoadout,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE} from './engine.js';
+import {runPoints,cards,classes,cleanLoadout,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE} from './engine.js';
 
 const scrypt=promisify(scryptCallback);
 const sessionDays=30;
@@ -38,15 +38,16 @@ function ensureProgress(user){
 }
 /** Huecos de carta activa de una clase (3, o 4 si se compró el extra). */
 export const slotsOf=(user,classId)=>Math.min(MAX_ACTIVE_SLOTS,user?.slots?.[classId]||ACTIVE_SLOTS);
+export const passiveSlotsOf=(user,classId)=>Math.min(MAX_PASSIVE_SLOTS,user?.passiveSlots?.[classId]||PASSIVE_SLOTS);
 /** Mazos de todas las clases, validados contra lo que tiene la cuenta (sin cuenta: los de inicio). */
 export function loadoutsOf(user){
   return Object.fromEntries(Object.keys(classes).map(classId=>[classId,user
-    ?cleanLoadout(classId,user.loadouts?.[classId]||defaultLoadout(classId),user.cards,slotsOf(user,classId))
+    ?cleanLoadout(classId,user.loadouts?.[classId]||defaultLoadout(classId),user.cards,slotsOf(user,classId),passiveSlotsOf(user,classId))
     :defaultLoadout(classId)]));
 }
 /** Datos públicos de la cuenta (sin contraseña). */
 export function publicUser(user){
-  return {admin:isAdmin(user.nick),nick:user.nick,shards:user.shards||0,cards:user.cards||[],slots:user.slots||{},loadouts:loadoutsOf(user),
+  return {admin:isAdmin(user.nick),nick:user.nick,shards:user.shards||0,cards:user.cards||[],slots:user.slots||{},passiveSlots:user.passiveSlots||{},loadouts:loadoutsOf(user),
     friends:user.friends,invites:(user.invites||[]).filter(i=>Date.now()-i.at<600000),runs:user.runs||0,best:user.best||0};
 }
 async function newSession(nick){
@@ -105,12 +106,22 @@ export async function buySlot(user,classId){
   await save(user);
   return publicUser(user);
 }
+/** Comprar el 2.º hueco de pasiva para una clase (caro). */
+export async function buyPassiveSlot(user,classId){
+  if(!Object.hasOwn(classes,classId))fail('Clase desconocida.');
+  if(passiveSlotsOf(user,classId)>=MAX_PASSIVE_SLOTS)fail('Esa clase ya tiene el 2.º hueco de pasiva.');
+  if((user.shards||0)<PASSIVE_SLOT_PRICE)fail('No tienes Esquirlas suficientes.');
+  user.shards-=PASSIVE_SLOT_PRICE;
+  user.passiveSlots={...user.passiveSlots,[classId]:MAX_PASSIVE_SLOTS};
+  await save(user);
+  return publicUser(user);
+}
 /** Guardar el mazo de una clase (se valida contra las cartas que se tienen). */
 export async function saveLoadout(user,classId,loadout){
   if(!Object.hasOwn(classes,classId))fail('Clase desconocida.');
   const actives=(loadout?.actives||[]).filter(id=>cards[id]?.kind==='active');
   if(!actives.length)fail('Equipa al menos una carta activa.');
-  user.loadouts={...user.loadouts,[classId]:cleanLoadout(classId,{actives,passive:loadout?.passive||null},user.cards,slotsOf(user,classId))};
+  user.loadouts={...user.loadouts,[classId]:cleanLoadout(classId,{actives,passives:loadout?.passives||(loadout?.passive?[loadout.passive]:[])},user.cards,slotsOf(user,classId),passiveSlotsOf(user,classId))};
   await save(user);
   return publicUser(user);
 }

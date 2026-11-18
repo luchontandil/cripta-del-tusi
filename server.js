@@ -162,6 +162,7 @@ async function accountRoute(operation,method,body,tokenValue){
   if(method!=='POST')throw new Error('Ruta desconocida.');
   if(operation==='buy-card')return {user:await accounts.buyCard(user,body.card)};
   if(operation==='buy-slot')return {user:await accounts.buySlot(user,body.classId)};
+  if(operation==='buy-passive-slot')return {user:await accounts.buyPassiveSlot(user,body.classId)};
   if(operation==='loadout')return {user:await accounts.saveLoadout(user,body.classId,body.loadout)};
   if(operation==='friend')return {user:await accounts.addFriend(user,body.nick),friends:await accounts.friendList(user)};
   if(operation==='unfriend'){const updated=await accounts.removeFriend(user,body.nick);return {user:updated,friends:await accounts.friendList({...user,friends:updated.friends})};}

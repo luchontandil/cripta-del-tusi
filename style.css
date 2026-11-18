@@ -1308,3 +1308,64 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;bac
 /* Portada: la versión, en blanco, abajo a la derecha */
 body:not(.in-expedition) .live-version{left:auto;right:10px;bottom:8px;color:#fff;background:#000a;font-size:.74rem;padding:3px 9px}
 body:not(.in-expedition) .live-version.update{color:#1b1206;background:#ffd76a}
+/* ───────── Cartas con aspecto de carta ───────── */
+.card-tile{aspect-ratio:3/4.3;min-height:0;padding:22px 8px 8px;gap:3px;justify-items:center;align-content:start;
+  background:linear-gradient(180deg,#2b2230 0%,#1a141e 55%,#130f16 100%);border:3px solid #6b5638;border-radius:8px;
+  box-shadow:inset 0 0 0 2px #120d10,inset 0 0 0 3px #3a2d22,0 4px 0 #000a;overflow:hidden}
+.card-tile.kind-passive{border-color:#7b5aa6;box-shadow:inset 0 0 0 2px #120d10,inset 0 0 0 3px #3e2c55,0 4px 0 #000a}
+.card-tile.kind-slot{border-color:#2f6f8a}
+.card-cost{position:absolute;top:4px;left:4px;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#7fc4ff,#1f5f9a);border:2px solid #0b1a2a;color:#fff;font-weight:900;font-size:.9rem;line-height:.8}
+.card-cost small{font-size:.42rem;letter-spacing:.04em}
+.card-cost.passive{background:radial-gradient(circle at 35% 30%,#d2b0ff,#5a3a8a)}
+.card-cost.passive .icon{width:14px;height:14px;color:#fff}
+.card-art{width:100%;aspect-ratio:16/10;display:grid;place-items:center;border:2px solid #000;border-radius:4px;
+  background:radial-gradient(circle at 50% 60%,#3d3048,#140f18 75%);box-shadow:inset 0 0 12px #000}
+.card-tile.kind-passive .card-art{background:radial-gradient(circle at 50% 60%,#4a3266,#140f18 75%)}
+.card-art .spell-icon,.card-art .passive-art{width:48px;height:48px;border-radius:8px}
+.card-name{width:100%;padding:2px 4px;background:linear-gradient(90deg,transparent,#000a 15%,#000a 85%,transparent);color:#f6e7c6;font-size:.8rem;line-height:1.15}
+.card-tile .card-kind{font-size:.6rem;color:#b9a98a;text-transform:uppercase;letter-spacing:.06em}
+.card-text{margin:2px 0 0;font-size:.62rem;line-height:1.25;color:#cfc2a8;text-align:center;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.card-tile .small-button{margin-top:auto;z-index:1}
+.card-tile.locked{filter:grayscale(.9) brightness(.6)}
+.card-tile.locked .card-price{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);filter:none;background:#000c;padding:1px 6px;border:1px solid #4fb7e0}
+.card-tile:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.card-tile:hover{transform:translateY(-2px)}
+.card-tile{transition:transform .12s,border-color .12s,box-shadow .12s}
+/* ───────── Mazo: tablero a la izquierda, colección a la derecha ───────── */
+.deck-dialog{width:min(97vw,1180px)}
+.deck-layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,1fr);gap:14px;align-items:start;margin-top:10px}
+.deck-board{position:relative;padding:12px 14px;background:#100c12;border:2px solid #000;box-shadow:inset 1px 1px 0 #3a302c;min-height:440px;overflow:hidden}
+.deck-board>*:not(.deck-backdrop){position:relative;z-index:1}
+.deck-backdrop{position:absolute;inset:0;display:grid;place-items:center;color:#2a2430;pointer-events:none;z-index:0}
+.deck-backdrop svg{width:min(92%,420px);height:auto;opacity:.9}
+.deck-backdrop-name{position:absolute;bottom:10px;right:14px;font:700 2rem var(--font-display);color:#231e28;letter-spacing:.08em;text-transform:uppercase}
+.deck-board .deck-slots{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.deck-board .deck-slots.passive-row{grid-template-columns:minmax(0,1fr) 3fr}
+.deck-slot{min-height:0;aspect-ratio:3/4.3;padding:0;background:#0c090ecc;border-radius:8px}
+.deck-slot.empty{border:2px dashed #4a3d52}
+.deck-slot>.card-tile{height:100%}
+.deck-slot.locked{gap:6px;padding:8px}
+.deck-help{margin-top:10px}
+.deck-collection{max-height:min(66vh,620px);overflow:auto;padding:10px;background:#0f0b11;border:2px solid #000;box-shadow:inset 1px 1px 0 #3a302c}
+.deck-collection .deck-title{margin-top:0}
+.deck-collection .card-grid{grid-template-columns:repeat(auto-fill,minmax(118px,1fr))}
+.shard-shop-grid,#shard-shop .card-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+@media(max-width:860px){.deck-layout{grid-template-columns:1fr}}
+/* ───────── Panel de cuenta: botones iguales; amigos desplegables ───────── */
+.gateway-account .account-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%}
+.gateway-account .account-actions>button{width:100%;justify-content:center;padding:.55em .4em;font-size:.86rem;min-height:40px}
+.gateway-account .account-actions>.logout{grid-column:1/-1}
+.gateway-account .account-stats{display:flex;flex-wrap:wrap;gap:5px}
+.friends>summary{display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:800;color:var(--gold);list-style:none;padding:4px 0}
+.friends>summary::-webkit-details-marker{display:none}
+.friends>summary::after{content:'▾';margin-left:auto;color:var(--muted)}
+.friends[open]>summary::after{content:'▴'}
+.friend-count{color:var(--muted);font-weight:700}
+.friends[open]>.add-friend{margin-top:6px}
+/* Texto de la carta: que no lo tapen el precio ni el botón */
+.card-text{-webkit-line-clamp:3}
+.card-tile.locked{padding-bottom:30px}
+.deck-slot .card-text{-webkit-line-clamp:2}
+#shard-shop .card-tile{aspect-ratio:auto;min-height:250px}
+#shard-shop .card-tile .card-text{-webkit-line-clamp:3;margin-bottom:6px}

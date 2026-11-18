@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,passiveEffects} from './engine.js?v=84';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=84';
-import {setupSfx} from './music.js?v=84';
-import {icon} from './icons.js?v=84';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,passiveEffects} from './engine.js?v=85';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=85';
+import {setupSfx} from './music.js?v=85';
+import {icon} from './icons.js?v=85';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -121,7 +121,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=84').then(({createIso})=>{
+import('./isometric.js?v=85').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -244,7 +244,7 @@ function renderAccount(){
   const shopButton=btn('',()=>openShardShop(el('class').value));shopButton.className='primary';
   shopButton.append(icon('shop'),'Tienda');
   const out=btn('',async()=>{try{await accountCall('logout',{});}catch{}setAccountToken(null);renderAccount();classPreview();});
-  out.className='ghost';out.append(icon('exit'),'Salir');
+  out.className='ghost logout';out.append(icon('exit'),'Cerrar sesión');
   const nickInput=document.createElement('input');nickInput.placeholder='Nick de tu amigo';nickInput.maxLength=16;
   const add=btn('',async()=>{
     try{const data=await accountCall('friend',{nick:nickInput.value});account.user=data.user;account.friends=data.friends;error('');renderAccount();}
@@ -259,13 +259,18 @@ function renderAccount(){
     const no=btn('Descartar',async()=>{try{const d=await accountCall('dismiss',{from:inv.from});account.user=d.user;renderAccount();}catch{}});no.className='ghost';
     return h('div','invite',icon('users'),h('span',null,h('b',null,inv.from),' te invita a su sala ',h('code',null,inv.code)),accept,no);
   });
+  const online=account.friends.filter(f=>f.online).length;
+  const friendBox=h('details','friends',h('summary',null,icon('users'),'Amigos ',h('span','friend-count','('+online+'/'+account.friends.length+')')),h('div','add-friend',nickInput,add),friends);
+  friendBox.open=friendsOpen;
+  friendBox.addEventListener('toggle',()=>{friendsOpen=friendBox.open;});
   box.replaceChildren(
     h('div','account-head',h('h2',null,icon('level'),u.nick),
       h('div','account-stats',shardChip(available()),h('span','chip',icon('crown'),'Mejor piso: '+(u.best||0)),h('span','chip',icon('clock'),(u.runs||0)+' partidas')),
       h('div','account-actions',deckButton,shopButton,u.admin?sfxEditorButton():null,out)),
     ...invites,
-    h('div','friends',h('h3',null,icon('users'),'Amigos'),h('div','add-friend',nickInput,add),friends));
+    friendBox);
 }
+let friendsOpen=false;
 async function acceptInvite(inv){
   el('code').value=inv.code;
   try{const d=await accountCall('dismiss',{from:inv.from});account.user=d.user;}catch{}
@@ -294,19 +299,36 @@ const ownsCard=id=>cards[id]?.starter||!!account.user?.cards?.includes(id);
 const slotsFor=classId=>Math.min(MAX_ACTIVE_SLOTS,account.user?.slots?.[classId]||ACTIVE_SLOTS);
 /** En la sala de espera, el servidor vuelve a leer tus cartas. */
 function syncLobbyDeck(){if(session?.code&&state?.phase==='lobby')send({type:'loadout'});}
-/** Carta en miniatura (activa: su habilidad; pasiva: su efecto). */
+/** Ficha al pasar el ratón, con un pequeño retraso para que no salte al cruzar por encima. */
+function hoverTip(target,build,delay=400){
+  let timer=null;
+  const show=()=>{const rect=target.getBoundingClientRect();showTip(build(),{left:rect.right+8,top:rect.top,bottom:rect.bottom},'tip-skill');};
+  target.addEventListener('pointerenter',()=>{clearTimeout(timer);timer=setTimeout(show,delay);});
+  target.addEventListener('pointerleave',()=>{clearTimeout(timer);hideUnit();});
+  target.addEventListener('focus',show);target.addEventListener('blur',hideUnit);
+}
+/** Descripción corta de una carta (para la propia carta). */
+function cardBlurb(card){
+  if(card.kind==='passive')return card.text;
+  const skill=classes[card.classId].skills[card.index];
+  return skillLore[skill[0]]||skillEffectText(skill)||'';
+}
+/** Ficha completa de una carta: qué hace, números y efecto. */
+function cardTipNodes(card){
+  if(card.kind==='passive')return [tipHead(h('span','passive-art',icon('crown')),card.name,'Carta pasiva · '+classes[card.classId].name,null),
+    h('p','tip-lore',card.text),h('p','tip-note','Solo se puede equipar una pasiva. Su efecto dura toda la partida.')];
+  const skill=classes[card.classId].skills[card.index];
+  return skillTipNodes({classId:card.classId,stats:{},level:1},card.index,skill,1);
+}
+/** Carta con aspecto de carta: coste, ilustración, nombre, tipo y descripción corta. */
 function cardTile(card,extra=''){
   const skill=card.kind==='active'?classes[card.classId].skills[card.index]:null;
-  const art=skill?spellIcon(skill[5],skill[6]):h('span','passive-art',icon('crown'));
-  const tile=h('article','card-tile kind-'+card.kind+' '+extra,art,h('strong',null,card.name),
-    h('small','card-kind',card.kind==='active'?(skill[1]+' PA · '+(skill[2]>1?'alcance '+skill[2]:'cuerpo a cuerpo')):'Pasiva'));
-  const show=()=>{
-    const rect=tile.getBoundingClientRect();
-    const nodes=skill?skillTipNodes({classId:card.classId,stats:{},level:1},card.index,skill,1)
-      :[tipHead(h('span','passive-art',icon('crown')),card.name,'Carta pasiva · '+classes[card.classId].name,null),h('p','tip-lore',card.text)];
-    showTip(nodes,{left:rect.right+6,top:rect.top,bottom:rect.bottom},'tip-skill');
-  };
-  tile.addEventListener('pointerenter',show);tile.addEventListener('pointerleave',hideUnit);
+  const art=h('div','card-art',skill?spellIcon(skill[5],skill[6]):h('span','passive-art',icon('crown')));
+  const cost=skill?h('span','card-cost',String(skill[1]),h('small',null,'PA')):h('span','card-cost passive',icon('crown'));
+  const type=skill?(skillSchool({classId:card.classId},skill)==='magic'?'Hechizo':'Físico')+(skill[2]>1?' · alcance '+skill[2]:' · cuerpo a cuerpo'):'Pasiva';
+  const tile=h('article','card-tile kind-'+card.kind+' '+extra,cost,art,h('strong','card-name',card.name),h('small','card-kind',type),h('p','card-text',cardBlurb(card)));
+  tile.tabIndex=0;
+  hoverTip(tile,()=>cardTipNodes(card));
   return tile;
 }
 function classTabs(current,onPick){
@@ -360,14 +382,28 @@ function renderDeck(){
   });
   const close=btn('Cerrar',()=>deckDialog.close());close.className='ghost';
   const shop=btn('',()=>openShardShop(deckClass));shop.className='primary';shop.append(icon('shop'),'Tienda de Esquirlas');
+  collection.sort((a,b)=>Number(b.classList.contains('owned'))-Number(a.classList.contains('owned')));
+  const board=h('section','deck-board',deckBackdrop(deckClass),
+    h('h3','deck-title',icon('play'),'Activas · '+loadout.actives.length+'/'+slots),h('div','deck-slots',...activeSlots),
+    h('h3','deck-title',icon('crown'),'Pasiva'),h('div','deck-slots passive-row',passiveSlot),
+    h('p','hint deck-help',account.user?'Clic en una carta de tu colección para equiparla; clic en una equipada para quitarla. En la partida puedes descubrir y aprender más al subir de nivel.'
+      :'Sin cuenta juegas con las cartas de inicio. Crea una cuenta para comprar cartas y montar tu mazo.'));
+  const owned=all.filter(c=>ownsCard(c.id)).length;
+  const side=h('aside','deck-collection',h('h3','deck-title',icon('bag'),'Tus cartas · '+owned+'/'+all.length),h('div','card-grid',...collection));
   deckDialog.replaceChildren(
     h('div','masteries-head',Object.assign(h('h2',null,icon('level'),'Mazo · '+classes[deckClass].name),{id:'deck-title'}),account.user?shardChip(available()):null,shop,close),
     classTabs(deckClass,id=>openDeck(id)),
-    h('p','hint',account.user?'Equipa hasta '+slots+' cartas activas (tus habilidades al empezar) y 1 pasiva. En la partida puedes descubrir y aprender más al subir de nivel.'
-      :'Sin cuenta juegas con las cartas de inicio. Crea una cuenta para comprar cartas y montar tu mazo.'),
-    h('h3','deck-title',icon('play'),'Activas · '+loadout.actives.length+'/'+slots),h('div','deck-slots',...activeSlots),
-    h('h3','deck-title',icon('crown'),'Pasiva'),h('div','deck-slots passive-row',passiveSlot),
-    h('h3','deck-title',icon('bag'),'Colección de '+classes[deckClass].name),h('div','card-grid',...collection));
+    h('div','deck-layout',board,side));
+}
+/** Dibujo en gris de fondo del tablero: la silueta del personaje dentro de un círculo de runas. */
+function deckBackdrop(classId){
+  const art=h('div','deck-backdrop');
+  art.setAttribute('aria-hidden','true');
+  art.innerHTML='<svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="92" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="100" cy="100" r="78" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 6"/>'
+    +Array.from({length:12},(_,i)=>{const a=i/12*Math.PI*2;return '<rect x="'+(100+Math.cos(a)*85-3)+'" y="'+(100+Math.sin(a)*85-3)+'" width="6" height="6" transform="rotate(45 '+(100+Math.cos(a)*85)+' '+(100+Math.sin(a)*85)+')" fill="currentColor"/>';}).join('')
+    +'<path d="M100 38c-9 0-15 7-15 16s6 17 15 17 15-8 15-17-6-16-15-16zM82 76c-7 2-12 7-14 14l-7 32 9 2 7-30 2 24-2 30-4 28h10l8-34 8 34h10l-4-28-2-30 2-24 7 30 9-2-7-32c-2-7-7-12-14-14z" fill="currentColor"/></svg>';
+  art.append(h('span','deck-backdrop-name',classes[classId].name));
+  return art;
 }
 async function buyExtraSlot(classId){
   try{const d=await accountCall('buy-slot',{classId});account.user=d.user;error('');renderDeck();renderShardShop();renderAccount();}catch(e){error(e.message);}
@@ -536,6 +572,9 @@ function placeTip(anchor){
 }
 function showTip(nodes,anchor,tone=''){
   const tooltip=el('unit-tooltip');
+  // Las ventanas modales (mazo, tienda…) van por encima de todo: la ficha tiene que ir dentro de la abierta.
+  const host=[...document.querySelectorAll('dialog[open]')].find(d=>d.matches(':modal'))||document.body;
+  if(tooltip.parentElement!==host)host.append(tooltip);
   tooltip.className='tip'+(tone?' '+tone:'');
   tooltip.replaceChildren(...nodes);
   placeTip(anchor);

@@ -1419,3 +1419,4 @@ body:not(.in-expedition) .live-version.update{color:#1b1206;background:#ffd76a}
 .tip-stats .tip-row .tip-value{justify-self:end;text-align:right}
 .tip-row.tip-amount .tip-value{gap:5px}
 .tip-value .reach-kind{display:block;line-height:1.1}
+.tip-row.tip-crit .tip-value b{font-size:1rem}

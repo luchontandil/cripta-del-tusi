@@ -1420,3 +1420,8 @@ body:not(.in-expedition) .live-version.update{color:#1b1206;background:#ffd76a}
 .tip-row.tip-amount .tip-value{gap:5px}
 .tip-value .reach-kind{display:block;line-height:1.1}
 .tip-row.tip-crit .tip-value b{font-size:1rem}
+/* Etiquetas de escalado bajo el nivel de la habilidad. */
+.skill-tags{display:block;margin-top:2px;font-size:.74rem;color:var(--muted)}
+.skill-tag{font-weight:700}
+.skill-tag.element-physical{color:var(--physical)}.skill-tag.element-magic{color:var(--magic)}.skill-tag.element-fire{color:var(--fire)}
+.skill-tag.element-ice{color:var(--ice)}.skill-tag.element-lightning{color:var(--lightning)}.skill-tag.element-chaos{color:var(--chaos)}

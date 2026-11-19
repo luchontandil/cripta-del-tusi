@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=100';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=100';
-import {setupSfx} from './music.js?v=100';
-import {icon} from './icons.js?v=100';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=101';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=101';
+import {setupSfx} from './music.js?v=101';
+import {icon} from './icons.js?v=101';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -123,7 +123,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=100').then(({createIso})=>{
+import('./isometric.js?v=101').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -917,6 +917,16 @@ function skillEffectText(skill){
   const burn=o.element==='fire'?' · '+(o.burnChance!==undefined?o.burnChance+' % de probabilidad de quemar: ':'Quemadura: ')+'arde 2 turnos y pierde ¼ del daño al empezar cada uno':'';
   return (text+area+burn).replace(/^ · /,'');
 }
+/** Con qué escala el daño de una habilidad: (Magia, Hielo), (Físico), (Magia, Físico)... */
+const tagNames={physical:'Físico',magic:'Magia',fire:'Fuego',ice:'Hielo',lightning:'Rayo',chaos:'Caos'};
+function scalingTags(unit,skill){
+  const f=skillFacts(unit,skill);
+  if(f.healing||f.utility)return [];
+  const scales=skillOptions(skill).scales;
+  if(scales)return [...scales];
+  if(f.school==='physical')return ['physical'];
+  return ['magic',...(['fire','ice','lightning','chaos'].includes(f.element)?[f.element]:[])];
+}
 /** Datos calculados de una habilidad para un personaje (con su equipo, si lo tiene). */
 function skillFacts(unit,skill){
   const [,cost,range,min,max,kind,,minRange=0]=skill;
@@ -1003,7 +1013,6 @@ function skillRows(unit,skill){
   if(o.push||o.pull)rows.push(statRow('mp',o.push?'Empuje':'Atrae',o.pull==='melee'?'Hasta el contacto':(o.push||o.pull)+((o.push||o.pull)>1?' casillas':' casilla')));
   if(o.inLine)rows.push(statRow('move','Lanzar','En línea recta'));
   if(o.casts)rows.push(statRow('clock','Usos por turno',state?.phase==='combat'&&unit.id===state.units[state.turn]?.id?Math.max(0,castsLeft(state,unit,skill))+' de '+o.casts:String(o.casts)));
-  if(o.scales)rows.push(statRow('plus','Escala con',o.scales.map(k=>elements[k].toLowerCase()).join(' + ')));
   if(o.anyTarget)rows.push(statRow('users','Objetivo','Aliado o enemigo'));
   // Alcance y si es modificable en la misma fila.
   const range=statRow('range','Alcance',(f.minRange&&f.minRange!==f.maxRange?f.minRange+'–':'')+f.maxRange+(f.reach?' (+'+f.reach+' equipo)':''));
@@ -1018,7 +1027,10 @@ function skillTipNodes(unit,index,skill,rank,hotkey=null){
   const effect=skillEffectText(skill);
   const base=classes[unit.classId]?.skills[index??classes[unit.classId].skills.findIndex(s=>s[0]===name)];
   const bonus=maxBonusText(base||skill);
-  return [tipHead(spellIcon(kind,symbol),name,rank?'Nivel '+rank+' de 3':'Sin aprender',hotkey?String(hotkey):null),
+  const head=tipHead(spellIcon(kind,symbol),name,rank?'Nivel '+rank+' de 3':'Sin aprender',hotkey?String(hotkey):null);
+  const tags=scalingTags(unit,skill);
+  if(tags.length)head.querySelector('.tip-title').append(h('span','skill-tags','(',...tags.flatMap((key,i)=>[i?', ':'',h('span','skill-tag element-'+key,tagNames[key])]),')'));
+  return [head,
     skillLore[name]?h('p','tip-lore',skillLore[name]):null,
     h('div','tip-stats',...skillRows(unit,skill)),
     effect?(()=>{const p=h('p','tip-effect');resourceText(p,effect);return p;})():null,

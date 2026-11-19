@@ -136,9 +136,11 @@ export function damagePercent(unit,skill){
   // Escalado propio de la habilidad (p. ej. el Misil mágico: mágico + físico).
   const scales=skillOptions(skill).scales;
   if(scales)return scales.reduce((sum,key)=>sum+(stats[key]||0),0);
-  if(skillSchool(unit,skill)==='physical')return stats.physical||0;
+  // Escuela (físico o mágico) + su elemento, si lo tiene: Escarcha = mágico + hielo; Cuchilla envenenada = físico + caótico.
   const element=skillElement(unit,skill);
-  return (stats.magic||0)+(elementalKeys.includes(element)?stats[element]||0:0);
+  const elemental=elementalKeys.includes(element)?stats[element]||0:0;
+  if(skillSchool(unit,skill)==='physical')return (stats.physical||0)+elemental;
+  return (stats.magic||0)+elemental;
 }
 /** Daño plano que se suma a la base (raro, de anillos y amuletos). */
 export const flatDamage=unit=>unit.stats?.damage||0;

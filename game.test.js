@@ -175,10 +175,11 @@ test('la vista previa aplica el crítico ×1,5 y la armadura frena las habilidad
   const [,,,lo,hi]=classes.guardia.skills[0];
   const net=(b,crit=1)=>Math.round(Math.floor(b*1.2)*crit*.7);
   assert.deepEqual(damagePreview(hero,foe,classes.guardia.skills[0]),{element:'physical',normal:[net(lo),net(hi)],critical:[net(lo,1.5),net(hi,1.5)],chance:.12});
-  // Golpe de brasas es físico aunque sea de fuego: suma el daño físico (no el de fuego) y la armadura lo frena.
+  // Golpe de brasas es físico de fuego: suma físico + fuego, y la armadura lo frena.
   hero.stats.fire=50;
   const embers=classes.guardia.skills.at(-1);
-  assert.deepEqual(damagePreview(hero,foe,embers).normal,[net(embers[3]),net(embers[4])]);
+  const hot=b=>Math.round(Math.floor(b*1.7)*.7);
+  assert.deepEqual(damagePreview(hero,foe,embers).normal,[hot(embers[3]),hot(embers[4])]);
 });
 test('la IA avanza hacia el rival aunque un aliado cierre el único paso',()=>{
   const s=battle('tirador');
@@ -880,11 +881,11 @@ test('cada monstruo tiene una habilidad propia: el diablillo estalla en cruz y l
   timeout(s);while(s.units[s.turn]===imp)timeout(s);
   assert.ok(hero.effects.weak);
 });
-test('daño: físicas suman solo el físico; hechizos suman mágico + su elemento; la armadura solo frena lo físico',()=>{
+test('daño: físicas suman físico + su elemento; hechizos suman mágico + su elemento; la armadura solo frena lo físico',()=>{
   const stats={physical:3,magic:5,fire:7,ice:11,lightning:13,chaos:17};
   const archer={classId:'tirador',stats},mage={classId:'mago',stats};
   const skill=(cls,name)=>classes[cls].skills.find(sk=>sk[0]===name);
-  assert.equal(damagePercent(archer,skill('tirador','Flecha ígnea')),3);
+  assert.equal(damagePercent(archer,skill('tirador','Flecha ígnea')),3+7,'física de fuego: físico + fuego');
   assert.equal(damagePercent(mage,skill('mago','Bola de fuego')),5+7);
   assert.equal(damagePercent(mage,skill('mago','Escarcha')),5+11);
   assert.equal(damagePercent(mage,skill('mago','Misil mágico')),5+3,'el Misil escala con mágico y físico');
@@ -893,7 +894,7 @@ test('daño: físicas suman solo el físico; hechizos suman mágico + su element
   const target={stats:{ward:40},effects:{}};
   const phys=damagePreview(archer,target,skill('tirador','Flecha ígnea')).normal[0];
   const magic=damagePreview(mage,target,skill('mago','Bola de fuego')).normal[0];
-  assert.equal(phys,Math.round(Math.floor(skill('tirador','Flecha ígnea')[3]*1.03)*.6));
+  assert.equal(phys,Math.round(Math.floor(skill('tirador','Flecha ígnea')[3]*1.10)*.6));
   assert.equal(magic,Math.floor(skill('mago','Bola de fuego')[3]*1.12));
 });
 

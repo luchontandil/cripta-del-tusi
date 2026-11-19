@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=101';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=101';
-import {setupSfx} from './music.js?v=101';
-import {icon} from './icons.js?v=101';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=102';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=102';
+import {setupSfx} from './music.js?v=102';
+import {icon} from './icons.js?v=102';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -123,7 +123,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=101').then(({createIso})=>{
+import('./isometric.js?v=102').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -918,14 +918,13 @@ function skillEffectText(skill){
   return (text+area+burn).replace(/^ · /,'');
 }
 /** Con qué escala el daño de una habilidad: (Magia, Hielo), (Físico), (Magia, Físico)... */
-const tagNames={physical:'Físico',magic:'Magia',fire:'Fuego',ice:'Hielo',lightning:'Rayo',chaos:'Caos'};
+const tagNames={physical:'Físico',magic:'Magia',fire:'Fuego',ice:'Hielo',lightning:'Rayo',chaos:'Caótico'};
 function scalingTags(unit,skill){
   const f=skillFacts(unit,skill);
   if(f.healing||f.utility)return [];
   const scales=skillOptions(skill).scales;
   if(scales)return [...scales];
-  if(f.school==='physical')return ['physical'];
-  return ['magic',...(['fire','ice','lightning','chaos'].includes(f.element)?[f.element]:[])];
+  return [f.school==='physical'?'physical':'magic',...(['fire','ice','lightning','chaos'].includes(f.element)?[f.element]:[])];
 }
 /** Datos calculados de una habilidad para un personaje (con su equipo, si lo tiene). */
 function skillFacts(unit,skill){
@@ -943,9 +942,9 @@ function skillFacts(unit,skill){
 }
 /** De dónde sale el bonus de daño: físico, o mágico + elemento. */
 function bonusSource(unit,f){
-  if(f.school==='physical')return 'daño físico';
   const elemental=['fire','ice','lightning','chaos'].includes(f.element);
-  return elemental?'mágico + '+elements[f.element].toLowerCase():'daño mágico';
+  const school=f.school==='physical'?'físico':'mágico';
+  return elemental?school+' + '+elements[f.element].toLowerCase():'daño '+school;
 }
 /**
  * Croquis del área (como en Dofus): rejilla isométrica en miniatura con las casillas afectadas.

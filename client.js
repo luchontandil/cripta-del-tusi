@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=96';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=96';
-import {setupSfx} from './music.js?v=96';
-import {icon} from './icons.js?v=96';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=97';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=97';
+import {setupSfx} from './music.js?v=97';
+import {icon} from './icons.js?v=97';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -123,7 +123,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=96').then(({createIso})=>{
+import('./isometric.js?v=97').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -840,47 +840,52 @@ const areaNames={cross:'cruz',circle:'círculo',cone:'cono',line:'línea',wave:'
 /** Texto del efecto de una habilidad, con sus valores reales (rango y bonificaciones incluidos). */
 /** Qué hace cada habilidad, en una frase (los números exactos van en la ficha). */
 const skillLore={
-  'Tajo':'Un tajo directo con el arma contra un enemigo pegado a ti.',
-  'Quebrar armadura':'Golpeas las juntas de la armadura: el enemigo queda vulnerable y todos le hacen más daño.',
-  'Segundo aliento':'Recuperas el aliento y te curas a ti mismo.',
-  'Empujón de escudo':'Embistes con el escudo y lanzas al enemigo hacia atrás; si choca contra algo, se hace daño extra.',
-  'Barrido':'Un golpe amplio en cono delante de ti que alcanza a todos los enemigos de esa zona.',
-  'Gancho':'Lanzas una cadena en línea recta y arrastras hasta ti a un enemigo o a un aliado (sin hacerle daño).',
-  'Muralla':'Te pones delante con el escudo: un aliado (o tú) gana armadura durante 2 turnos.',
-  'Golpe de brasas':'Un golpe con el arma envuelta en brasas: hace daño y deja al enemigo ardiendo.',
-  'Flecha precisa':'Un disparo certero a distancia contra un enemigo a la vista.',
-  'Flecha de lastre':'Una flecha helada que entumece al enemigo y le quita PM en su próximo turno.',
-  'Flecha perforante':'Un disparo que atraviesa la armadura y deja al enemigo vulnerable.',
-  'Paso atrás':'Golpeas al enemigo pegado a ti y lo apartas para ganar distancia.',
-  'Lluvia de flechas':'Disparas al aire y cae una lluvia de flechas en cruz sobre la zona elegida.',
-  'Flecha penetrante':'Una flecha que sigue de largo y daña a todos los enemigos en línea detrás del objetivo.',
-  'Flecha de retroceso':'Un disparo tan fuerte que empuja al enemigo hacia atrás.',
-  'Flecha ígnea':'Una flecha en llamas: hace daño y deja al enemigo ardiendo.',
-  'Luz ardiente':'Un haz de luz sagrada que quema a un enemigo cercano.',
-  'Restaurar':'Cierras las heridas de un aliado (o las tuyas) y recupera vida.',
-  'Sello de fragilidad':'Marcas a un enemigo con un sello: queda vulnerable y todos le hacen más daño.',
-  'Purificar':'Limpias a un aliado de veneno, quemadura, maldiciones, lentitud y vulnerabilidad, y lo curas un poco.',
-  'Escudo sagrado':'Rodeas a un aliado de luz: gana armadura durante 2 turnos.',
-  'Celeridad divina':'Bendices a un aliado: tendrá más PM en su próximo turno.',
-  'Juicio':'Fuego sagrado cae en cruz sobre la zona: daña y prende a los enemigos que alcance.',
-  'Alba radiante':'Una luz cálida en cruz que cura a todos los aliados de la zona.',
-  'Misil mágico':'Lanza un misil mágico que además hace daño físico: escala con tu daño mágico y con tu daño físico.',
-  'Bola de fuego':'Lanza una bola de fuego que hace daño en área al objetivo, con baja probabilidad de dejar quemaduras.',
-  'Escarcha':'Un soplido de escarcha delante de ti que puede ralentizar un poco a los enemigos que alcanza.',
-  'Descarga arcana':'Un proyectil de magia pura contra un enemigo a la vista.',
-  'Cono de hielo':'Un soplo helado en cono delante de ti: daña y ralentiza a los enemigos alcanzados.',
-  'Relámpago':'Un rayo en línea recta desde ti que alcanza a todos los enemigos de la línea.',
-  'Onda de choque':'Una onda mágica que golpea y aleja al enemigo.',
-  'Teletransporte':'Desapareces y reapareces en otra casilla libre, sin necesidad de verla.',
-  'Rayo umbrío':'Un rayo de energía oscura (caótica) contra un enemigo a la vista.',
-  'Shuriken':'Lanzas una estrella arrojadiza contra un enemigo a la vista.',
-  'Cuchilla envenenada':'Un corte con hoja envenenada: el enemigo pierde vida al empezar sus próximos turnos.',
-  'Paso de sombra':'Te fundes en las sombras y reapareces en otra casilla que tengas a la vista, sin gastar PM ni pisar lo que haya en medio.',
-  'Puñalada trasera':'Una puñalada letal a un enemigo pegado a ti; muy probable que sea crítica.',
-  'Bomba de humo':'Una bomba que estalla en cruz: daña y deja a los enemigos aturdidos y más lentos.',
-  'Kunai con cadena':'Lanzas un kunai atado a una cadena y tiras del enemigo hacia ti.',
-  'Sustitución':'Intercambias tu posición con la de otra unidad, aliada o enemiga.',
-  'Corte glacial':'Un corte con hoja helada: daña y quita PM al enemigo en su próximo turno.'
+  // Guardián
+  'Tajo':'Un corte seco y sin adornos contra quien tengas delante.',
+  'Quebrar armadura':'Golpeas donde la armadura cede: el enemigo queda expuesto y todo el grupo le pega más fuerte.',
+  'Segundo aliento':'Aprietas los dientes, tomas aire y vuelves a ponerte en pie con fuerzas renovadas.',
+  'Empujón de escudo':'Embistes con el escudo por delante. Si el enemigo choca contra una pared o contra otro, lo nota el doble.',
+  'Barrido':'Un arco amplio con el arma que castiga a todo lo que se amontone frente a ti.',
+  'Gancho':'Lanzas la cadena y tiras: el enemigo acaba a tus pies, o el aliado en apuros, a salvo a tu lado.',
+  'Muralla':'Plantas el escudo delante de un compañero (o de ti) y su armadura aguanta lo que venga.',
+  'Golpe de brasas':'El filo, al rojo vivo, abre la herida y la deja ardiendo.',
+  // Arquero
+  'Flecha precisa':'Respiras, apuntas y sueltas. Una flecha limpia a cualquier enemigo a la vista.',
+  'Flecha de lastre':'Una punta helada que entumece las piernas: el enemigo apenas podrá moverse en su próximo turno.',
+  'Flecha perforante':'Busca la rendija de la armadura y la abre para que el resto del grupo remate.',
+  'Paso atrás':'Golpe rápido al que se te ha pegado y lo apartas para recuperar tu distancia.',
+  'Lluvia de flechas':'Tensas hacia el cielo y dejas que la gravedad haga el resto sobre toda la zona.',
+  'Flecha penetrante':'Atraviesa al primero y sigue su camino: todo lo que esté en la línea recibe.',
+  'Flecha de retroceso':'Un disparo tan potente que tira al enemigo hacia atrás.',
+  'Flecha ígnea':'Prendes la punta antes de soltarla: el blanco sigue ardiendo después del impacto.',
+  // Clérigo
+  'Luz ardiente':'Un destello sagrado que quema a los enemigos que se acercan demasiado.',
+  'Restaurar':'Posas la mano y la luz cierra las heridas, tuyas o de un aliado.',
+  'Sello de fragilidad':'Un sello brilla sobre el enemigo y marca dónde golpear: todos le hacen más daño.',
+  'Purificar':'Arrancas de un aliado venenos, quemaduras y maldiciones, y le devuelves algo de vida.',
+  'Escudo sagrado':'Un halo de luz envuelve a un aliado y frena los golpes durante un tiempo.',
+  'Celeridad divina':'Una bendición que aligera los pasos de un aliado en su próximo turno.',
+  'Juicio':'El cielo responde y el fuego sagrado cae sobre los enemigos de la zona.',
+  'Alba radiante':'Una luz cálida que se extiende y sana a todos los aliados que toca.',
+  // Mago
+  'Misil mágico':'Un proyectil de energía pura que nunca se desvía. Se alimenta tanto de tu magia como de tu fuerza.',
+  'Bola de fuego':'Una esfera ardiente que estalla al llegar y puede dejar a los enemigos en llamas.',
+  'Escarcha':'Un aliento helado barre lo que tienes delante y puede entumecer a quien alcance.',
+  'Descarga arcana':'Magia en bruto lanzada contra cualquier enemigo a la vista.',
+  'Cono de hielo':'Un soplo glacial que hiela y frena a todo lo que tengas enfrente.',
+  'Relámpago':'Un rayo que sale de tus manos y recorre la línea entera, alcanzando a todos los enemigos en ella.',
+  'Onda de choque':'Una sacudida de energía que golpea y aparta al enemigo.',
+  'Teletransporte':'Te desvaneces y reapareces en otro punto, aunque no lo veas.',
+  'Rayo umbrío':'Energía caótica que se retuerce camino del blanco.',
+  // Ninja
+  'Shuriken':'Una estrella de acero que vuela rápida y silenciosa hacia el blanco.',
+  'Cuchilla envenenada':'Un corte pequeño, pero el veneno sigue trabajando turno tras turno.',
+  'Paso de sombra':'Te funden las sombras y apareces donde mires, sin pisar nada por el camino.',
+  'Puñalada trasera':'Una hoja que encuentra el punto débil: casi siempre es un golpe crítico.',
+  'Bomba de humo':'Una nube espesa que daña y deja a los enemigos desorientados y lentos.',
+  'Kunai con cadena':'Clavas el kunai y tiras de la cadena: el enemigo viene hacia ti.',
+  'Sustitución':'Un parpadeo y has cambiado tu lugar con el de otro, amigo o enemigo.',
+  'Corte glacial':'Un tajo con hoja helada que entumece al enemigo para su próximo turno.'
 };
 function skillEffectText(skill){
   const kind=skill[5],o=skillOptions(skill);

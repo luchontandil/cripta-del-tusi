@@ -815,7 +815,7 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
       statRow('ward','Armadura',Math.min(75,unit.stats?.ward||0)+' %'),
       statRow('initiative','Iniciativa',unit.initiative),
       statRow('mp','Movimiento',Math.max(0,3+(unit.stats?.movement||0)-(unit.effects?.slow?.value||0))+' PM'),
-      statRow('attack','Ataque',unit.damage+'–'+(unit.damage+2)),statRow('range','Alcance',unit.range+(unit.range===1?' casilla':' casillas')));
+      statRow('attack','Ataque',unit.damage+'–'+(unit.damage+2)),statRow('range','Alcance',String(unit.range)));
   }else stats.append(...heroStatRows(unit));
   nodes.push(stats);
   const note=unit.boss?bosses[unit.look]?.powers:traitNote(monsterTraits[unit.look]);

@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=93';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=93';
-import {setupSfx} from './music.js?v=93';
-import {icon} from './icons.js?v=93';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=94';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=94';
+import {setupSfx} from './music.js?v=94';
+import {icon} from './icons.js?v=94';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -123,7 +123,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=93').then(({createIso})=>{
+import('./isometric.js?v=94').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1926,6 +1926,16 @@ function impact(event){
       el('animations').append(flash);
       setTimeout(()=>flash.remove(),600);
     }
+    return;
+  }
+  // PM quitados: «−N PM» justo debajo del número de daño.
+  if(event.kind==='mp'){
+    const tag=h('span','impact mp-loss','−'+event.amount+' PM');
+    tag.title='Pierde '+event.amount+' PM en su próximo turno';
+    Object.assign(tag.style,boardPoint(event.pos,1.48));
+    tag.style.setProperty('--float-offset','34px');
+    el('animations').append(tag);
+    setTimeout(()=>tag.remove(),hitDuration);
     return;
   }
   const tag=document.createElement('span');

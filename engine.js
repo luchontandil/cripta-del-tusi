@@ -1266,6 +1266,11 @@ function effect(unit,key,value,turns) {
   const previous=unit.effects[key];
   unit.effects[key]={value:Math.max(previous?.value||0,value),turns:Math.max(previous?.turns||0,turns)};
 }
+/** Quita PM para el próximo turno y lo anuncia (el número «−N PM» sale bajo el daño). */
+function drainMp(s,unit,value,turns){
+  effect(unit,'slow',value,turns);
+  emit(s,{kind:'mp',unit:unit.id,pos:unit.pos,amount:value});
+}
 /** Fuerza de cada glifo según el piso: crece con la partida para que siga pesando. */
 export function glyphPower(kind,floor=1){
   const f=Math.max(1,floor);
@@ -1285,7 +1290,7 @@ function triggerGlyph(s,g,unit) {
     note(s,unit.name+' queda envenenado.');
   }
   if(power.slow) {
-    effect(unit,'slow',power.slow,1);
+    drainMp(s,unit,power.slow,1);
     note(s,unit.name+' pierde '+power.slow+' PM en su próximo turno por el glifo de cadenas.');
   }
 }
@@ -1959,13 +1964,13 @@ function monsterAttack(s,unit,target,rng){
   const dealt=before-target.hp;
   if(special&&alive(target)){
     if(special==='skeleton'){
-      effect(target,'slow',1,1);
+      drainMp(s,target,1,1);
       const to=target.pos+(target.pos-unit.pos);
       if(adjacent(s,target.pos).includes(to)&&freeCell(s,to))move(s,target,[to],false);
     }
     if(special==='skull'){effect(target,'weak',1,1);note(s,target.name+' queda maldito: −1 PA en su próximo turno.');}
-    if(special==='slug'){effect(target,'slow',2,1);note(s,target.name+' queda pringado: −2 PM.');}
-    if(special==='plant'){effect(target,'slow',3,1);note(s,target.name+' queda atrapado por raíces.');}
+    if(special==='slug'){drainMp(s,target,2,1);note(s,target.name+' queda pringado: −2 PM.');}
+    if(special==='plant'){drainMp(s,target,3,1);note(s,target.name+' queda atrapado por raíces.');}
     if(special==='succubus')drag(s,unit,target,2);
   }
   const steal=unit.look==='vampqueen'?1:Math.max(trait.lifesteal||0,unit.lifesteal||0);
@@ -1978,7 +1983,7 @@ function monsterAttack(s,unit,target,rng){
     }
   }
   if(trait.slime&&alive(target)){
-    effect(target,'slow',1,1);
+    drainMp(s,target,1,1);
     note(s,unit.name+' deja su baba en '+target.name+': −1 PM en su próximo turno.');
   }
   if(trait.poison&&alive(target)){
@@ -1990,11 +1995,11 @@ function monsterAttack(s,unit,target,rng){
     note(s,unit.name+' drena la voluntad de '+target.name+': −1 PA en su próximo turno.');
   }
   if((trait.hamstring||unit.hamstring)&&alive(target)){
-    effect(target,'slow',1,1);
+    drainMp(s,target,1,1);
     note(s,unit.name+' entorpece a '+target.name+': −1 PM en su próximo turno.');
   }
   if(trait.charm&&alive(target)){
-    effect(target,'slow',1,1);
+    drainMp(s,target,1,1);
     note(s,unit.name+' encanta a '+target.name+': −1 PM en su próximo turno.');
   }
 }
@@ -2085,7 +2090,7 @@ function bossPower(s,boss,heroes,rng){
   const near=[...alivePlayers].sort((a,b)=>distance(s,boss.pos,a.pos)-distance(s,boss.pos,b.pos));
   if(boss.look==='cerberus'){
     if(cycle%2===0){
-      for(const hero of alivePlayers){effect(hero,'slow',1,1);emit(s,{kind:'spell',effect:'slow',actor:boss.id,from:boss.pos,pos:hero.pos});}
+      for(const hero of alivePlayers){drainMp(s,hero,1,1);emit(s,{kind:'spell',effect:'slow',actor:boss.id,from:boss.pos,pos:hero.pos});}
       note(s,'Cancerbero aúlla: todo el grupo pierde 1 PM en su próximo turno.');
       return false;
     }
@@ -2291,7 +2296,7 @@ function applySkill(s,unit,target,skill,rng,scale=1){
   if(!alive(target))return;
   if(kind==='expose'){effect(target,'expose',value||3,2);note(s,target.name+' queda vulnerable: todos los atacantes infligen +'+(value||3)+'.');}
   if(kind==='slow'&&(opts.slowChance===undefined||rng()*100<opts.slowChance)){
-    effect(target,'slow',value||2,1);
+    drainMp(s,target,value||2,1);
     if(opts.slowChance!==undefined)note(s,target.name+' queda ralentizado: −'+(value||2)+' PM.');
   }
   if(kind==='venom'){effect(target,'poison',value||3,2);note(s,target.name+' queda envenenado.');}

@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=97';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=97';
-import {setupSfx} from './music.js?v=97';
-import {icon} from './icons.js?v=97';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=98';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=98';
+import {setupSfx} from './music.js?v=98';
+import {icon} from './icons.js?v=98';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -123,7 +123,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=97').then(({createIso})=>{
+import('./isometric.js?v=98').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -969,7 +969,7 @@ function skillRows(unit,skill){
   // Daño y curación como filas: valor a la derecha, con el icono y el color de su tipo (sin rótulo de elemento).
   const amount=(cls,iconName,low,high,title)=>{
     const row=h('div','tip-row tip-amount '+cls,icon(cls==='heal'?'heal':'attack'),h('span','tip-label',title),
-      h('span','tip-value',icon(iconName),h('b',null,String(low)),' a ',h('b',null,String(high))));
+      h('span','tip-value',icon(iconName),h('b',null,String(low)),'–',h('b',null,String(high))));
     return row;
   };
   if(f.healing){
@@ -981,7 +981,7 @@ function skillRows(unit,skill){
     if(f.bonus||f.flat)row.title='Base '+skill[3]+'–'+skill[4]+(f.flat?' +'+f.flat:'')+(f.bonus?' · +'+f.bonus+' % por '+bonusSource(unit,f):'');
     rows.push(row);
     // Crítico: probabilidad y el daño que hace al acertar (×1,5 ya aplicado).
-    rows.push(statRow('critical','Crítico',f.crit+' % · '+Math.round(f.low*1.5)+' a '+Math.round(f.high*1.5)));
+    rows.push(statRow('critical','Crítico',f.crit+' % · '+Math.round(f.low*1.5)+'–'+Math.round(f.high*1.5)));
   }
   const sketch=areaSketch(skill);
   if(o.area||sketch){

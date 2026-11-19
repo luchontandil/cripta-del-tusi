@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=94';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=94';
-import {setupSfx} from './music.js?v=94';
-import {icon} from './icons.js?v=94';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=95';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=95';
+import {setupSfx} from './music.js?v=95';
+import {icon} from './icons.js?v=95';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -123,7 +123,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=94').then(({createIso})=>{
+import('./isometric.js?v=95').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -961,14 +961,22 @@ function areaSketch(skill){
 function skillRows(unit,skill){
   const f=skillFacts(unit,skill),o=skillOptions(skill);
   const rows=[statRow('ap','Coste',f.cost+' PA')];
-  if(f.healing)rows.push(h('div','tip-damage heal',icon('heal'),h('b',null,String(f.low)),' a ',h('b',null,String(f.high)),' de curación',f.bonus?h('small',null,' (+'+f.bonus+' nivel)'):null));
-  else if(!f.utility){
-    rows.push(statRow(f.school==='magic'?'magic':'physical','Tipo',f.school==='magic'?'Hechizo':'Físico','school-'+f.school));
-    if(f.element!=='physical'&&!(f.school==='magic'&&f.element==='magic'))rows.push(statRow(f.element,'Elemento',elements[f.element],'element-'+f.element));
-    rows.push(h('div','tip-damage element-'+f.element,icon(f.element),
-      h('b',null,String(f.low)),' a ',h('b',null,String(f.high)),' de daño '+(f.element==='physical'?'físico':f.element==='magic'?'mágico':f.element==='chaos'?'caótico':'de '+elements[f.element].toLowerCase()),
-      f.bonus||f.flat?h('small',null,' (base '+skill[3]+'–'+skill[4]+(f.flat?' +'+f.flat:'')+(f.bonus?' · +'+f.bonus+' % por '+bonusSource(unit,f):'')+')'):null));
-    rows.push(statRow('critical','Crítico',f.crit+' % · ×1,5'));
+  // Daño y curación como filas: valor a la derecha, con el icono y el color de su tipo (sin rótulo de elemento).
+  const amount=(cls,iconName,low,high,title)=>{
+    const row=h('div','tip-row tip-amount '+cls,icon(cls==='heal'?'heal':'attack'),h('span','tip-label',title),
+      h('span','tip-value',icon(iconName),h('b',null,String(low)),' a ',h('b',null,String(high))));
+    return row;
+  };
+  if(f.healing){
+    const row=amount('heal','heal',f.low,f.high,'Curación');
+    if(f.bonus)row.title='+'+f.bonus+' por nivel';
+    rows.push(row);
+  }else if(!f.utility){
+    const row=amount('element-'+f.element,f.element,f.low,f.high,'Daño');
+    if(f.bonus||f.flat)row.title='Base '+skill[3]+'–'+skill[4]+(f.flat?' +'+f.flat:'')+(f.bonus?' · +'+f.bonus+' % por '+bonusSource(unit,f):'');
+    rows.push(row);
+    // Crítico: probabilidad y el daño que hace al acertar (×1,5 ya aplicado).
+    rows.push(statRow('critical','Crítico',f.crit+' % · '+Math.round(f.low*1.5)+' a '+Math.round(f.high*1.5)));
   }
   const sketch=areaSketch(skill);
   if(o.area||sketch){
@@ -978,13 +986,15 @@ function skillRows(unit,skill){
   }
   if(o.push||o.pull)rows.push(statRow('mp',o.push?'Empuje':'Atrae',o.pull==='melee'?'Hasta el contacto':(o.push||o.pull)+((o.push||o.pull)>1?' casillas':' casilla')));
   if(o.inLine)rows.push(statRow('move','Lanzar','En línea recta'));
-  if(o.casts)rows.push(statRow('clock','Lanzamientos por turno',String(o.casts)+(state?.phase==='combat'&&unit.id===state.units[state.turn]?.id?' · quedan '+Math.max(0,castsLeft(state,unit,skill)):'')));
-  if(o.scales)rows.push(statRow('plus','Escala con',o.scales.map(k=>'daño '+elements[k].toLowerCase()).join(' + ')));
+  if(o.casts)rows.push(statRow('clock','Usos por turno',state?.phase==='combat'&&unit.id===state.units[state.turn]?.id?Math.max(0,castsLeft(state,unit,skill))+' de '+o.casts:String(o.casts)));
+  if(o.scales)rows.push(statRow('plus','Escala con',o.scales.map(k=>elements[k].toLowerCase()).join(' + ')));
   if(o.anyTarget)rows.push(statRow('users','Objetivo','Aliado o enemigo'));
-  rows.push(statRow('range','Alcance',(f.minRange&&f.minRange!==f.maxRange?f.minRange+'–':'')+f.maxRange+(f.maxRange===1?' casilla':' casillas')+(f.reach?' (+'+f.reach+' equipo)':'')));
-  rows.push(statRow('reach','Tipo de alcance',f.modifiable?'Modificable':'Fijo',f.modifiable?'yes':'no'));
+  // Alcance y si es modificable en la misma fila.
+  const range=statRow('range','Alcance',(f.minRange&&f.minRange!==f.maxRange?f.minRange+'–':'')+f.maxRange+(f.maxRange===1?' casilla':' casillas')+(f.reach?' (+'+f.reach+' equipo)':''));
+  range.querySelector('.tip-value').append(h('small','reach-kind '+(f.modifiable?'yes':'no'),f.modifiable?'modificable':'fijo'));
+  range.title=f.modifiable?'Modificable: el «+Alcance» del equipo lo aumenta.':'Fijo: el «+Alcance» del equipo no lo cambia.';
+  rows.push(range);
   rows.push(statRow('info','Línea de visión',o.los===false?'No necesaria':'Necesaria'));
-  rows.push(h('p','tip-reach-note',f.modifiable?'Alcance modificable: el «+Alcance» de tu casco lo aumenta.':'Alcance fijo: el «+Alcance» del equipo no lo cambia.'));
   return rows;
 }
 function skillTipNodes(unit,index,skill,rank,hotkey=null){
@@ -995,7 +1005,7 @@ function skillTipNodes(unit,index,skill,rank,hotkey=null){
   return [tipHead(spellIcon(kind,symbol),name,rank?'Nivel '+rank+' de 3':'Sin aprender',hotkey?String(hotkey):null),
     skillLore[name]?h('p','tip-lore',skillLore[name]):null,
     h('div','tip-stats',...skillRows(unit,skill)),
-    effect?h('p','tip-note',effect):null,
+    effect?(()=>{const p=h('p','tip-effect');resourceText(p,effect);return p;})():null,
     bonus?h('p','tip-note max-bonus'+(rank>=3?' active':''),icon('xp'),(rank>=3?'Rango máximo: ':'Al rango 3: ')+bonus):null].filter(Boolean);
 }
 function initiative(turn){

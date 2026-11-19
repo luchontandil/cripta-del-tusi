@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=95';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=95';
-import {setupSfx} from './music.js?v=95';
-import {icon} from './icons.js?v=95';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=96';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=96';
+import {setupSfx} from './music.js?v=96';
+import {icon} from './icons.js?v=96';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -123,7 +123,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=95').then(({createIso})=>{
+import('./isometric.js?v=96').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -990,7 +990,7 @@ function skillRows(unit,skill){
   if(o.scales)rows.push(statRow('plus','Escala con',o.scales.map(k=>elements[k].toLowerCase()).join(' + ')));
   if(o.anyTarget)rows.push(statRow('users','Objetivo','Aliado o enemigo'));
   // Alcance y si es modificable en la misma fila.
-  const range=statRow('range','Alcance',(f.minRange&&f.minRange!==f.maxRange?f.minRange+'–':'')+f.maxRange+(f.maxRange===1?' casilla':' casillas')+(f.reach?' (+'+f.reach+' equipo)':''));
+  const range=statRow('range','Alcance',(f.minRange&&f.minRange!==f.maxRange?f.minRange+'–':'')+f.maxRange+(f.reach?' (+'+f.reach+' equipo)':''));
   range.querySelector('.tip-value').append(h('small','reach-kind '+(f.modifiable?'yes':'no'),f.modifiable?'modificable':'fijo'));
   range.title=f.modifiable?'Modificable: el «+Alcance» del equipo lo aumenta.':'Fijo: el «+Alcance» del equipo no lo cambia.';
   rows.push(range);

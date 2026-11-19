@@ -1,9 +1,9 @@
 import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=99';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=99';
-import {setupSfx} from './music.js?v=99';
-import {icon} from './icons.js?v=99';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=100';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=100';
+import {setupSfx} from './music.js?v=100';
+import {icon} from './icons.js?v=100';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -123,7 +123,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=99').then(({createIso})=>{
+import('./isometric.js?v=100').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -190,9 +190,19 @@ function paintVersion(data){
   box.classList.toggle('stale',!!(data&&data.assets&&data.assets!==CLIENT_VERSION));
   // Si el servidor ya tiene una versión más nueva que esta página (caché del navegador), ofrecer recargar.
   const newer=data?.assets&&Number(data.assets)>Number(CLIENT_VERSION);
-  box.onclick=newer?()=>location.reload():null;
+  // Recargar pidiendo la página con ?v=N: GitHub Pages guarda la portada en caché unos minutos y un
+  // recargo normal puede devolver la versión vieja.
+  const fresh=()=>location.replace(location.pathname+'?v='+data.assets+location.hash);
+  box.onclick=newer?fresh:null;
   box.classList.toggle('update',!!newer);
-  if(newer)box.textContent='Hay una versión nueva ('+data.assets+') · pulsa para recargar';
+  if(!newer)return;
+  // Ya se recargó pidiendo esa versión y sigue llegando la vieja: la web aún se está publicando.
+  const asked=Number(new URLSearchParams(location.search).get('v'))||0;
+  if(asked>=Number(data.assets)){
+    box.textContent='Publicando la versión '+data.assets+'… se recargará sola';
+    clearTimeout(paintVersion.retry);
+    paintVersion.retry=setTimeout(()=>{if(!state)fresh();},30000);
+  }else box.textContent='Hay una versión nueva ('+data.assets+') · pulsa para recargar';
 }
 // Comprobar cada 2 minutos si hay versión nueva publicada.
 setInterval(()=>{if(!state||state.phase==='lobby')accountCall('status').then(paintVersion).catch(()=>{});},120000);

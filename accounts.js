@@ -2,7 +2,7 @@
 import {randomBytes,scrypt as scryptCallback,timingSafeEqual} from 'node:crypto';
 import {promisify} from 'node:util';
 import {getJSON,setJSON,remove} from './store.js';
-import {runPoints,cards,classes,cleanLoadout,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE} from './engine.js';
+import {cleanMap,setCustomMaps,runPoints,cards,classes,cleanLoadout,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE} from './engine.js';
 
 const scrypt=promisify(scryptCallback);
 const sessionDays=30;
@@ -275,4 +275,30 @@ export async function deleteSound(user,{key,id}){
 export async function soundFile(id){
   if(!/^[0-9a-f]{16}$/.test(String(id)))return null;
   return getJSON('sfx:file:'+id);
+}
+
+// ───────────── Mapas creados (editor de mapas, solo administradores) ─────────────
+const mapsKey='maps:list';
+/** Lista guardada de mapas creados. */
+export async function customMapList(){return (await getJSON(mapsKey))||[];}
+/** Carga los mapas en el motor (al arrancar el servidor y tras cada cambio). */
+export async function loadCustomMaps(){setCustomMaps(await customMapList());}
+function adminOnly(user){if(!isAdmin(user.nick))throw Object.assign(new Error('Solo un administrador puede editar mapas.'),{status:403});}
+/** Crea o reemplaza un mapa (por id). */
+export async function saveCustomMap(user,raw){
+  adminOnly(user);
+  const map={...cleanMap(raw),author:user.nick,updated:Date.now()};
+  const list=(await customMapList()).filter(m=>m.id!==map.id);
+  if(list.length>=200)throw new Error('Demasiados mapas (máximo 200).');
+  list.push(map);
+  await setJSON(mapsKey,list);
+  setCustomMaps(list);
+  return {map,maps:list};
+}
+export async function deleteCustomMap(user,id){
+  adminOnly(user);
+  const list=(await customMapList()).filter(m=>m.id!==String(id));
+  await setJSON(mapsKey,list);
+  setCustomMaps(list);
+  return {maps:list};
 }

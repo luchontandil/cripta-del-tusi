@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost,setAway} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost,setAway,setCustomMaps,cleanMap,mapWarnings,testCustomMap} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -1367,4 +1367,63 @@ test('sala: la cuenta con héroe en una partida empezada vuelve a él',{timeout:
   assert.equal(back.state.players.length,1,'no se duplica');
   const other=await call('/api/'+room.code+'/join',{name:'Intruso',classId:'mago'});
   assert.equal(other.status,400,'sin héroe en la partida no se puede entrar');
+});
+test('mapas creados: se limpian, salen en su zona según la frecuencia y usan sus puntos de aparición',()=>{
+  const w=10,h=6;
+  const raw={name:'  Sala de prueba  ',act:1,room:'normal',weight:100,width:w,height:h,
+    voids:[0,9],walls:[22,23,0],water:[44],traps:[{pos:45,kind:'gas'},{pos:22,kind:'spikes'}],
+    heroSpawns:[18,28,38,48,22],enemySpawns:[11,21,31,41,51,18],wallVariants:{22:2,23:7}};
+  const m=cleanMap(raw);
+  assert.equal(m.name,'Sala de prueba');
+  assert.deepEqual(m.walls,[22,23],'un obstáculo no puede estar en el vacío');
+  assert.deepEqual(m.traps,[{pos:45,kind:'gas'}],'ni una trampa sobre un obstáculo');
+  assert.deepEqual(m.heroSpawns,[18,28,38,48]);
+  assert.deepEqual(m.enemySpawns,[11,21,31,41,51],'un punto no puede ser de héroe y de enemigo');
+  assert.deepEqual(m.wallVariants,{22:2});
+  assert.ok(mapWarnings(m).some(t=>t.includes('enemigos')));
+  setCustomMaps([m]);
+  try{
+    const s=create();join(s,'a','A','guardia');
+    act(s,'a',{type:'start'},rng);
+    act(s,'a',{type:'vote',option:0},rng);tick(s,rng);
+    assert.equal(s.phase,'combat');
+    assert.equal(s.customMap?.name,'Sala de prueba','frecuencia 100 %: sale el mapa creado');
+    assert.deepEqual([s.width,s.height],[w,h]);
+    assert.deepEqual(s.walls,[22,23]);
+    assert.deepEqual(s.wallVariants,{22:2});
+    const hero=s.units.find(u=>!u.enemy);
+    assert.equal(hero.pos,18,'el héroe empieza en su punto de aparición');
+    for(const foe of s.units.filter(u=>u.enemy))assert.ok(!s.walls.includes(foe.pos)&&!s.voids.includes(foe.pos));
+    // Otra zona (acto 2) o frecuencia 0: no sale.
+    setCustomMaps([{...m,act:2}]);
+    const t=create();join(t,'a','A','guardia');act(t,'a',{type:'start'},rng);act(t,'a',{type:'vote',option:0},rng);tick(t,rng);
+    assert.equal(t.customMap,null);
+    // Prueba desde el editor: combate de jefe del acto 2 con ese mapa.
+    const u=create();join(u,'a','A','guardia');
+    testCustomMap(u,{...m,act:2,room:'boss'},rng);
+    assert.equal(u.phase,'combat');assert.equal(u.act,2);
+    assert.equal(u.customMap.name,'Sala de prueba');
+    assert.ok(u.units.some(x=>x.enemy&&x.boss),'hay jefe');
+  }finally{setCustomMaps([]);}
+});
+test('mapas creados en el servidor: solo el administrador guarda y borra; la lista es pública',{timeout:10000},async t=>{
+  const {server:app}=await import('./server.js');
+  if(!app.listening){app.listen(0,'127.0.0.1');await once(app,'listening');}
+  t.after(()=>{app.close();setCustomMaps([]);});
+  const base='http://127.0.0.1:'+app.address().port;
+  const call=async(path,body,account)=>{
+    const response=await fetch(base+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(account?{'X-Account':account}:{})},body:body?JSON.stringify(body):undefined});
+    return {status:response.status,...await response.json()};
+  };
+  const map={name:'Pasillo',act:1,room:'any',weight:50,width:8,height:6,walls:[20]};
+  const someone=await call('/api/account/register',{nick:'Cartógrafo'+Date.now().toString(36).slice(-4),password:'secreto123'});
+  assert.equal((await call('/api/account/map-save',{map},someone.token)).status,403);
+  const admin=(await call('/api/account/login',{nick:'passa',password:'secreto123'})).token||(await call('/api/account/register',{nick:'passa',password:'secreto123'})).token;
+  const saved=await call('/api/account/map-save',{map},admin);
+  assert.equal(saved.status,200);
+  assert.equal(saved.map.author,'passa');
+  const list=await call('/api/maps');
+  assert.ok(list.maps.some(m=>m.id===saved.map.id&&m.name==='Pasillo'));
+  const gone=await call('/api/account/map-delete',{id:saved.map.id},admin);
+  assert.ok(!gone.maps.some(m=>m.id===saved.map.id));
 });

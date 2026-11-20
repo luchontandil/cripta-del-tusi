@@ -760,7 +760,7 @@ export function encounter(floor,size,options={}) {
 }
 export const distance = (s,a,b) => Math.abs(a%s.width-b%s.width)+Math.abs(Math.floor(a/s.width)-Math.floor(b/s.width));
 export const onBoard=(s,pos)=>Number.isInteger(pos)&&pos>=0&&pos<s.width*s.height&&!s.voids?.includes(pos);
-const adjacent = (s,pos) => [pos-s.width,pos+s.width,pos-1,pos+1].filter(n=>onBoard(s,n)&&distance(s,pos,n)===1);
+export const adjacent = (s,pos) => [pos-s.width,pos+s.width,pos-1,pos+1].filter(n=>onBoard(s,n)&&distance(s,pos,n)===1);
 const forms={
   L:(x,y)=>x<.52||y>=.43,
   T:(x,y)=>y<.43||(x>=.28&&x<.73),
@@ -1096,6 +1096,96 @@ export function enemyScaling(floor,heroes){
     damage:Number(Math.pow(clamp(defense/expectedDefense,.7,2.2),.75).toFixed(2))
   };
 }
+// ───────────── Mapas creados en el editor ─────────────
+/**
+ * Un mapa creado: tamaño, casillas fuera del mapa (voids), obstáculos (walls, con variante opcional),
+ * agua/lava, trampas y puntos de aparición. Pertenece a una zona (acto + tipo de sala) y tiene una
+ * frecuencia: el % de veces que sale en lugar de un mapa aleatorio de esa zona.
+ */
+export const MAP_LIMITS={minW:6,maxW:20,minH:5,maxH:14};
+export const ROOM_KINDS={any:'Cualquiera',normal:'Normal',elite:'Élite',boss:'Jefe'};
+export const obstacleNames={
+  crypt:['Columna rota','Sarcófago con velas','Huesos y escombros'],
+  jungle:['Árbol retorcido','Helechos con flores','Ídolo con musgo'],
+  hell:['Agujas de obsidiana','Brasero de azufre','Roca de lava']
+};
+let customMaps=[];
+/** Lista de mapas creados que usa el juego (el servidor y el modo solitario la cargan al empezar). */
+export function setCustomMaps(list){customMaps=(Array.isArray(list)?list:[]).map(m=>{try{return cleanMap(m);}catch{return null;}}).filter(Boolean);}
+export const getCustomMaps=()=>customMaps;
+/** Normaliza y valida un mapa (lanza un error con el motivo si no sirve). */
+export function cleanMap(raw){
+  const m=raw&&typeof raw==='object'?raw:{};
+  const int=(v,lo,hi,def)=>{const n=Math.round(Number(v));return Number.isFinite(n)?Math.min(hi,Math.max(lo,n)):def;};
+  const width=int(m.width,MAP_LIMITS.minW,MAP_LIMITS.maxW,12),height=int(m.height,MAP_LIMITS.minH,MAP_LIMITS.maxH,8);
+  const size=width*height;
+  const cells=list=>[...new Set((Array.isArray(list)?list:[]).map(Number).filter(p=>Number.isInteger(p)&&p>=0&&p<size))].sort((a,b)=>a-b);
+  const voids=cells(m.voids);
+  const off=new Set(voids);
+  const walls=cells(m.walls).filter(p=>!off.has(p));
+  const blocked=new Set([...voids,...walls]);
+  const water=cells(m.water).filter(p=>!blocked.has(p));
+  water.forEach(p=>blocked.add(p));
+  const traps=[];
+  for(const t of Array.isArray(m.traps)?m.traps:[]){
+    const pos=Number(t?.pos);
+    if(!Number.isInteger(pos)||pos<0||pos>=size||blocked.has(pos)||traps.some(x=>x.pos===pos))continue;
+    traps.push({pos,kind:t.kind==='gas'?'gas':'spikes'});
+  }
+  const trapSet=new Set(traps.map(t=>t.pos));
+  const heroSpawns=cells(m.heroSpawns).filter(p=>!blocked.has(p)&&!trapSet.has(p)).slice(0,8);
+  const enemySpawns=cells(m.enemySpawns).filter(p=>!blocked.has(p)&&!trapSet.has(p)&&!heroSpawns.includes(p)).slice(0,24);
+  const wallVariants={};
+  for(const [k,v] of Object.entries(m.wallVariants||{})){const p=Number(k),n=Number(v);if(walls.includes(p)&&[0,1,2].includes(n))wallVariants[p]=n;}
+  const name=String(m.name||'').trim().slice(0,40)||'Mapa sin nombre';
+  const act=int(m.act,1,ACTS,1);
+  const room=Object.hasOwn(ROOM_KINDS,m.room)?m.room:'any';
+  const weight=int(m.weight,0,100,30);
+  const id=/^[a-z0-9]{6,16}$/.test(m.id||'')?m.id:Math.random().toString(36).slice(2,10);
+  return {id,name,act,room,weight,enabled:m.enabled!==false,width,height,voids,walls,wallVariants,water,traps,heroSpawns,enemySpawns,
+    ...(m.author?{author:String(m.author).slice(0,24)}:{}),...(m.updated?{updated:Number(m.updated)||0}:{})};
+}
+/** Avisos de un mapa: no impiden guardarlo, pero el editor los muestra. */
+export function mapWarnings(map){
+  const m=cleanMap(map);
+  const out=[];
+  if(m.heroSpawns.length<4)out.push('Faltan puntos de aparición de héroes ('+m.heroSpawns.length+'/4): el juego completará el resto.');
+  if(m.enemySpawns.length<8)out.push('Pocos puntos de enemigos ('+m.enemySpawns.length+'/8 recomendados): el juego añadirá casillas libres.');
+  // Todas las casillas transitables conectadas (si no, habría zonas imposibles de alcanzar).
+  const s={width:m.width,height:m.height,voids:m.voids};
+  const blocked=new Set([...m.voids,...m.walls,...m.water]);
+  const open=Array.from({length:m.width*m.height},(_,p)=>p).filter(p=>!blocked.has(p));
+  if(open.length){
+    const seen=new Set([open[0]]);
+    for(const p of seen)for(const n of adjacent(s,p))if(!blocked.has(n))seen.add(n);
+    if(seen.size<open.length)out.push((open.length-seen.size)+' casillas quedan aisladas: nadie puede llegar a ellas.');
+  }else out.push('No hay casillas transitables.');
+  if(!m.enabled)out.push('Desactivado: no sale en partidas.');
+  else if(!m.weight)out.push('Frecuencia 0 %: no sale en partidas.');
+  return out;
+}
+/** Mapa creado para esta sala (o null): se recorre la zona en orden aleatorio y cada uno se tira con su frecuencia. */
+function pickCustomMap(s,room,rng){
+  const pool=customMaps.filter(m=>m.enabled&&m.weight>0&&m.act===actOf(s.floor)&&(m.room==='any'||m.room===room));
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  return pool.find(m=>rng()*100<m.weight)||null;
+}
+/** Partida de prueba desde el editor: empieza directamente en un combate de esa zona con ese mapa. */
+export function testCustomMap(s,raw,rng=Math.random){
+  const map=cleanMap(raw);
+  s.route=makeRoute(rng,map.act);
+  s.act=map.act;s.bossKills=0;
+  s.floor=(map.act-1)*FLOORS_PER_ACT+(map.room==='boss'?FLOORS_PER_ACT-1:map.room==='elite'?3:1)-1;
+  s.testMap=map;
+  openFloor(s,rng,map.room==='elite',map.room==='boss'?actBosses[map.act-1][1][0]:null);
+}
+/** Coloca un mapa creado en el estado (o uno de prueba desde el editor). */
+function applyCustomMap(s,map){
+  [s.width,s.height]=[map.width,map.height];
+  s.voids=[...map.voids];s.shape=map.voids.length?'personalizado':'rectángulo';
+  s.roomForm='custom';s.roomFormName='Mapa del editor';
+  return {name:map.name,style:'custom',walls:[...map.walls],water:[...map.water],traps:map.traps.map(t=>({...t}))};
+}
 function openFloor(s,rng,elite=false,boss=null) {
   s.phase='combat';
   s.vote=null;
@@ -1109,17 +1199,26 @@ function openFloor(s,rng,elite=false,boss=null) {
   const mapRng=floorRandom(s.mapSeed);
   // Formas de sala: unas ayudan al cuerpo a cuerpo (pequeñas), otras a la distancia (largas, amplias).
   const extra=s.players.length-1;
-  const forms=roomForms(extra,mapRng);
-  const form=s.floor===1?forms[0]:pick(forms.filter(f=>f.key!==s.roomForm),mapRng);
-  s.roomForm=form.key;s.roomFormName=form.name;
-  [s.width,s.height]=[form.w,form.h];
-  Object.assign(s,contour(s,mapRng));
+  // Mapa creado en el editor: el de prueba (s.testMap) o uno de la zona según su frecuencia.
+  const custom=s.testMap||pickCustomMap(s,boss?'boss':elite?'elite':'normal',mapRng);
+  s.testMap=null;
+  s.customMap=custom?{id:custom.id,name:custom.name}:null;
+  s.wallVariants=custom?{...custom.wallVariants}:{};
+  let layout;
+  if(custom)layout=applyCustomMap(s,custom);
+  else{
+    const forms=roomForms(extra,mapRng);
+    const form=s.floor===1?forms[0]:pick(forms.filter(f=>f.key!==s.roomForm),mapRng);
+    s.roomForm=form.key;s.roomFormName=form.name;
+    [s.width,s.height]=[form.w,form.h];
+    Object.assign(s,contour(s,mapRng));
+  }
   s.act=actOf(s.floor);
   s.biome=actBiomes[s.act-1];
   s.glyphs=[];
   const w=s.width;
   const mid=Math.floor(s.height/2);
-  const layout=makeLayout(s,mapRng);
+  layout||=makeLayout(s,mapRng);
   s.layoutName=layout.name;
   s.layoutStyle=layout.style;
   s.walls=layout.walls;
@@ -1128,7 +1227,9 @@ function openFloor(s,rng,elite=false,boss=null) {
   const trapCells=new Set(s.traps.map(t=>t.pos));
   const free=Array.from({length:w*s.height},(_,pos)=>pos).filter(pos=>onBoard(s,pos)&&!s.walls.includes(pos)&&!s.water.includes(pos)&&!trapCells.has(pos));
   const rightScore=pos=>(pos%w)*4-Math.abs(Math.floor(pos/w)-mid);
-  const heroPositions=s.floor===1?[0,-1,1,-2].map(y=>w*(mid+y)+w-2):
+  // Mapa creado: sus puntos de aparición primero; si faltan, las casillas libres más a la derecha.
+  const heroPositions=custom?[...custom.heroSpawns.filter(p=>free.includes(p)),...[...free].filter(p=>!custom.heroSpawns.includes(p)&&!custom.enemySpawns.includes(p)).sort((a,b)=>rightScore(b)-rightScore(a))].slice(0,s.players.length):
+    s.floor===1?[0,-1,1,-2].map(y=>w*(mid+y)+w-2):
     [...free].sort((a,b)=>rightScore(b)-rightScore(a)).slice(0,s.players.length);
   const heroes=s.players.map((p,i)=>{
     const previous=s.units.find(u=>u.id===p.id);
@@ -1147,8 +1248,11 @@ function openFloor(s,rng,elite=false,boss=null) {
   const scale=enemyScaling(s.floor,heroes);
   s.scaling=scale;
   if(s.mods.startHpPct)for(const hero of heroes)hero.hp=Math.max(1,Math.min(hero.hp,Math.ceil(hero.max*s.mods.startHpPct)));
-  const spawns=s.floor===1?Array.from({length:(s.height-2)*2},(_,i)=>w*(1+Math.floor(i/2))+1+i%2):
+  const spawns=custom?custom.enemySpawns.filter(p=>free.includes(p)&&!heroPositions.includes(p)):
+    s.floor===1?Array.from({length:(s.height-2)*2},(_,i)=>w*(1+Math.floor(i/2))+1+i%2):
     free.filter(pos=>!heroPositions.includes(pos)).sort((a,b)=>a%w-b%w).slice(0,Math.max(12,lineup.length*2));
+  // Si el mapa creado no tiene bastantes puntos de enemigos, se usan las casillas libres más a la izquierda.
+  if(custom&&spawns.length<lineup.length)spawns.push(...free.filter(p=>!heroPositions.includes(p)&&!spawns.includes(p)).sort((a,b)=>a%w-b%w).slice(0,lineup.length-spawns.length));
   const foes=lineup.map(u=>{
     const pos=spawns.splice(roll(0,spawns.length-1,mapRng),1)[0];
     const hp=Math.max(1,Math.round(u.hp*(s.mods.enemyHp||1)*scale.hp));
@@ -1156,7 +1260,7 @@ function openFloor(s,rng,elite=false,boss=null) {
   });
   s.units=[...heroes,...foes].sort((a,b)=>b.initiative-a.initiative);
   s.turn=0;
-  note(s,'Piso '+s.floor+' · '+s.layoutName+' · '+(s.roomFormName||'Sala').toLowerCase()+(s.voids.length?' · '+s.shape.toUpperCase():'')+(boss?' · '+bosses[boss].name:elite?' · Combate de élite':''));
+  note(s,'Piso '+s.floor+' · '+s.layoutName+' · '+(s.roomFormName||'Sala').toLowerCase()+(s.voids.length&&!s.customMap?' · '+s.shape.toUpperCase():'')+(boss?' · '+bosses[boss].name:elite?' · Combate de élite':''));
   if(Math.abs(scale.hp-1)>=.05||Math.abs(scale.damage-1)>=.05)
     note(s,'Los enemigos se adaptan al poder del grupo: vida ×'+scale.hp.toFixed(2)+', daño ×'+scale.damage.toFixed(2)+'.');
   const effects=modText(s.mods);

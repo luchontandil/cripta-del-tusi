@@ -16,7 +16,7 @@ import { persistent } from './store.js';
 
 export const rooms = new Map();
 const assets = {'/':'index.html','/client.js':'client.js','/engine.js':'engine.js','/art.js':'art.js','/music.js':'music.js','/icons.js':'icons.js','/style.css':'style.css',
-  '/isometric.js':'isometric.js','/models3d.js':'models3d.js','/three.module.js':'three.module.js','/three.core.js':'three.core.js','/three-LICENSE.txt':'three-LICENSE.txt','/favicon.svg':'favicon.svg'};
+  '/isometric.js':'isometric.js','/models3d.js':'models3d.js','/mapeditor.js':'mapeditor.js','/three.module.js':'three.module.js','/three.core.js':'three.core.js','/three-LICENSE.txt':'three-LICENSE.txt','/favicon.svg':'favicon.svg'};
 const mime = {html:'text/html',js:'text/javascript',css:'text/css',txt:'text/plain',ogg:'audio/ogg',json:'application/json',md:'text/markdown',svg:'image/svg+xml'};
 const token = bytes => randomBytes(bytes).toString('hex');
 const snapshot = room => ({
@@ -72,7 +72,7 @@ export const server = createServer(async (req,res) => {
     let body = {};
     if (req.method === 'POST') {
       let input = '';
-      const limit = path === '/api/account/sfx-upload' ? 640*1024 : path === '/api/account/sfx-mix' ? 32768 : 4096;
+      const limit = path === '/api/account/sfx-upload' ? 640*1024 : path === '/api/account/sfx-mix' || path === '/api/account/map-save' ? 32768 : 4096;
       for await (const chunk of req) {
         input += chunk;
         if (input.length > limit) return send(413,{error:'Solicitud demasiado grande.'});
@@ -82,6 +82,8 @@ export const server = createServer(async (req,res) => {
     const accountToken = req.headers['x-account'] || null;
     if (code === 'account') return send(200, await accountRoute(operation, req.method, body, accountToken));
     if (code === 'sfx' && operation === 'mix' && req.method === 'GET') return send(200,{mix:await accounts.soundMix()});
+    // Mapas creados: la lista es pública (el modo solitario la necesita); editarla, solo el administrador.
+    if (code === 'maps' && !operation && req.method === 'GET') return send(200,{maps:await accounts.customMapList()});
     if (req.method === 'POST' && ((code === 'rooms' && !operation) || operation === 'join')) {
       const creating = code === 'rooms';
       if (creating && rooms.size >= 250) return send(503,{error:'Servidor lleno.'});
@@ -220,6 +222,8 @@ async function accountRoute(operation,method,body,tokenValue){
   if(operation==='dismiss')return {user:await accounts.dismissInvite(user,body.from)};
   if(operation==='award')return accounts.awardSolo(user,body);
   if(operation==='sfx-mix')return {mix:await accounts.saveSoundMix(user,body.mix)};
+  if(operation==='map-save')return accounts.saveCustomMap(user,body.map);
+  if(operation==='map-delete')return accounts.deleteCustomMap(user,body.id);
   if(operation==='sfx-upload')return {mix:await accounts.uploadSound(user,body)};
   if(operation==='sfx-delete')return {mix:await accounts.deleteSound(user,body)};
   throw new Error('Ruta desconocida.');
@@ -233,6 +237,8 @@ setInterval(() => {
     }
   }
 },200).unref();
+// Mapas creados en el editor: se cargan al arrancar.
+accounts.loadCustomMaps().catch(error=>console.error('Mapas:',error.message));
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   server.listen(Number(process.env.PORT || 3000),'0.0.0.0',()=>console.log('Cripta del tusi · puerto '+server.address().port));
 }

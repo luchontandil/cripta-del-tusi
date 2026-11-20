@@ -1,9 +1,10 @@
-import {critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
+import {setCustomMaps,testCustomMap,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=102';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=102';
-import {setupSfx} from './music.js?v=102';
-import {icon} from './icons.js?v=102';
+  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=104';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=104';
+import {setupSfx} from './music.js?v=104';
+import {icon} from './icons.js?v=104';
+import {openMapEditor} from './mapeditor.js?v=104';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -123,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=102').then(({createIso})=>{
+import('./isometric.js?v=104').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -209,6 +210,8 @@ setInterval(()=>{if(!state||state.phase==='lobby')accountCall('status').then(pai
 // Mezcla de sonidos definida por el administrador (volumen, tono y variantes de cada categoría).
 let savedMix={};
 fetch(serverBase()+'/api/sfx/mix',{signal:AbortSignal.timeout(12000)}).then(r=>r.json()).then(d=>{savedMix=d.mix||{};sfx.setMix(savedMix,serverBase());}).catch(()=>{});
+// Mapas creados en el editor: el modo solitario también los usa.
+fetch(serverBase()+'/api/maps',{signal:AbortSignal.timeout(12000)}).then(r=>r.json()).then(d=>setCustomMaps(d.maps||[])).catch(()=>{});
 setInterval(refreshAccount,10000);
 // Al cargar la página: comprobar la sesión enseguida (antes se esperaba a la primera consulta, a los 10 s).
 refreshAccount();
@@ -307,7 +310,7 @@ function renderAccount(){
   box.replaceChildren(
     h('div','account-head',h('div','account-title',h('h2',null,icon('level'),u.nick),shardBadge(available())),
       h('div','account-stats',h('span','chip',icon('crown'),'Mejor piso: '+(u.best||0)),h('span','chip',icon('clock'),(u.runs||0)+' partidas')),
-      h('div','account-actions',deckButton,shopButton,SFX_EDITOR&&u.admin?sfxEditorButton():null,out)),
+      h('div','account-actions',deckButton,shopButton,SFX_EDITOR&&u.admin?sfxEditorButton():null,u.admin?mapEditorButton():null,out)),
     ...invites,
     friendBox);
 }
@@ -2434,6 +2437,7 @@ el('leave').onclick=()=>{
   syncViewport();
   hideUnit();
   localStorage.removeItem('amber-session');sessionStorage.removeItem('amber-session');
+  editorTest=null;paintEditorReturn();
   error('');render();
 };
 /**
@@ -2484,6 +2488,48 @@ const sfxLabels={armor:'Golpe en armadura',arrow:'Disparo de flecha',arrowhit:'I
   step_wet:'Pasos en el barro',swing:'Golpe al aire',trap:'Trampa',venom:'Veneno',win:'Victoria',v_bat:'Voz: murciélago',v_beast:'Voz: bestia',
   v_boss:'Voz: jefe',v_ghost:'Voz: espectro',v_imp:'Voz: diablillo',v_plant:'Voz: planta',v_shade:'Voz: vampiro y súcubo',v_skeleton:'Voz: esqueleto',
   v_slime:'Voz: limo',v_worm:'Voz: gusano',amb_crypt:'Ambiente: mazmorra',el_fire:'Elemento: fuego (impacto)',el_ice:'Elemento: hielo (impacto)',el_shadow:'Elemento: caótico (impacto)',el_lightning:'Elemento: rayo (impacto)',arcane:'Hechizo mágico',amb_jungle:'Ambiente: jungla',amb_hell:'Ambiente: infierno'};
+// ───────────── Editor de mapas (solo administradores) ─────────────
+let editorTest=null;
+const mapEditorApi={
+  list:async()=>{
+    const response=await fetch(serverBase()+'/api/maps',{signal:AbortSignal.timeout(12000)});
+    const data=await response.json();
+    if(!response.ok)throw new Error(data.error||'Error del servidor.');
+    return data.maps||[];
+  },
+  save:map=>accountCall('map-save',{map}),
+  remove:id=>accountCall('map-delete',{id}),
+  // Probar: partida en solitario que empieza directamente en un combate de esa zona con ese mapa (sin recompensas).
+  test:map=>{
+    if(busy)return;
+    generation++;rendered='';
+    const p=profile();
+    const next=create();
+    session={id:'local'};
+    join(next,session.id,account.user?.nick||p.name,p.classId,{loadouts:Object.fromEntries(Object.keys(classes).map(c=>[c,myLoadout(c)]))});
+    soloAwarded=true;
+    testCustomMap(next,map);
+    editorTest=map.id;mapEditorApi.current=map.id;
+    error('');
+    setState(next,true);
+    paintEditorReturn();
+  }
+};
+function mapEditorButton(){
+  const b=btn('',()=>openMapEditor(mapEditorApi));b.className='ghost';
+  b.append(icon('grid'),'Editor de mapas');
+  return b;
+}
+/** Durante una prueba del editor: botón para volver a él. */
+function paintEditorReturn(){
+  let b=el('editor-return');
+  if(!editorTest||!state){b?.remove();return;}
+  if(!b){
+    b=h('button','editor-return','⟲ Volver al editor');b.id='editor-return';
+    b.onclick=()=>{editorTest=null;el('leave').onclick();openMapEditor(mapEditorApi);};
+    document.body.append(b);
+  }
+}
 function sfxEditorButton(){
   const b=btn('',()=>openSfxEditor());b.className='ghost';
   b.append(icon('sound'),'Editor de SFX');

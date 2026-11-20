@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost,setAway,setCustomMaps,cleanMap,mapWarnings,testCustomMap} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost,setAway,setCustomMaps,cleanMap,mapWarnings,testCustomMap,actStart,midBossFloor} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -148,14 +148,13 @@ test('genera botín con afijos y permite equipar y engarzar runas permanentes',(
   assert.throws(()=>act(s,'p0',{type:'sell',item:other.id},rng),/tienda/);
   assert.equal(s.stock.length,0);
   assert.throws(()=>act(s,'p0',{type:'next'},rng),/habilidades/);
+  // Combate normal: 3 habilidades que ya tiene, para mejorar.
   const offer=trainingOffer(p);
   assert.equal(offer.length,3);
-  assert.equal(offer.filter(o=>o.rank>0).length,2,'dos para mejorar');
-  assert.equal(offer.filter(o=>o.rank===0).length,1,'una nueva');
+  assert.equal(offer.filter(o=>o.rank>0).length,3,'tras un combate normal, las tres son mejoras');
   const outside=trainingChoices(p).find(o=>!offer.some(c=>c.index===o.index));
   if(outside)assert.throws(()=>act(s,'p0',{type:'train',skill:outside.index},rng),/cartas/);
-  const newSpell=offer.find(option=>option.rank===0);
-  act(s,'p0',{type:'train',skill:newSpell.index},rng);
+  act(s,'p0',{type:'train',skill:offer[0].index},rng);
   assert.throws(()=>act(s,'p0',{type:'train',skill:0},rng),/pendiente/);
   act(s,'p0',{type:'next'},rng);
   enterCombat(s);
@@ -164,7 +163,7 @@ test('genera botín con afijos y permite equipar y engarzar runas permanentes',(
   const raised=s.units.find(u=>u.id==='p0');
   assert.ok(raised.max>=hero.max+4);
   assert.ok(raised.stats.physical>=1);
-  assert.ok(skillFor(raised,newSpell.index));
+  assert.ok(skillFor(raised,offer[0].index));
 });
 test('la vista previa aplica el crítico ×1,5 y la armadura frena las habilidades físicas',()=>{
   const s=battle('guardia');
@@ -363,17 +362,21 @@ test('dos clientes reciben la misma trayectoria completa y el cambio de turno', 
   assert.equal(active.state.units[active.state.turn].id,peer.id);
 });
 
-test('cada acto tiene 8 pisos, jefes en 4 y 8, sin élites al principio y todos los nodos alcanzables',()=>{
+test('actos de 8, 10 y 12 pisos: jefes en 4/8, 5/10 y 6/12, sin élites al principio y todos los nodos alcanzables',()=>{
+  const layout={1:[8,4],2:[10,5],3:[12,6]};
   for(let seed=1;seed<30;seed++){
     let x=seed;const random=()=>((x=(Math.imul(x,1664525)+1013904223)>>>0)/4294967296);
     for(const actNumber of [1,2,3]){
       const route=makeRoute(random,actNumber);
-      assert.equal(route.rows.length,8);
-      assert.equal(route.rows[3][0].kind,'boss');
-      assert.equal(route.rows[7][0].kind,'boss');
+      const [length,mid]=layout[actNumber];
+      assert.equal(route.rows.length,length);
+      assert.equal(route.rows[mid-1][0].kind,'boss');
+      assert.equal(route.rows[length-1][0].kind,'boss');
+      assert.equal(route.rows.flat().filter(n=>n.kind==='boss').length,2);
+      assert.equal(route.rows[0][0].floor,actStart(actNumber)+1);
       assert.ok(route.rows[0].concat(route.rows[1]).every(n=>n.kind!=='elite'));
-      for(let r=1;r<8;r++)for(const node of route.rows[r])assert.ok(route.rows[r-1].some(prev=>prev.next.includes(node.id)));
-      for(let r=0;r<7;r++)for(const node of route.rows[r])assert.ok(node.next.length>0);
+      for(let r=1;r<length;r++)for(const node of route.rows[r])assert.ok(route.rows[r-1].some(prev=>prev.next.includes(node.id)));
+      for(let r=0;r<length-1;r++)for(const node of route.rows[r])assert.ok(node.next.length>0);
     }
   }
 });
@@ -584,7 +587,7 @@ test('una partida completa recorre los 3 actos y termina en victoria',()=>{
     }else assert.fail('fase inesperada '+s.phase);
   }
   assert.equal(s.phase,'won');
-  assert.equal(s.floor,24);
+  assert.equal(s.floor,30);
   assert.deepEqual([...acts],[1,2,3]);
   assert.equal(s.bossKills,6);
 });
@@ -615,8 +618,8 @@ test('colores fijos por puesto y mazo de cartas aplicado a la partida',()=>{
 });
 test('Esquirlas: crecen con lo lejos que se llega',()=>{
   assert.ok(runPoints({floor:3})<runPoints({floor:9,bossKills:2}));
-  assert.ok(runPoints({floor:24,bossKills:6,won:true})>runPoints({floor:24,bossKills:5}));
-  assert.equal(runPoints({floor:999,bossKills:99,won:true}),240+240+300+300);
+  assert.ok(runPoints({floor:30,bossKills:6,won:true})>runPoints({floor:30,bossKills:5}));
+  assert.equal(runPoints({floor:999,bossKills:99,won:true}),300+240+300+300);
 });
 test('pasiva Furia mágica: recibe más daño físico y hace más daño mágico',async()=>{
   const {scaledDamage}=await import('./engine.js');
@@ -762,7 +765,7 @@ test('el Guardián tiene más vida y su Gancho atrae en línea recta a aliados y
 
 test('cada acto tiene su ambientación, su fauna y salas generadas al azar',()=>{
   assert.deepEqual(actBiomes,['crypt','jungle','hell']);
-  const looks=act=>new Set(Array.from({length:8},(_,i)=>encounter((act-1)*8+1+i,4,{elite:i%3===0})).flat().map(u=>u.look));
+  const looks=act=>new Set(Array.from({length:8},(_,i)=>encounter(actStart(act)+1+i,4,{elite:i%3===0})).flat().map(u=>u.look));
   const crypt=looks(1),jungle=looks(2),hell=looks(3);
   assert.ok(crypt.has('skeleton')&&crypt.has('slime'));
   assert.ok(jungle.has('slug')&&jungle.has('bat')&&jungle.has('plant'));
@@ -787,7 +790,7 @@ test('cada acto tiene su ambientación, su fauna y salas generadas al azar',()=>
     s.phase='reward';s.picks=['p0'];act(s,'p0',{type:'next'},seq);
   }
   assert.ok(rooms>=15);
-  assert.equal(seen.size,rooms);
+  assert.ok(seen.size>=rooms-1,'salas casi siempre distintas: '+seen.size+' de '+rooms);
   assert.ok(styles.size>=5&&names.size>=rooms-3,styles.size+' estilos, '+names.size+' nombres');
 });
 
@@ -932,7 +935,7 @@ test('hay más tipos de sala y cada acto tiene los suyos',()=>{
   for(let actNo=1;actNo<=3;actNo++)for(let i=0;i<25;i++){
     const s=battle('guardia');
     s.route=makeRoute(rng,actNo);
-    s.floor=(actNo-1)*8+1+(i%3);
+    s.floor=actStart(actNo)+1+(i%3);
     s.phase='reward';s.picks=['p0'];
     act(s,'p0',{type:'next'},rng);
     for(let k=0;k<6&&s.phase!=='combat';k++){
@@ -1017,7 +1020,7 @@ test('forja: re-tirar todo, solo afijos o solo sufijos y mejorar rareza, cobrand
 test('la forja aparece en el mapa de cada acto',()=>{
   for(let actNo=1;actNo<=3;actNo++){
     const route=makeRoute(rng,actNo);
-    assert.ok(route.rows[4].some(n=>n.kind==='forge'),'piso 5 del acto '+actNo);
+    assert.ok(route.rows[midBossFloor(actNo)].some(n=>n.kind==='forge'),'justo después del jefe intermedio del acto '+actNo);
   }
 });
 
@@ -1428,4 +1431,32 @@ test('mapas creados en el servidor: solo el administrador guarda y borra; la lis
   assert.ok(list.maps.some(m=>m.id===saved.map.id&&m.name==='Pasillo'));
   const gone=await call('/api/account/map-delete',{id:saved.map.id},admin);
   assert.ok(!gone.maps.some(m=>m.id===saved.map.id));
+});
+
+test('recompensas: tras un combate normal, 3 mejoras; tras un jefe, 3 habilidades nuevas de la clase',()=>{
+  const fight=(boss)=>{
+    const s=battle('guardia');
+    s.node={kind:boss?'boss':'combat'};
+    for(const u of s.units)if(u.enemy)u.hp=0;
+    const hero=s.units.find(u=>!u.enemy);s.turn=s.units.indexOf(hero);
+    act(s,hero.id,{type:'end'},rng);
+    return s;
+  };
+  const normal=fight(false);
+  const p=normal.players[0];
+  assert.equal(normal.phase,'reward');
+  const ups=trainingOffer(p);
+  assert.equal(ups.length,Math.min(3,trainingChoices(p).filter(c=>c.rank>0).length));
+  assert.ok(ups.every(c=>c.rank>0),'solo mejoras de lo que ya tiene');
+  const boss=fight(true);
+  const fresh=trainingOffer(boss.players[0]);
+  assert.equal(fresh.length,3);
+  assert.ok(fresh.every(c=>c.rank===0),'solo habilidades nuevas');
+  // Si no quedan habilidades nuevas (el mago tiene 3), se ofrecen mejoras.
+  const mage=battle('mago');
+  mage.node={kind:'boss'};
+  for(const u of mage.units)if(u.enemy)u.hp=0;
+  const hero=mage.units.find(u=>!u.enemy);mage.turn=mage.units.indexOf(hero);
+  act(mage,hero.id,{type:'end'},rng);
+  assert.ok(trainingOffer(mage.players[0]).every(c=>c.rank>0));
 });

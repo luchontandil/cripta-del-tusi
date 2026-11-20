@@ -616,7 +616,7 @@ function lobbyLoadout(player){
 }
 /** Puntos de cuenta al terminar la partida: según lo lejos que se llegó. */
 export function runPoints(summary){
-  const floor=Math.max(0,Math.min(ACTS*FLOORS_PER_ACT,Math.floor(Number(summary.floor)||0)));
+  const floor=Math.max(0,Math.min(TOTAL_FLOORS,Math.floor(Number(summary.floor)||0)));
   const kills=Math.max(0,Math.min(6,Math.floor(Number(summary.bossKills)||0)));
   const acts=Math.max(0,actOf(floor)-1)+(summary.won?1:0);
   // Esquirlas: 10 por piso, 40 por jefe, 100 por acto superado y 300 por ganar.
@@ -624,9 +624,18 @@ export function runPoints(summary){
 }
 export const monsterNames={slime:'Limo',bat:'Murciélago',skull:'Calavera flotante',worm:'Gusano de cripta',slimeking:'Limo colosal',
   skeleton:'Esqueleto',succubus:'Súcubo',vampire:'Vampiro',imp:'Diablillo',slug:'Babosa',plant:'Planta escupidora',lavaslime:'Limo de lava'};
-export const ACTS=3,FLOORS_PER_ACT=8;
-export const actOf=floor=>Math.min(ACTS,Math.ceil(Math.max(1,floor)/FLOORS_PER_ACT));
-export const actFloor=floor=>floor-(actOf(floor)-1)*FLOORS_PER_ACT;
+/**
+ * Pisos de cada acto. El jefe intermedio está a mitad del acto y el final en el último piso:
+ * acto 1 → 4 y 8; acto 2 → 5 y 10 (una sala más antes de cada jefe); acto 3 → 6 y 12 (dos más).
+ */
+export const ACTS=3,ACT_FLOORS=[8,10,12];
+export const TOTAL_FLOORS=ACT_FLOORS.reduce((a,b)=>a+b,0);
+/** Último piso del acto anterior (el acto empieza en actStart+1). */
+export const actStart=act=>ACT_FLOORS.slice(0,act-1).reduce((a,b)=>a+b,0);
+export const actLength=act=>ACT_FLOORS[act-1];
+export const midBossFloor=act=>ACT_FLOORS[act-1]/2;
+export const actOf=floor=>{let act=1;while(act<ACTS&&Math.max(1,floor)>actStart(act+1))act++;return act;};
+export const actFloor=floor=>floor-actStart(actOf(floor));
 export const actNames=['La Mazmorra','La Jungla','El Infierno'];
 /** Ambientación de cada acto: mazmorra oscura, jungla y infierno. */
 export const actBiomes=['crypt','jungle','hell'];
@@ -742,7 +751,7 @@ export function encounter(floor,size,options={}) {
         stats:{ward:20,movement:0},effects:{},cycle:0,resist:{...(bossResist[boss]||{})}});
       continue;
     }
-    const ranged=i%2===1&&local+(act-1)*8>1;
+    const ranged=i%2===1&&floor>1;
     const isElite=!ranged&&(elite&&i===0||(local>=5&&i===2));
     const pool=ranged?life.ranged:life.melee;
     const species=isElite?life.elite:pool[rng?Math.floor(rng()*pool.length):(i+floor)%pool.length];
@@ -1177,7 +1186,7 @@ export function testCustomMap(s,raw,rng=Math.random){
   const map=cleanMap(raw);
   s.route=makeRoute(rng,map.act);
   s.act=map.act;s.bossKills=0;
-  s.floor=(map.act-1)*FLOORS_PER_ACT+(map.room==='boss'?FLOORS_PER_ACT-1:map.room==='elite'?3:1)-1;
+  s.floor=actStart(map.act)+(map.room==='boss'?actLength(map.act):map.room==='elite'?4:2)-1;
   s.testMap=map;
   openFloor(s,rng,map.room==='elite',map.room==='boss'?actBosses[map.act-1][1][0]:null);
 }
@@ -1474,7 +1483,7 @@ function finish(s,rng) {
     healParty(s,.5);
     note(s,'El jefe cae: el grupo recupera la mitad de su vida.');
   }
-  s.phase=bossFight&&s.floor===ACTS*FLOORS_PER_ACT?'won':'reward';
+  s.phase=bossFight&&s.floor===TOTAL_FLOORS?'won':'reward';
   s.mods={};
   s.glyphs=[];
   const elite=s.node?.kind==='elite';
@@ -1487,7 +1496,7 @@ function finish(s,rng) {
     s.training=true;
     for(const p of s.players){
       p.xp=100;
-      p.trainOffer=rollTrainingOffer(p,rng);
+      p.trainOffer=rollTrainingOffer(p,rng,bossFight);
       p.trained=p.trainOffer.length===0;
       p.gold+=Math.round((10+s.floor*4)*(elite?1.5:1));
       const ilvl=itemLevel(s,(elite?1:0)+(bossFight?2:0));
@@ -1664,10 +1673,11 @@ function armTimer(s,count){
 export function makeRoute(rng,act=1){
   const rows=[];
   const [midBoss,endBoss]=actBosses[act-1].map(options=>options.length>1?pick(options,rng):options[0]);
-  for(let local=1;local<=FLOORS_PER_ACT;local++){
-    const floor=(act-1)*FLOORS_PER_ACT+local;
-    if(local===4||local===8){
-      const boss=local===4?midBoss:endBoss;
+  const length=actLength(act),mid=midBossFloor(act);
+  for(let local=1;local<=length;local++){
+    const floor=actStart(act)+local;
+    if(local===mid||local===length){
+      const boss=local===mid?midBoss:endBoss;
       rows.push([{id:act+'-'+local+'-0',floor,kind:'boss',boss,bossName:bosses[boss].name,x:.5,next:[]}]);
       continue;
     }
@@ -1679,10 +1689,10 @@ export function makeRoute(rng,act=1){
       return r<.45?'combat':r<.7?'elite':'event';
     });
     if(local>2&&new Set(kinds).size===1)kinds[kinds.length-1]=kinds[0]==='event'?'combat':'event';
-    // Tiendas solo en el mapa: siempre en los pisos 3 y 7 del acto, a veces en el 6.
-    if(local===3||local===7||(local===6&&rng()<.35))kinds[Math.floor(rng()*count)]='shop';
-    // Forjas: siempre en el piso 5 del acto y a veces en el 2.
-    if(local===5||(local===2&&rng()<.3)){const i=Math.floor(rng()*count);if(kinds[i]!=='shop')kinds[i]='forge';else kinds[(i+1)%count]='forge';}
+    // Tiendas solo en el mapa: siempre en el piso 3 y en el anterior al jefe final, a veces dos antes.
+    if(local===3||local===length-1||(local===length-2&&rng()<.35))kinds[Math.floor(rng()*count)]='shop';
+    // Forjas: siempre justo después del jefe intermedio y a veces en el piso 2.
+    if(local===mid+1||(local===2&&rng()<.3)){const i=Math.floor(rng()*count);if(kinds[i]!=='shop')kinds[i]='forge';else kinds[(i+1)%count]='forge';}
     if(!kinds.some(kind=>kind==='combat'||kind==='elite'))kinds[['shop','forge'].includes(kinds[0])?count-1:0]='combat';
     rows.push(xs.map((x,i)=>({id:act+'-'+local+'-'+i,floor,kind:kinds[i],x,next:[]})));
   }
@@ -1712,7 +1722,7 @@ export function makeRoute(rng,act=1){
 }
 const findNode=(s,id)=>s.route.rows.flat().find(node=>node.id===id);
 function routeOptions(s){
-  const row=s.route.rows[s.floor-(s.route.act-1)*FLOORS_PER_ACT];
+  const row=s.route.rows[s.floor-actStart(s.route.act)];
   if(!row)return [];
   const current=s.node&&findNode(s,s.node.id);
   return current&&current.floor===s.floor?current.next:row.map(node=>node.id);
@@ -1723,7 +1733,7 @@ function openRoute(s,rng){
   s.stock=[];
   s.ready=[];
   // Al vencer al jefe final del acto empieza el siguiente, con un árbol nuevo.
-  if(s.floor>=s.route.act*FLOORS_PER_ACT&&s.route.act<ACTS){
+  if(s.floor>=actStart(s.route.act)+actLength(s.route.act)&&s.route.act<ACTS){
     s.route=makeRoute(rng,s.route.act+1);
     s.node=null;
     s.act=s.route.act;
@@ -1933,18 +1943,17 @@ function startEvent(s,rng){
   note(s,'Piso '+s.floor+' · Evento: '+event.title+'.');
 }
 /**
- * Cartas al subir de nivel: 2 habilidades ya aprendidas (sin rango máximo) para mejorar
- * y 1 habilidad nueva para aprender, al azar. Si falta de un tipo, se completa con el otro.
+ * Cartas de habilidad tras un combate:
+ * - combates normales (y salas élite sueltas): 3 habilidades que ya tienes, para mejorarlas;
+ * - jefes (el intermedio y el final de cada acto): 3 habilidades nuevas de la clase que aún no tienes en la partida.
+ * Si no hay bastantes del tipo que toca, se completa con el otro.
  */
-function rollTrainingOffer(player,rng){
+function rollTrainingOffer(player,rng,learn=false){
   const shuffle=list=>{const out=[...list];for(let i=out.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[out[i],out[j]]=[out[j],out[i]];}return out;};
   const all=trainingChoices(player);
   const upgrades=shuffle(all.filter(c=>c.rank>0)),fresh=shuffle(all.filter(c=>c.rank===0));
-  const pickUp=upgrades.slice(0,2),pickNew=fresh.slice(0,1);
-  const rest=[...upgrades.slice(2),...fresh.slice(1)];
-  const offer=[...pickUp,...pickNew];
-  while(offer.length<3&&rest.length)offer.push(rest.shift());
-  return offer.map(c=>c.index);
+  const [first,second]=learn?[fresh,upgrades]:[upgrades,fresh];
+  return [...first,...second].slice(0,3).map(c=>c.index);
 }
 /** Las cartas que tiene un jugador para elegir ahora mismo. */
 export function trainingOffer(player){

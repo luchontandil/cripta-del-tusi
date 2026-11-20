@@ -1,10 +1,10 @@
 import {setCustomMaps,testCustomMap,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,FLOORS_PER_ACT,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=107';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=107';
-import {setupSfx} from './music.js?v=107';
-import {icon} from './icons.js?v=107';
-import {openMapEditor} from './mapeditor.js?v=107';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=109';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=109';
+import {setupSfx} from './music.js?v=109';
+import {icon} from './icons.js?v=109';
+import {openMapEditor} from './mapeditor.js?v=109';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=107').then(({createIso})=>{
+import('./isometric.js?v=109').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1558,7 +1558,13 @@ function updateTraining(player,ready){
     return;
   }
   if(trainingDialog.open)return;
-  el('training-title').textContent='Nivel '+(player.level+1)+' · Habilidad';
+  // Tras un jefe se ofrecen habilidades nuevas; tras los demás combates, mejoras de las que tienes.
+  const offer=trainingOffer(player);
+  const learning=offer.some(c=>c.rank===0)&&offer.every(c=>c.rank===0);
+  el('training-title').textContent='Nivel '+(player.level+1)+' · '+(learning?'Habilidad nueva':'Mejora una habilidad');
+  el('training-intro').textContent=learning?'Elige una habilidad nueva de tu clase para el resto de la partida.':
+    offer.some(c=>c.rank===0)?'Mejora una habilidad que ya conoces o aprende una nueva. Pasa el ratón por una opción para ver cómo cambia.':
+    'Elige cuál de tus habilidades mejorar. Pasa el ratón por una opción para ver cómo cambia.';
   const unit=state.units.find(u=>u.id===player.id)||{classId:player.classId,stats:{},level:player.level};
   el('training-compare').hidden=true;
   el('training-choices').replaceChildren(...trainingOffer(player).map(({index,rank,name})=>{
@@ -1621,7 +1627,7 @@ function updateGameOver(){
   const foes=state.units.filter(u=>u.enemy);
   const stat=(iconName,label,value)=>[h('dt',null,icon(iconName),label),h('dd',null,String(value))];
   el('gameover-stats').replaceChildren(
-    ...stat('level','Piso alcanzado',state.floor+' de '+ACTS*FLOORS_PER_ACT+' · acto '+actOf(state.floor||1)),
+    ...stat('level','Piso alcanzado',state.floor+' de '+TOTAL_FLOORS+' · acto '+actOf(state.floor||1)),
     ...stat('crown','Jefes derrotados',(state.bossKills||0)+' de 6'),
     ...stat('clock','Rondas en este piso',state.rounds||1),
     ...stat('skull','Enemigos caídos en este piso',foes.filter(u=>u.hp<=0).length+' / '+foes.length));

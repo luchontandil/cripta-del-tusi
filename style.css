@@ -573,7 +573,7 @@ summary{cursor:pointer}
 .map-lines line.walked{stroke:var(--gold-2);stroke-dasharray:none;stroke-width:3}
 .map-lines line.open{stroke:#f2cd8a;stroke-dasharray:none;stroke-width:2.5;animation:line-glow 1.4s ease-in-out infinite}
 @keyframes line-glow{50%{stroke:#fff1cf}}
-.floor-label{position:absolute;top:6px;transform:translateX(-50%);font-size:.68rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.floor-label{position:absolute;top:6px;transform:translateX(-50%);font-size:.68rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
 .floor-label.next{color:var(--gold)}
 .route-node{
   position:absolute;transform:translate(-50%,-50%);width:54px;height:54px;padding:0;border-radius:50%;

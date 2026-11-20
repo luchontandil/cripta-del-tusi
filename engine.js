@@ -1135,14 +1135,16 @@ export function cleanMap(raw){
   const trapSet=new Set(traps.map(t=>t.pos));
   const heroSpawns=cells(m.heroSpawns).filter(p=>!blocked.has(p)&&!trapSet.has(p)).slice(0,8);
   const enemySpawns=cells(m.enemySpawns).filter(p=>!blocked.has(p)&&!trapSet.has(p)&&!heroSpawns.includes(p)).slice(0,24);
-  const wallVariants={};
+  const wallVariants={},wallRotations={};
   for(const [k,v] of Object.entries(m.wallVariants||{})){const p=Number(k),n=Number(v);if(walls.includes(p)&&[0,1,2].includes(n))wallVariants[p]=n;}
+  // Giro de cada obstáculo (0–3, en cuartos de vuelta). Sin dato, el juego usa el giro por defecto.
+  for(const [k,v] of Object.entries(m.wallRotations||{})){const p=Number(k),n=Number(v);if(walls.includes(p)&&[0,1,2,3].includes(n))wallRotations[p]=n;}
   const name=String(m.name||'').trim().slice(0,40)||'Mapa sin nombre';
   const act=int(m.act,1,ACTS,1);
   const room=Object.hasOwn(ROOM_KINDS,m.room)?m.room:'any';
   const weight=int(m.weight,0,100,30);
   const id=/^[a-z0-9]{6,16}$/.test(m.id||'')?m.id:Math.random().toString(36).slice(2,10);
-  return {id,name,act,room,weight,enabled:m.enabled!==false,width,height,voids,walls,wallVariants,water,traps,heroSpawns,enemySpawns,
+  return {id,name,act,room,weight,enabled:m.enabled!==false,width,height,voids,walls,wallVariants,wallRotations,water,traps,heroSpawns,enemySpawns,
     ...(m.author?{author:String(m.author).slice(0,24)}:{}),...(m.updated?{updated:Number(m.updated)||0}:{})};
 }
 /** Avisos de un mapa: no impiden guardarlo, pero el editor los muestra. */
@@ -1204,6 +1206,7 @@ function openFloor(s,rng,elite=false,boss=null) {
   s.testMap=null;
   s.customMap=custom?{id:custom.id,name:custom.name}:null;
   s.wallVariants=custom?{...custom.wallVariants}:{};
+  s.wallRotations=custom?{...custom.wallRotations}:{};
   let layout;
   if(custom)layout=applyCustomMap(s,custom);
   else{

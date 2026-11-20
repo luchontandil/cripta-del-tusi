@@ -1,6 +1,6 @@
 // Editor de mapas (solo administradores): estilo «modo construcción», con catálogo de casillas abajo.
 // Crea, edita, prueba y guarda mapas; cada mapa pertenece a una zona (acto + tipo de sala) y tiene una frecuencia.
-import {cleanMap,mapWarnings,MAP_LIMITS,ROOM_KINDS,obstacleNames,actNames,actBiomes,ACTS,setCustomMaps,adjacent} from './engine.js?v=104';
+import {cleanMap,mapWarnings,MAP_LIMITS,ROOM_KINDS,obstacleNames,actNames,actBiomes,ACTS,setCustomMaps,adjacent} from './engine.js?v=107';
 
 const liquidNames={crypt:'Agua',jungle:'Ciénaga',hell:'Lava'};
 const floorColors={crypt:['#2f3446','#383c50'],jungle:['#2c4322','#344d27'],hell:['#2a2624','#322c29']};
@@ -13,7 +13,7 @@ function catalog(act){
   const biome=actBiomes[act-1]||'crypt';
   return [
     {id:'floor',cat:'ground',name:'Suelo',hint:'Casilla libre. Borra lo que haya.'},
-    {id:'void',cat:'ground',name:'Vacío',hint:'Fuera del mapa: no existe ni bloquea la visión… porque no hay nada.'},
+    {id:'void',cat:'ground',name:'Vacío',hint:'Fuera del mapa: no se puede pisar y tapa la línea de visión.'},
     ...obstacleNames[biome].map((name,i)=>({id:'wall'+i,cat:'obstacle',name,hint:'Obstáculo: bloquea el paso y la línea de visión.',variant:i})),
     {id:'water',cat:'liquid',name:liquidNames[biome],hint:'No se puede pisar, pero no tapa la visión.'},
     {id:'spikes',cat:'trap',name:'Pinchos',hint:'Trampa: daña a quien la pisa.'},
@@ -22,7 +22,7 @@ function catalog(act){
     {id:'enemy',cat:'spawn',name:'Aparición de enemigo',hint:'Dónde pueden aparecer los enemigos (8 o más recomendados).'}
   ];
 }
-const tools={brush:['Pincel','B','Pinta casilla a casilla'],rect:['Rectángulo','R','Arrastra para rellenar un rectángulo'],fill:['Relleno','F','Rellena la zona conectada del mismo tipo'],pick:['Cuentagotas','I','Copia la casilla que pulses']};
+const tools={brush:['Pincel','B','Pinta casilla a casilla'],rotate:['Girar','G','Pulsa un obstáculo para girarlo 90°'],rect:['Rectángulo','R','Arrastra para rellenar un rectángulo'],fill:['Relleno','F','Rellena la zona conectada del mismo tipo'],pick:['Cuentagotas','I','Copia la casilla que pulses']};
 
 function el(tag,cls,...kids){
   const node=document.createElement(tag);
@@ -31,7 +31,7 @@ function el(tag,cls,...kids){
   return node;
 }
 const blank=(act=1,room='any')=>({id:Math.random().toString(36).slice(2,10),name:'Mapa nuevo',act,room,weight:30,enabled:true,width:12,height:8,
-  voids:[],walls:[],wallVariants:{},water:[],traps:[],heroSpawns:[],enemySpawns:[]});
+  voids:[],walls:[],wallVariants:{},wallRotations:{},water:[],traps:[],heroSpawns:[],enemySpawns:[]});
 
 /**
  * Abre el editor. api: {list():Promise<maps>, save(map):Promise<{map,maps}>, remove(id):Promise<{maps}>, test(map)}.
@@ -40,7 +40,10 @@ export function openMapEditor(api){
   let dialog=document.getElementById('map-editor');
   if(!dialog){dialog=el('dialog','map-editor');dialog.id='map-editor';document.body.append(dialog);}
   let maps=[],map=api.draft?structuredClone(api.draft):blank(),dirty=!!api.draft,tile='wall0',tool='brush',category='all',filter='',listFilter='';
-  let undo=[],redo=[],drag=null,hover=-1;
+  let undo=[],redo=[],drag=null,hover=-1,turn=0;
+  map.wallRotations||={};
+  /** Giro de un obstáculo: el guardado o, si no hay, el que el juego le da por defecto (según la casilla). */
+  const rotationAt=pos=>map.wallRotations[pos]??pos%4;
 
   // ── Modelo: qué hay en cada casilla ──
   const kindAt=pos=>{
@@ -56,13 +59,13 @@ export function openMapEditor(api){
     const out=list=>list.filter(p=>p!==pos);
     map.voids=out(map.voids);map.walls=out(map.walls);map.water=out(map.water);
     map.heroSpawns=out(map.heroSpawns);map.enemySpawns=out(map.enemySpawns);
-    map.traps=map.traps.filter(t=>t.pos!==pos);delete map.wallVariants[pos];
+    map.traps=map.traps.filter(t=>t.pos!==pos);delete map.wallVariants[pos];delete map.wallRotations[pos];
   };
   const put=(pos,id)=>{
     if(kindAt(pos)===id)return false;
     clear(pos);
     if(id==='void')map.voids.push(pos);
-    else if(id.startsWith('wall')){map.walls.push(pos);map.wallVariants[pos]=Number(id.slice(4));}
+    else if(id.startsWith('wall')){map.walls.push(pos);map.wallVariants[pos]=Number(id.slice(4));map.wallRotations[pos]=turn;}
     else if(id==='water')map.water.push(pos);
     else if(id==='spikes'||id==='gas')map.traps.push({pos,kind:id});
     else if(id==='hero')map.heroSpawns.push(pos);
@@ -104,10 +107,14 @@ export function openMapEditor(api){
   const toolBar=el('div','me-tools');
   const toolButtons={};
   for(const [key,[name,keyName,hint]] of Object.entries(tools)){
-    const b=el('button','me-tool',el('span',null,{brush:'🖌',rect:'▭',fill:'🪣',pick:'💧'}[key]),el('small',null,keyName));
+    const b=el('button','me-tool',el('span',null,{brush:'🖌',rotate:'⟳',rect:'▭',fill:'🪣',pick:'💧'}[key]),el('small',null,keyName));
     b.title=name+' ('+keyName+') · '+hint;b.onclick=()=>{tool=key;paintTools();};
     toolButtons[key]=b;toolBar.append(b);
   }
+  const turnButton=el('button','me-tool me-turn');
+  turnButton.title='Giro de los obstáculos que pongas (Q gira 90°)';
+  turnButton.onclick=()=>{turn=(turn+1)%4;paintTools();paintBoard();};
+  toolBar.append(turnButton);
   const undoButton=el('button','me-tool','↶');undoButton.title='Deshacer (Ctrl+Z)';
   const redoButton=el('button','me-tool','↷');redoButton.title='Rehacer (Ctrl+Y)';
   toolBar.append(el('span','me-gap'),undoButton,redoButton);
@@ -117,7 +124,7 @@ export function openMapEditor(api){
   const tabs=el('div','me-tabs');
   const tileSearch=el('input','me-search');tileSearch.placeholder='Filtrar casillas…';
   const tileGrid=el('div','me-tiles');
-  const help=el('p','me-help','Clic izquierdo: pintar · clic derecho: borrar (suelo) · rueda: cambiar de casilla · B/R/F/I: herramientas');
+  const help=el('p','me-help','Clic izquierdo: pintar · clic derecho: borrar (suelo) · rueda: cambiar de casilla · B/G/R/F/I: herramientas · Q: girar obstáculo');
   const tray=el('footer','me-tray',el('div','me-tray-head',tabs,tileSearch,help),tileGrid);
 
   dialog.replaceChildren(top,el('div','me-body',side,stage),tray);
@@ -147,7 +154,14 @@ export function openMapEditor(api){
         else if(kind.startsWith('wall')){
           ctx.fillStyle='#00000066';ctx.fillRect(x+4,y+6,cell-6,cell-6);
           ctx.fillStyle={crypt:'#565c72',jungle:'#4c6a32',hell:'#4a3a34'}[b];ctx.fillRect(x+3,y+3,cell-7,cell-8);
+          // Hacia dónde mira: el emoji gira y una muesca dorada marca el frente.
+          const r=preview.has(pos)?turn:rotationAt(pos);
+          ctx.save();ctx.translate(x+cell/2,y+cell/2);ctx.rotate(r*Math.PI/2);
+          ctx.fillStyle='#ffd27a';ctx.fillRect(-cell*.18,cell*.3,cell*.36,3);
+          ctx.restore();
+          ctx.save();ctx.translate(x+cell/2,y+cell/2);ctx.rotate(r*Math.PI/2);ctx.translate(-x-cell/2,-y-cell/2);
           glyph(obstacleGlyphs[b][Number(kind.slice(4))],x,y,.56);
+          ctx.restore();
         }else if(kind==='spikes'){
           ctx.fillStyle='#c9c3d6';
           for(const [dx,dy] of [[.3,.32],[.7,.32],[.5,.52],[.3,.72],[.7,.72]]){ctx.beginPath();ctx.moveTo(x+cell*dx,y+cell*(dy-.14));ctx.lineTo(x+cell*(dx-.1),y+cell*(dy+.08));ctx.lineTo(x+cell*(dx+.1),y+cell*(dy+.08));ctx.fill();}
@@ -178,7 +192,8 @@ export function openMapEditor(api){
       const swatch=el('canvas','me-swatch');swatch.width=swatch.height=56;
       drawSwatch(swatch,t.id);
       const card=el('button','me-tile'+(tile===t.id?' on':''),swatch,el('span',null,t.name),el('small',null,categories[t.cat]));
-      card.title=t.hint;card.onclick=()=>{tile=t.id;if(tool==='pick')tool='brush';paintTiles();paintTools();};
+      card.title=t.hint;
+      card.onclick=()=>{tile=t.id;if(tool==='pick')tool='brush';paintTiles();paintTools();};
       return card;
     }));
     if(!items.length)tileGrid.append(el('p','me-empty','Ninguna casilla coincide con el filtro.'));
@@ -201,6 +216,8 @@ export function openMapEditor(api){
   function paintTools(){
     for(const [key,b] of Object.entries(toolButtons))b.classList.toggle('on',tool===key);
     undoButton.disabled=!undo.length;redoButton.disabled=!redo.length;
+    turnButton.replaceChildren(el('span','me-turn-arrow','↑'),el('small',null,turn*90+'°'));
+    turnButton.firstChild.style.transform='rotate('+(turn*90+180)+'deg)';
   }
   function paintFields(){
     nameInput.value=map.name;actSelect.value=map.act;roomSelect.value=map.room;
@@ -245,7 +262,8 @@ export function openMapEditor(api){
     edit(()=>{
       const move=p=>{const x=p%map.width,y=Math.floor(p/map.width);return x<w&&y<h?y*w+x:-1;};
       const keep=list=>list.map(move).filter(p=>p>=0);
-      const variants={};for(const [p,v] of Object.entries(map.wallVariants)){const q=move(Number(p));if(q>=0)variants[q]=v;}
+      const remap=obj=>{const out={};for(const [p,v] of Object.entries(obj||{})){const q=move(Number(p));if(q>=0)out[q]=v;}return out;};
+      const variants=remap(map.wallVariants);map.wallRotations=remap(map.wallRotations);
       Object.assign(map,{voids:keep(map.voids),walls:keep(map.walls),water:keep(map.water),heroSpawns:keep(map.heroSpawns),enemySpawns:keep(map.enemySpawns),
         traps:map.traps.map(t=>({...t,pos:move(t.pos)})).filter(t=>t.pos>=0),wallVariants:variants,width:w,height:h});
     });
@@ -276,7 +294,12 @@ export function openMapEditor(api){
     const pos=cellAt(e);if(pos<0)return;
     canvas.setPointerCapture(e.pointerId);
     const id=e.button===2?'floor':tile;
-    if(tool==='pick'&&e.button!==2){tile=kindAt(pos);tool='brush';paintTiles();paintTools();return;}
+    if(tool==='pick'&&e.button!==2){tile=kindAt(pos);if(tile.startsWith('wall'))turn=rotationAt(pos);tool='brush';paintTiles();paintTools();return;}
+    if(tool==='rotate'){
+      if(!map.walls.includes(pos))return;
+      edit(()=>{map.wallRotations[pos]=(rotationAt(pos)+(e.button===2?3:1))%4;});
+      return;
+    }
     if(tool==='fill'){edit(()=>flood(pos,id));return;}
     remember();
     drag={tool:tool==='rect'?'rect':'brush',start:pos,end:pos,id,changed:false};
@@ -293,7 +316,7 @@ export function openMapEditor(api){
   };
   canvas.onpointerup=()=>{
     if(!drag)return;
-    if(drag.tool==='rect'){const id=drag.id;const cells=dragCells();for(const p of cells)drag.changed=put(p,id)||drag.changed;}
+    if(drag.tool!=='brush'){const id=drag.id;const cells=dragCells();for(const p of cells)drag.changed=put(p,id)||drag.changed;}
     if(drag.changed){dirty=true;redo=[];}else undo.pop();
     drag=null;paintBoard();paintWarnings();paintTools();
   };
@@ -336,18 +359,26 @@ export function openMapEditor(api){
   testButton.onclick=()=>{api.draft=dirty?structuredClone(map):null;dialog.close();api.test(cleanMap(map));};
   closeButton.onclick=()=>{if(confirmLeave())dialog.close();};
   dialog.oncancel=e=>{if(!confirmLeave())e.preventDefault();};
-  dialog.onkeydown=e=>{
+  const onKey=e=>{
+    if(!dialog.open)return;
     const k=e.key.toLowerCase();
     if((e.ctrlKey||e.metaKey)&&k==='s'){e.preventDefault();saveButton.onclick();return;}
     if(e.target.matches('input,select'))return;
     if((e.ctrlKey||e.metaKey)&&k==='z'){e.preventDefault();(e.shiftKey?redoButton:undoButton).onclick();return;}
     if((e.ctrlKey||e.metaKey)&&k==='y'){e.preventDefault();redoButton.onclick();return;}
-    const shortcut={b:'brush',r:'rect',f:'fill',i:'pick'}[k];
+    if(k==='q'){
+      // Q: si el ratón está sobre un obstáculo, lo gira; si no, gira la pieza que vas a poner.
+      if(hover>=0&&map.walls.includes(hover))edit(()=>{map.wallRotations[hover]=(rotationAt(hover)+1)%4;});
+      else{turn=(turn+1)%4;paintTools();paintBoard();}
+      return;
+    }
+    const shortcut={b:'brush',g:'rotate',r:'rect',f:'fill',i:'pick'}[k];
     if(shortcut){tool=shortcut;paintTools();}
   };
   const onResize=()=>{if(dialog.open)paintBoard();};
   window.addEventListener('resize',onResize);
-  dialog.onclose=()=>window.removeEventListener('resize',onResize);
+  document.addEventListener('keydown',onKey);
+  dialog.onclose=()=>{window.removeEventListener('resize',onResize);document.removeEventListener('keydown',onKey);};
 
   dialog.showModal();
   dialog.tabIndex=-1;dialog.focus();

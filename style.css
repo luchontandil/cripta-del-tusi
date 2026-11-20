@@ -1498,3 +1498,7 @@ body:not(.in-expedition) .live-version.update{color:#1b1206;background:#ffd76a}
 .me-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
 .me-actions button{white-space:nowrap}
 .me-status{white-space:nowrap}
+.map-editor{grid-template-columns:minmax(0,1fr)}
+.me-tray,.me-body,.me-top{min-width:0}
+.me-tray{overflow:hidden}
+.me-turn-arrow{display:inline-block;color:#ffd27a;transition:transform .15s}

@@ -1372,7 +1372,7 @@ test('mapas creados: se limpian, salen en su zona según la frecuencia y usan su
   const w=10,h=6;
   const raw={name:'  Sala de prueba  ',act:1,room:'normal',weight:100,width:w,height:h,
     voids:[0,9],walls:[22,23,0],water:[44],traps:[{pos:45,kind:'gas'},{pos:22,kind:'spikes'}],
-    heroSpawns:[18,28,38,48,22],enemySpawns:[11,21,31,41,51,18],wallVariants:{22:2,23:7}};
+    heroSpawns:[18,28,38,48,22],enemySpawns:[11,21,31,41,51,18],wallVariants:{22:2,23:7},wallRotations:{22:3,23:9,44:1}};
   const m=cleanMap(raw);
   assert.equal(m.name,'Sala de prueba');
   assert.deepEqual(m.walls,[22,23],'un obstáculo no puede estar en el vacío');
@@ -1380,6 +1380,7 @@ test('mapas creados: se limpian, salen en su zona según la frecuencia y usan su
   assert.deepEqual(m.heroSpawns,[18,28,38,48]);
   assert.deepEqual(m.enemySpawns,[11,21,31,41,51],'un punto no puede ser de héroe y de enemigo');
   assert.deepEqual(m.wallVariants,{22:2});
+  assert.deepEqual(m.wallRotations,{22:3},'giros solo de 0 a 3 y solo en obstáculos');
   assert.ok(mapWarnings(m).some(t=>t.includes('enemigos')));
   setCustomMaps([m]);
   try{
@@ -1391,6 +1392,7 @@ test('mapas creados: se limpian, salen en su zona según la frecuencia y usan su
     assert.deepEqual([s.width,s.height],[w,h]);
     assert.deepEqual(s.walls,[22,23]);
     assert.deepEqual(s.wallVariants,{22:2});
+    assert.deepEqual(s.wallRotations,{22:3});
     const hero=s.units.find(u=>!u.enemy);
     assert.equal(hero.pos,18,'el héroe empieza en su punto de aparición');
     for(const foe of s.units.filter(u=>u.enemy))assert.ok(!s.walls.includes(foe.pos)&&!s.voids.includes(foe.pos));

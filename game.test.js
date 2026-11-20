@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost,setAway,setCustomMaps,cleanMap,mapWarnings,testCustomMap,actStart,midBossFloor} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost,setAway,setCustomMaps,cleanMap,mapWarnings,testCustomMap,actStart,midBossFloor,labCombat,labEnemyOptions} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -1459,4 +1459,30 @@ test('recompensas: tras un combate normal, 3 mejoras; tras un jefe, 3 habilidade
   const hero=mage.units.find(u=>!u.enemy);mage.turn=mage.units.indexOf(hero);
   act(mage,hero.id,{type:'end'},rng);
   assert.ok(trainingOffer(mage.players[0]).every(c=>c.rank>0));
+});
+test('laboratorio: héroes, habilidades y enemigos a elegir, muñeco que no ataca y trucos',()=>{
+  const s=create();join(s,'lab0','A','guardia');join(s,'lab1','B','mago');
+  const ranks=classes.guardia.skills.map((_,i)=>i===5?3:0);
+  labCombat(s,{act:2,room:'normal',heroes:[{classId:'sombra',level:7,ranks:classes.sombra.skills.map((_,i)=>i===6?2:0)},{classId:'guardia',level:3,ranks,passives:['guardia.baluarte','x']}],
+    enemies:[{kind:'dummy',hp:500},{kind:'skull',elite:true},{kind:'boss:cerberus'}],immortal:true,infinite:true},rng);
+  assert.equal(s.phase,'combat');assert.equal(s.act,2);
+  const [a,b]=['lab0','lab1'].map(id=>s.units.find(u=>u.id===id));
+  assert.equal(a.classId,'sombra');assert.equal(a.level,7);assert.equal(a.skillRanks[6],2);assert.equal(a.skillRanks[0],0);
+  assert.equal(b.level,3);assert.deepEqual(b.passives,['guardia.baluarte']);
+  const foes=s.units.filter(u=>u.enemy);
+  assert.equal(foes.length,3);
+  const dummy=foes.find(u=>u.dummy);assert.equal(dummy.hp,500);
+  assert.ok(foes.some(u=>u.look==='skull'&&u.elite));assert.ok(foes.some(u=>u.boss&&u.look==='cerberus'));
+  // El muñeco pasa su turno sin hacer nada.
+  s.turn=s.units.indexOf(dummy);s.deadline=0;s.enemyPlan=null;const before=s.turn;
+  tick(s,rng);assert.notEqual(s.turn,before);
+  // PA/PM infinitos en el turno de un héroe y no muere.
+  s.turn=s.units.indexOf(a);s.enemyPlan=null;
+  a.hp=1;
+  const options=labEnemyOptions();
+  assert.ok(options.some(o=>o.id==='dummy')&&options.some(o=>o.id==='boss:cerberus')&&options.some(o=>o.id==='imp'));
+  // Al morir todos los enemigos termina sin recompensas.
+  for(const f of foes)f.hp=0;
+  act(s,'lab0',{type:'end'},rng);
+  assert.equal(s.phase,'won');
 });

@@ -1,10 +1,10 @@
-import {setCustomMaps,testCustomMap,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
+import {setCustomMaps,testCustomMap,labCombat,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=109';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=109';
-import {setupSfx} from './music.js?v=109';
-import {icon} from './icons.js?v=109';
-import {openMapEditor} from './mapeditor.js?v=109';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=112';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=112';
+import {setupSfx} from './music.js?v=112';
+import {icon} from './icons.js?v=112';
+import {openMapEditor} from './mapeditor.js?v=112';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=109').then(({createIso})=>{
+import('./isometric.js?v=112').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -2050,6 +2050,11 @@ async function animate(){
   updatePawns();
 }
 function setState(next,initial=false){
+  // Laboratorio con varios héroes: controlas al que tenga el turno.
+  if(next?.lab&&!session?.code&&next.phase==='combat'){
+    const unit=next.units[next.turn];
+    if(unit&&!unit.enemy&&session.id!==unit.id)session={...session,id:unit.id};
+  }
   const previous=state;
   const newFloor=previous?.floor!==next.floor;
   if(newFloor||initial){
@@ -2495,7 +2500,7 @@ const sfxLabels={armor:'Golpe en armadura',arrow:'Disparo de flecha',arrowhit:'I
   v_boss:'Voz: jefe',v_ghost:'Voz: espectro',v_imp:'Voz: diablillo',v_plant:'Voz: planta',v_shade:'Voz: vampiro y súcubo',v_skeleton:'Voz: esqueleto',
   v_slime:'Voz: limo',v_worm:'Voz: gusano',amb_crypt:'Ambiente: mazmorra',el_fire:'Elemento: fuego (impacto)',el_ice:'Elemento: hielo (impacto)',el_shadow:'Elemento: caótico (impacto)',el_lightning:'Elemento: rayo (impacto)',arcane:'Hechizo mágico',amb_jungle:'Ambiente: jungla',amb_hell:'Ambiente: infierno'};
 // ───────────── Editor de mapas (solo administradores) ─────────────
-let editorTest=null;
+let editorTest=null,labConfig=null;
 const mapEditorApi={
   list:async()=>{
     const response=await fetch(serverBase()+'/api/maps',{signal:AbortSignal.timeout(12000)});
@@ -2505,6 +2510,20 @@ const mapEditorApi={
   },
   save:map=>accountCall('map-save',{map}),
   remove:id=>accountCall('map-delete',{id}),
+  // Laboratorio: combate de prueba con los héroes, habilidades y enemigos elegidos (sin recompensas).
+  lab:config=>{
+    if(busy)return;
+    generation++;rendered='';
+    const next=create();
+    config.heroes.forEach((hero,i)=>join(next,'lab'+i,classes[hero.classId].name,hero.classId,{}));
+    session={id:'lab0'};
+    soloAwarded=true;
+    labCombat(next,config);
+    labConfig=config;editorTest=config.map?.id||'lab';mapEditorApi.current=config.map?.id;
+    error('');
+    setState(next,true);
+    paintEditorReturn();
+  },
   // Probar: partida en solitario que empieza directamente en un combate de esa zona con ese mapa (sin recompensas).
   test:map=>{
     if(busy)return;
@@ -2526,15 +2545,19 @@ function mapEditorButton(){
   b.append(icon('grid'),'Editor de mapas');
   return b;
 }
-/** Durante una prueba del editor: botón para volver a él. */
+/** Durante una prueba del editor o del laboratorio: reiniciar el combate o volver al editor. */
 function paintEditorReturn(){
-  let b=el('editor-return');
-  if(!editorTest||!state){b?.remove();return;}
-  if(!b){
-    b=h('button','editor-return','⟲ Volver al editor');b.id='editor-return';
-    b.onclick=()=>{editorTest=null;el('leave').onclick();openMapEditor(mapEditorApi);};
-    document.body.append(b);
+  let bar=el('editor-return');
+  if(!editorTest||!state){bar?.remove();return;}
+  if(!bar){
+    const back=h('button',null,'⟲ Volver al editor');
+    back.onclick=()=>{editorTest=null;labConfig=null;el('leave').onclick();openMapEditor(mapEditorApi);};
+    const again=h('button',null,'↻ Reiniciar combate');again.id='lab-restart';
+    again.onclick=()=>{if(labConfig)mapEditorApi.lab(structuredClone(labConfig));};
+    bar=h('div','editor-return',h('b',null,'Laboratorio'),again,back);bar.id='editor-return';
+    document.body.append(bar);
   }
+  el('lab-restart').hidden=!labConfig;
 }
 function sfxEditorButton(){
   const b=btn('',()=>openSfxEditor());b.className='ghost';

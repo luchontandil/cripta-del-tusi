@@ -1181,6 +1181,59 @@ function pickCustomMap(s,room,rng){
   for(let i=pool.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
   return pool.find(m=>rng()*100<m.weight)||null;
 }
+// ───────────── Laboratorio de pruebas (editor de mapas) ─────────────
+/** Lo que se puede poner de enemigo en el laboratorio: el muñeco, cada monstruo y cada jefe. */
+export function labEnemyOptions(){
+  const species=[...new Set(fauna.flatMap(f=>[...f.melee,...f.ranged,f.elite,f.extra]))];
+  return [{id:'dummy',name:'Muñeco de prueba',group:'Pruebas'},
+    ...species.map(id=>({id,name:monsterNames[id],group:'Monstruos'})),
+    ...Object.entries(bosses).map(([id,b])=>({id:'boss:'+id,name:b.name,group:'Jefes'}))];
+}
+function labLineup(s){
+  return s.lab.enemies.slice(0,12).map((entry,i)=>{
+    const id='enemy'+i;
+    if(entry.kind==='dummy'){
+      const hp=Math.max(1,Math.min(99999,Math.round(Number(entry.hp)||999)));
+      return {id,name:'Muñeco de prueba',look:'skeleton',dummy:true,boss:false,elite:false,enemy:true,resist:{},initiative:0,range:1,hp,damage:0,stats:{ward:0,movement:0},effects:{}};
+    }
+    if(String(entry.kind).startsWith('boss:')){
+      const key=entry.kind.slice(5),info=bosses[key];
+      if(!info)fail('Jefe desconocido.');
+      return {id,name:info.name,look:key,boss:true,elite:false,enemy:true,initiative:info.initiative,range:info.range,
+        hp:Math.round((48+s.floor*6)*info.hp),damage:4+s.floor,element:info.element,stats:{ward:20,movement:0},effects:{},cycle:0,resist:{...(bossResist[key]||{})}};
+    }
+    if(!monsterNames[entry.kind])fail('Monstruo desconocido.');
+    const ranged=fauna.some(f=>f.ranged.includes(entry.kind));
+    return monster(entry.kind,id,s.floor,{ranged,elite:!!entry.elite});
+  });
+}
+/**
+ * Combate de laboratorio: héroes con la clase, el nivel y las habilidades (y su nivel) que se elijan,
+ * los enemigos que se elijan (o los normales de la zona), en un mapa creado o aleatorio, y trucos opcionales.
+ * config: {act, room, map|null, heroes:[{classId, level, ranks:[0-3,…], passives:[id]}], enemies:[{kind, elite, hp}], immortal, infinite}
+ */
+export function labCombat(s,config,rng=Math.random){
+  const c=config||{};
+  s.lab={immortal:!!c.immortal,infinite:!!c.infinite,enemies:(Array.isArray(c.enemies)?c.enemies:[]).filter(e=>e&&e.kind)};
+  s.players.forEach((p,i)=>{
+    const h=c.heroes?.[i]||{};
+    if(Object.hasOwn(classes,h.classId))p.classId=h.classId;
+    p.labLevel=Math.max(1,Math.min(40,Math.round(Number(h.level)||1)));
+    const count=classes[p.classId].skills.length;
+    const ranks=Array.from({length:count},(_,k)=>Math.max(0,Math.min(3,Math.round(Number(h.ranks?.[k])||0))));
+    if(!ranks.some(r=>r>0))ranks[0]=1;
+    p.skillRanks=ranks;
+    p.passives=(Array.isArray(h.passives)?h.passives:[]).filter(id=>passiveCards[p.classId]?.some(card=>card.id===id));
+  });
+  const act=Math.max(1,Math.min(ACTS,Math.round(Number(c.act)||c.map?.act||1)));
+  const room=['normal','elite','boss'].includes(c.room)?c.room:'normal';
+  const map=c.map?{...cleanMap(c.map),act,room}:null;
+  s.route=makeRoute(rng,act);
+  s.act=act;s.bossKills=0;
+  s.floor=actStart(act)+(room==='boss'?actLength(act):room==='elite'?4:2)-1;
+  s.testMap=map;
+  openFloor(s,rng,room==='elite',room==='boss'&&!s.lab.enemies.length?actBosses[act-1][1][0]:null);
+}
 /** Partida de prueba desde el editor: empieza directamente en un combate de esa zona con ese mapa. */
 export function testCustomMap(s,raw,rng=Math.random){
   const map=cleanMap(raw);
@@ -1245,7 +1298,7 @@ function openFloor(s,rng,elite=false,boss=null) {
     [...free].sort((a,b)=>rightScore(b)-rightScore(a)).slice(0,s.players.length);
   const heroes=s.players.map((p,i)=>{
     const previous=s.units.find(u=>u.id===p.id);
-    const level=s.floor;
+    const level=s.lab?(p.labLevel||1):s.floor;
     p.level=level;
     p.xp=0;
     p.trained=true;
@@ -1256,8 +1309,8 @@ function openFloor(s,rng,elite=false,boss=null) {
       hp:!previous?max:previous.hp>0?Math.max(1,Math.min(max,previous.hp+Math.max(0,max-(previous.max||max)))):Math.ceil(max*.1),
       pos:heroPositions[i],effects:{}};
   });
-  const lineup=encounter(s.floor,s.players.length,{elite,boss,rng:floorRandom((s.mapSeed^0x9e3779b9)>>>0)});
-  const scale=enemyScaling(s.floor,heroes);
+  const lineup=s.lab?.enemies?.length?labLineup(s):encounter(s.floor,s.players.length,{elite,boss,rng:floorRandom((s.mapSeed^0x9e3779b9)>>>0)});
+  const scale=s.lab?{hp:1,damage:1}:enemyScaling(s.floor,heroes);
   s.scaling=scale;
   if(s.mods.startHpPct)for(const hero of heroes)hero.hp=Math.max(1,Math.min(hero.hp,Math.ceil(hero.max*s.mods.startHpPct)));
   const spawns=custom?custom.enemySpawns.filter(p=>free.includes(p)&&!heroPositions.includes(p)):
@@ -1342,6 +1395,8 @@ function hit(s,actor,target,raw,kind='damage',critical=false,element='physical',
   const extra=kind==='damage'?(target.effects.expose?.value||0):0;
   const damage=Math.min(target.hp,netDamage(target,raw,element,critical,extra));
   target.hp-=damage;
+  // Laboratorio: «no morir» deja a los héroes con 1 PV.
+  if(s.lab?.immortal&&!target.enemy&&target.hp<=0)target.hp=1;
   if(target.hp>0)target.lastHit=damage;
   emit(s,{kind,unit:target.id,pos:target.pos,from:actor.pos,amount:damage,critical,element});
   // Vampirismo de los héroes: se acumula la fracción y se cura en puntos enteros.
@@ -1458,8 +1513,9 @@ function beginTurn(s) {
   // Los enemigos tienen 4 PM de base (uno más que los héroes).
   // Los de distancia, 3 PM (si no, disparan y huyen sin que se les pueda alcanzar).
   s.mp=Math.max(0,(u.enemy?(archetypeOf(u)==='ranged'?ENEMY_MP-1:ENEMY_MP):BASE_MP)+(u.stats?.movement||0)+(bonus.mp||0)+(u.effects.haste?.value||0)-(u.effects.slow?.value||0));
+  if(s.lab?.infinite&&!u.enemy){s.ap=99;s.mp=99;}
   s.turnStarted=Date.now();
-  s.deadline=s.turnStarted+(u.enemy?350:60000);
+  s.deadline=u.enemy?s.turnStarted+350:s.lab?null:s.turnStarted+60000;
   if(u.effects.poison)hit(s,{name:'Veneno',pos:u.pos},u,u.effects.poison.value,'poison',false,'chaos');
   if(u.effects.burn&&alive(u))hit(s,{name:'Quemadura',pos:u.pos},u,u.effects.burn.value,'burn',false,'fire');
   applyGlyphs(s,u,-1);
@@ -1476,6 +1532,8 @@ function finish(s,rng) {
     return true;
   }
   if(s.units.some(u=>u.enemy&&alive(u)))return false;
+  // Laboratorio de pruebas: sin recompensas; el combate termina y se puede reiniciar.
+  if(s.lab){s.phase='won';note(s,'Laboratorio: combate terminado.');return true;}
   const bossFight=s.node?.kind==='boss';
   if(bossFight){
     s.bossKills=(s.bossKills||0)+1;
@@ -1984,6 +2042,8 @@ export function tick(s,rng=Math.random) {
   const unit=s.units[s.turn];
   if(!alive(unit)){advance(s,rng);return true;}
   if(unit.enemy){
+    // Muñeco de prueba: no se mueve ni ataca.
+    if(unit.dummy){advance(s,rng);return true;}
     const heroes=s.units.filter(u=>!u.enemy&&alive(u));
     if(!s.enemyPlan){
       if(unit.boss){
@@ -2589,7 +2649,7 @@ export function act(s,id,a,rng=Math.random) {
     return;
   }
   if(s.phase==='reward'){gearAction(s,player,a,rng);return;}
-  if(s.phase!=='combat'||s.units[s.turn].id!==id||Date.now()>=s.deadline)fail('No es tu turno.');
+  if(s.phase!=='combat'||s.units[s.turn].id!==id||(s.deadline!=null&&Date.now()>=s.deadline))fail('No es tu turno.');
   const unit=s.units[s.turn];
   if(a.type==='end'){advance(s,rng);return;}
   if(a.type==='move'){

@@ -1,6 +1,6 @@
 // Editor de mapas (solo administradores): estilo «modo construcción», con catálogo de casillas abajo.
 // Crea, edita, prueba y guarda mapas; cada mapa pertenece a una zona (acto + tipo de sala) y tiene una frecuencia.
-import {cleanMap,mapWarnings,MAP_LIMITS,ROOM_KINDS,obstacleNames,actNames,actBiomes,ACTS,setCustomMaps,adjacent} from './engine.js?v=109';
+import {cleanMap,mapWarnings,MAP_LIMITS,ROOM_KINDS,obstacleNames,actNames,actBiomes,ACTS,setCustomMaps,adjacent,classes,passiveCards,labEnemyOptions} from './engine.js?v=112';
 
 const liquidNames={crypt:'Agua',jungle:'Ciénaga',hell:'Lava'};
 const floorColors={crypt:['#2f3446','#383c50'],jungle:['#2c4322','#344d27'],hell:['#2a2624','#322c29']};
@@ -356,7 +356,9 @@ export function openMapEditor(api){
     finally{saveButton.disabled=false;}
   };
   // Probar: el borrador (aunque no esté guardado) se conserva para volver al editor.
-  testButton.onclick=()=>{api.draft=dirty?structuredClone(map):null;dialog.close();api.test(cleanMap(map));};
+  // Probar: abre el laboratorio (héroes, habilidades, enemigos y trucos) con este mapa.
+  // El borrador (aunque no esté guardado) se conserva para volver al editor.
+  testButton.onclick=()=>openLab(dialog,api,()=>{api.draft=dirty?structuredClone(map):null;return cleanMap(map);});
   closeButton.onclick=()=>{if(confirmLeave())dialog.close();};
   dialog.oncancel=e=>{if(!confirmLeave())e.preventDefault();};
   const onKey=e=>{
@@ -391,4 +393,116 @@ export function openMapEditor(api){
     paintAll();
   }).catch(error=>{status.textContent='No se pudieron cargar los mapas: '+error.message;});
   return {reopen:()=>{dialog.showModal();paintAll();}};
+}
+
+// ───────────── Laboratorio de pruebas ─────────────
+const LAB_KEY='cripta-lab';
+const labDefaults=()=>({heroes:[{classId:'mago',level:5,ranks:null,passives:[]}],enemies:[{kind:'dummy',hp:999}],room:'normal',useMap:true,immortal:true,infinite:false});
+function loadLab(){try{return {...labDefaults(),...JSON.parse(localStorage.getItem(LAB_KEY)||'{}')};}catch{return labDefaults();}}
+function saveLab(config){try{localStorage.setItem(LAB_KEY,JSON.stringify(config));}catch{}}
+/** Rangos por defecto de una clase: las habilidades iniciales a nivel 1. */
+const startRanks=classId=>classes[classId].skills.map((_,i)=>i<3?1:0);
+
+/**
+ * Ventana del laboratorio, encima del editor. getMap() devuelve el mapa actual (limpio).
+ * Al empezar llama a api.lab(config) con {act, room, map|null, heroes, enemies, immortal, infinite}.
+ */
+export function openLab(editor,api,getMap){
+  const config=loadLab();
+  const panel=el('div','lab-panel');
+  const shade=el('div','lab-shade',panel);
+  editor.append(shade);
+  const close=()=>shade.remove();
+  const enemyOptions=labEnemyOptions();
+
+  function heroCard(h,i){
+    h.ranks=Array.isArray(h.ranks)&&h.ranks.length===classes[h.classId].skills.length?h.ranks:startRanks(h.classId);
+    const classSelect=el('select');
+    for(const [id,c] of Object.entries(classes))classSelect.append(new Option(c.name,id));
+    classSelect.value=h.classId;
+    classSelect.onchange=()=>{h.classId=classSelect.value;h.ranks=startRanks(h.classId);h.passives=[];paint();};
+    const level=el('input');Object.assign(level,{type:'number',min:1,max:40,value:h.level});
+    level.onchange=()=>{h.level=Math.max(1,Math.min(40,Number(level.value)||1));};
+    const remove=el('button','ghost lab-x','✕');remove.title='Quitar este héroe';
+    remove.disabled=config.heroes.length<2;
+    remove.onclick=()=>{config.heroes.splice(i,1);paint();};
+    const skills=el('div','lab-skills',...classes[h.classId].skills.map((skill,k)=>{
+      const rank=el('select');
+      ['—','1','2','3'].forEach((label,r)=>rank.append(new Option(label,r)));
+      rank.value=h.ranks[k];
+      rank.onchange=()=>{h.ranks[k]=Number(rank.value);row.classList.toggle('off',!h.ranks[k]);};
+      const row=el('label','lab-skill'+(h.ranks[k]?'':' off'),el('span',null,skill[0]),rank);
+      return row;
+    }));
+    const all=el('button','ghost lab-mini','Todas a nivel 3');all.onclick=()=>{h.ranks=h.ranks.map(()=>3);paint();};
+    const none=el('button','ghost lab-mini','Iniciales');none.onclick=()=>{h.ranks=startRanks(h.classId);paint();};
+    const passives=(passiveCards[h.classId]||[]).map(card=>{
+      const box=el('input');box.type='checkbox';box.checked=h.passives?.includes(card.id);
+      box.onchange=()=>{h.passives=box.checked?[...(h.passives||[]),card.id]:(h.passives||[]).filter(x=>x!==card.id);};
+      const label=el('label','lab-passive',box,' Pasiva: '+card.name);label.title=card.text;
+      return label;
+    });
+    return el('div','lab-hero',
+      el('div','lab-hero-head',el('b',null,'Héroe '+(i+1)),classSelect,el('label','lab-inline','Nivel ',level),remove),
+      el('div','lab-hint','Habilidades y su nivel (— = no la lleva)'),skills,
+      el('div','lab-row',all,none),...passives);
+  }
+  function enemyRow(e,i){
+    const kind=el('select');
+    let group=null;
+    for(const o of enemyOptions){
+      if(o.group!==group?.label){group=el('optgroup');group.label=o.group;kind.append(group);}
+      group.append(new Option(o.name,o.id));
+    }
+    kind.value=e.kind;
+    kind.onchange=()=>{e.kind=kind.value;paint();};
+    const extra=[];
+    if(e.kind==='dummy'){
+      const hp=el('input');Object.assign(hp,{type:'number',min:1,max:99999,value:e.hp||999});
+      hp.onchange=()=>{e.hp=Number(hp.value)||999;};
+      extra.push(el('label','lab-inline','Vida ',hp));
+    }else if(!e.kind.startsWith('boss:')){
+      const elite=el('input');elite.type='checkbox';elite.checked=!!e.elite;elite.onchange=()=>{e.elite=elite.checked;};
+      extra.push(el('label','lab-inline',elite,' Élite'));
+    }
+    const remove=el('button','ghost lab-x','✕');remove.onclick=()=>{config.enemies.splice(i,1);paint();};
+    return el('div','lab-enemy',kind,...extra,remove);
+  }
+  function check(key,label,hint){
+    const box=el('input');box.type='checkbox';box.checked=!!config[key];box.onchange=()=>{config[key]=box.checked;};
+    const l=el('label','lab-check',box,' '+label);l.title=hint;return l;
+  }
+  function paint(){
+    const addHero=el('button',null,'+ Añadir héroe');addHero.disabled=config.heroes.length>=4;
+    addHero.onclick=()=>{config.heroes.push({classId:'guardia',level:config.heroes[0]?.level||5,ranks:null,passives:[]});paint();};
+    const addEnemy=el('button',null,'+ Añadir enemigo');addEnemy.disabled=config.enemies.length>=12;
+    addEnemy.onclick=()=>{config.enemies.push({kind:'dummy',hp:999});paint();};
+    const room=el('select');for(const [k,v] of [['normal','Normal'],['elite','Élite'],['boss','Jefe']])room.append(new Option(v,k));
+    room.value=config.room;room.onchange=()=>{config.room=room.value;};
+    const useMap=el('select');useMap.append(new Option('Este mapa',1),new Option('Mapa aleatorio de la zona',0));
+    useMap.value=config.useMap?1:0;useMap.onchange=()=>{config.useMap=useMap.value==='1';};
+    const start=el('button','primary','▶ Empezar prueba');
+    start.onclick=()=>{
+      saveLab(config);
+      const map=getMap();
+      close();editor.close();
+      api.lab({...structuredClone(config),act:map.act,map:config.useMap?map:null});
+    };
+    const cancel=el('button','ghost','Cancelar');cancel.onclick=close;
+    panel.replaceChildren(
+      el('header','lab-head',el('h2',null,'Laboratorio de pruebas'),el('p',null,'Elige héroes, habilidades y enemigos, y prueba en este mapa. No da recompensas. La configuración se recuerda.')),
+      el('div','lab-cols',
+        el('section','lab-col',el('h3',null,'Héroes'),...config.heroes.map(heroCard),addHero,
+          el('p','lab-hint','Con varios héroes, controlas a cada uno en su turno.')),
+        el('section','lab-col',el('h3',null,'Enemigos'),
+          config.enemies.length?el('div','lab-enemies',...config.enemies.map(enemyRow)):el('p','lab-hint','Sin enemigos elegidos: salen los normales de la zona.'),
+          addEnemy,
+          el('h3',null,'Combate'),
+          el('label','lab-inline','Mapa ',useMap),el('label','lab-inline','Sala ',room),
+          el('h3',null,'Trucos'),
+          check('infinite','PA y PM infinitos','Los héroes empiezan cada turno con 99 PA y 99 PM (los usos por turno de cada habilidad siguen contando).'),
+          check('immortal','Los héroes no mueren','Los héroes no bajan de 1 PV.'))),
+      el('footer','lab-foot',cancel,start));
+  }
+  paint();
 }

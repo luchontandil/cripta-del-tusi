@@ -19,8 +19,8 @@ async function hashPassword(password,salt=randomBytes(16).toString('hex')){
   const hash=(await scrypt(String(password),salt,32)).toString('hex');
   return {salt,hash};
 }
-/** Administradores: «passa» siempre, más los nicks de la variable de entorno ADMIN_NICKS (separados por comas). */
-const builtInAdmins=['passa'];
+/** Administradores: «passa» y «maurisho» siempre, más los nicks de la variable de entorno ADMIN_NICKS (separados por comas). */
+const builtInAdmins=['passa','maurisho'];
 export function isAdmin(nick){
   const list=[...builtInAdmins,...String(process.env.ADMIN_NICKS||'').split(',')].map(n=>n.trim().toLowerCase()).filter(Boolean);
   return !!nick&&list.includes(String(nick).trim().toLowerCase());

@@ -1731,3 +1731,48 @@ test('venenos de héroe: 2 de base que escalan con el daño caótico; Dardo pest
   assert.equal(s.units[s.turn],a,'vuelve a ser su turno');
   assert.ok(!foe.effects.corrode,'se acaba al empezar el turno del arquero');
 });
+
+test('Arquero tanda 2: Congelamiento, Ramo helado, Tramposa y Expansión de dominio',()=>{
+  const names=classes.tirador.skills.map(k=>k[0]);
+  const idx=n=>names.indexOf(n);
+  const setup=()=>{
+    const s=battle('tirador');
+    s.walls=[];s.water=[];s.traps=[];s.voids=[];
+    const a=s.units.find(u=>!u.enemy);a.skillRanks=names.map(()=>1);
+    const foes=s.units.filter(u=>u.enemy);
+    for(const f of foes){f.pos=-99;f.hp=f.max=300;f.stats.ward=0;f.resist={};f.stats.movement=-9;}
+    s.turn=s.units.indexOf(a);s.ap=30;s.mp=3;s.casts={};s.castTargets={};s.phase='combat';
+    a.pos=5*s.width+8;
+    return {s,a,foes,w:s.width};
+  };
+  // Congelación prematura congela; el siguiente golpe de hielo hace +50 % y quita 1 PM.
+  {const {s,a,foes}=setup();const f=foes[0];f.pos=a.pos-4;
+    act(s,a.id,{type:'skill',skill:idx('Congelación prematura'),pos:f.pos},()=>.5);
+    assert.ok(f.effects.frozen,'congelado');
+    const before=f.hp;
+    act(s,a.id,{type:'skill',skill:idx('Flecha helada'),pos:f.pos},()=>.5);
+    assert.ok(!f.effects.frozen,'se consume');
+    assert.equal(f.effects.chill.value,1,'−1 PM extra');
+    assert.equal(f.effects.slow.value,1,'más el −1 PM de la flecha');
+    const cold=before-f.hp;
+    const t=setup();t.foes[0].pos=t.a.pos-4;
+    const b2=t.foes[0].hp;act(t.s,t.a.id,{type:'skill',skill:idx('Flecha helada'),pos:t.foes[0].pos},()=>.5);
+    assert.ok(cold>b2-t.foes[0].hp,'pega más congelado');}
+  // Ramo helado: cono 1-3-5 desde la casilla elegida.
+  {const {s,a,foes,w}=setup();foes[0].pos=a.pos-5-w*2;
+    act(s,a.id,{type:'skill',skill:idx('Ramo helado'),pos:a.pos-3},()=>.5);
+    assert.ok(foes[0].hp<300,'borde del cono');}
+  // Tramposa: oculta, salta al pisar la cruz, daña a ≤3 y luego congela.
+  {const {s,a,foes,w}=setup();
+    act(s,a.id,{type:'skill',skill:idx('Tramposa'),pos:a.pos-4},()=>.5);
+    assert.equal(s.snares.length,1);
+    foes[0].pos=a.pos-6;foes[0].stats.movement=0;
+    _test.move(s,foes[0],[a.pos-5],true);
+    assert.equal(s.snares.length,0,'se activa');
+    assert.ok(foes[0].hp<300);assert.ok(foes[0].effects.frozen,'congela después del daño');}
+  // Expansión de dominio: el Congelamiento dura un turno más del arquero.
+  {const {s,a,foes}=setup();const f=foes[0];f.pos=a.pos-4;
+    act(s,a.id,{type:'skill',skill:idx('Expansión de dominio'),pos:a.pos},()=>.5);
+    act(s,a.id,{type:'skill',skill:idx('Congelación prematura'),pos:f.pos},()=>.5);
+    assert.equal(f.effects.frozen.skips,1);}
+});

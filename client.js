@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=138';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=138';
-import {setupSfx} from './music.js?v=138';
-import {icon} from './icons.js?v=138';
-import {openMapEditor} from './mapeditor.js?v=138';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=139';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=139';
+import {setupSfx} from './music.js?v=139';
+import {icon} from './icons.js?v=139';
+import {openMapEditor} from './mapeditor.js?v=139';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -25,8 +25,8 @@ function lootReady(){
 const onPages=location.hostname.endsWith('.github.io');
 el('server').value=localStorage.getItem('amber-server')||(onPages?'https://cripta-del-tusi.onrender.com':location.origin);
 const error=message=>{el('error').textContent=message;};
-const iconName={reach:'Ojo de águila',corrode:'Corroído',detonate:'Detonado',expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',burn:'Quemadura',weak:'Maldito',haste:'Prisa',shield:'Escudo',fury:'Furia',barrier:'Guardia',blind:'Eclipse'};
-const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',reach:v=>'+'+v+' de alcance',corrode:v=>'−'+v+' % a todas las resistencias',detonate:v=>'estalla al acabar su turno ('+v+' de fuego a 2 casillas)',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo',fury:v=>'+'+v+' % de daño',barrier:v=>v+' de escudo',blind:v=>'−'+v+' de alcance'};
+const iconName={frozen:'Congelado',chill:'Hielo roto',domain:'Expansión de dominio',reach:'Ojo de águila',corrode:'Corroído',detonate:'Detonado',expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',burn:'Quemadura',weak:'Maldito',haste:'Prisa',shield:'Escudo',fury:'Furia',barrier:'Guardia',blind:'Eclipse'};
+const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',frozen:()=>'el próximo golpe de hielo hace +50 % y quita 1 PM',chill:v=>'−'+v+' PM',domain:()=>'tus Congelamientos y Contagios duran 1 turno más',reach:v=>'+'+v+' de alcance',corrode:v=>'−'+v+' % a todas las resistencias',detonate:v=>'estalla al acabar su turno ('+v+' de fuego a 2 casillas)',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo',fury:v=>'+'+v+' % de daño',barrier:v=>v+' de escudo',blind:v=>'−'+v+' de alcance'};
 const specs={guardia:'Lanza, empujes y escudo · controla el frente',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
 const roles={guardia:'Valkyria',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
 // Editor de SFX desactivado por ahora; poner true para volver a mostrarlo al admin.
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=138').then(({createIso})=>{
+import('./isometric.js?v=139').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -896,6 +896,10 @@ const skillLore={
   'Ojo de águila':'Respiras hondo, fijas la vista y el campo de batalla se acerca.',
   'Flecha venenosa':'El veneno agarrota los músculos: al enemigo le cuesta actuar.',
   'Dardo pestilente':'Un dardo podrido que corroe cualquier defensa.',
+  'Congelación prematura':'Una flecha cae del cielo y escarcha el suelo: lo que toca queda listo para romperse.',
+  'Ramo helado':'La flecha revienta en un abanico de esquirlas de hielo.',
+  'Tramposa':'Una trampa escondida bajo la escarcha: quien la pise, lo lamentará.',
+  'Expansión de dominio':'Tu hielo y tus venenos tardan más en soltar a sus presas.',
   // Ninja
   'Shuriken':'Una estrella de acero que vuela rápida y silenciosa hacia el blanco.',
   'Cuchilla envenenada':'Un corte pequeño, pero el veneno sigue trabajando turno tras turno.',
@@ -921,6 +925,8 @@ function skillEffectText(skill){
     shield:'+'+(o.value||3)+' de armadura durante 2 turnos',
     haste:'+'+(o.value||2)+' PM en el próximo turno del aliado',
     sprint:'Ganas +'+(o.value||2)+' PM este turno',
+    snare:'Trampa oculta (los enemigos no la ven). Se activa cuando un enemigo pisa la cruz; estalla y daña a todos los enemigos a '+(o.blast||3)+' casillas o menos (−20 % por casilla, sin línea de visión) y después los congela. Dura todo el combate; solo una a la vez',
+    domain:'Durante '+(o.turns||2)+' turnos, los Congelamientos y Contagios que apliques duran 1 turno más',
     detonate:'Detonado: al acabar su turno estalla y quema a sus aliados a 2 casillas o menos ('+(o.detonate||[3,5]).join('-')+' de fuego). Una vez por objetivo y turno',
     reach:'+'+(o.value||3)+' de alcance en tus hechizos de alcance modificable durante '+(o.turns||2)+' turnos',
     curse:'−'+(o.value||1)+' PA en el próximo turno del objetivo (no se acumula)',
@@ -934,7 +940,7 @@ function skillEffectText(skill){
     leap:'Saltas a una casilla libre y golpeas a todos los enemigos a tu alrededor (−20 % por casilla de distancia)',
     dash:o.teleport?(o.los===false?'Teletransporte (sin necesitar línea de visión)':'Teletransporte a una casilla libre que veas, sin gastar PM'):'Desplazamiento por una ruta libre sin gastar PM'
   }[kind]||'';
-  const extra=(o.stack?'+'+o.stack.value+' de daño base de esta habilidad por cada uso durante '+(o.stack.turns||2)+' turnos (acumulable '+(o.stack.max||3)+' veces, cada carga dura lo suyo)':'')+(o.meleeBonus?'+'+o.meleeBonus+' % de daño si el objetivo está adyacente':'')+(o.friendly?'Daña también a los aliados del área':'')+(o.recoil?(o.friendly?' · ':'')+'Retrocedes '+o.recoil+' casilla al disparar (si chocas, te haces daño)':'');
+  const extra=(o.stack?'+'+o.stack.value+' de daño base de esta habilidad por cada uso durante '+(o.stack.turns||2)+' turnos (acumulable '+(o.stack.max||3)+' veces, cada carga dura lo suyo)':'')+(o.meleeBonus?'+'+o.meleeBonus+' % de daño si el objetivo está adyacente':'')+(o.freeze&&skill[5]!=='snare'?'Congela a los enemigos alcanzados hasta tu próximo turno: el siguiente golpe de hielo que reciban hace +50 % y les quita 1 PM':'')+(o.friendly?'Daña también a los aliados del área':'')+(o.recoil?(o.friendly?' · ':'')+'Retrocedes '+o.recoil+' casilla al disparar (si chocas, te haces daño)':'');
   const steal=o.lifesteal?' · Te curas el '+o.lifesteal+' % del daño hecho':'';
   const burn=o.element==='fire'&&o.burnChance!==0?' · '+(o.burnChance!==undefined?o.burnChance+' % de probabilidad de quemar: ':'Quemadura: ')+'arde 2 turnos y pierde ¼ del daño al empezar cada uno':'';
   return ([text,extra].filter(Boolean).join(' · ')+area+steal+burn).replace(/^ · /,'');
@@ -1028,7 +1034,7 @@ function skillRows(unit,skill){
   }
   const sketch=areaSketch(skill);
   if(o.area||sketch){
-    const label=o.area==='wave'?(o.width||3)+'×'+(o.size||1)+' al frente':o.area==='line'?'línea de '+((o.size||1)+1)+' casillas':o.area==='trident'?'tridente':o.area==='tee'?'T invertida':o.area==='circle'&&!skill[2]?'círculo de '+(o.size||1)+' a tu alrededor':o.area?areaNames[o.area]+(o.size>1?' · tamaño '+o.size:''):'cruz';
+    const label=o.area==='wave'?(o.width||3)+'×'+(o.size||1)+' al frente':o.area==='line'?'línea de '+((o.size||1)+1)+' casillas':o.area==='trident'?'tridente':o.area==='tee'?'T invertida':o.area==='cone'?'cono '+Array.from({length:(o.size||1)+1},(_,i)=>2*i+1).join('-'):o.area==='circle'&&!skill[2]?'círculo de '+(o.size||1)+' a tu alrededor':o.area?areaNames[o.area]+(o.size>1?' · tamaño '+o.size:''):'cruz';
     const row=statRow('blast','Área',label);
     if(sketch)row.querySelector('.tip-value').append(sketch);
     rows.push(row);
@@ -2208,6 +2214,7 @@ function drawBoard(turn,walking,skill){
     const wall=state.walls.includes(pos);
     const glyph=state.glyphs.find(g=>g.cells.includes(pos));
     // Zona de En guardia! (círculo alrededor de quien la lanzó, hasta su próximo turno).
+    const snare=!voidCell&&!wall&&(state.snares||[]).some(t=>distance(state,t.pos,pos)<=1);
     const guardZone=!voidCell&&!wall&&(state.guardZones||[]).some(z=>{const o=state.units.find(u=>u.id===z.owner&&u.hp>0);return o&&distance(state,o.pos,pos)<=z.size;});
     const water=state.water?.includes(pos);
     const trap=state.traps?.find(t=>t.pos===pos);
@@ -2223,7 +2230,7 @@ function drawBoard(turn,walking,skill){
     });
     const shadesIndex=((Math.imul(pos+1,2654435761)^state.mapSeed)>>>6)%shades.length;
     cell.style.setProperty('--tile',shades[shadesIndex]);
-    cell.className=['cell',voidCell&&'void',wall&&'wall',water&&'water',trap&&'trap trap-'+trap.kind,path&&'walk',blocked&&'no-sight',castRange&&'cast-range',aim&&'aim',glyph&&'glyph-'+glyph.kind,glyph?.warn&&'warn',guardZone&&'guard-zone'].filter(Boolean).join(' ');
+    cell.className=['cell',voidCell&&'void',wall&&'wall',water&&'water',trap&&'trap trap-'+trap.kind,path&&'walk',blocked&&'no-sight',castRange&&'cast-range',aim&&'aim',glyph&&'glyph-'+glyph.kind,glyph?.warn&&'warn',guardZone&&'guard-zone',snare&&'hero-trap'].filter(Boolean).join(' ');
     if(voidCell){cell.disabled=true;cell.setAttribute('aria-hidden','true');}
     cell.setAttribute('aria-label',(unit?.name||(wall?'Muro':water?'Agua':trap?trapInfo[trap.kind].name:'Casilla'))+' '+(pos%state.width+1)+', '+(Math.floor(pos/state.width)+1));
     if(path){

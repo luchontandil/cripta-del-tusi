@@ -31,9 +31,12 @@ export const classes = {
     ['Flecha Repelente',3,8,3,5,'push','➶',1,{element:'physical',push:2,casts:2,modifiable:true}],
     ['Ojo de águila',2,0,0,0,'reach','◉',0,{value:3,turns:2,los:false,casts:1,cooldown:3,modifiable:false}],
     ['Flecha venenosa',2,8,1,4,'curse','☠',1,{element:'chaos',value:1,casts:2,modifiable:true}],
-    ['Dardo pestilente',2,8,2,4,'corrode','✣',1,{element:'chaos',value:25,poison:2,perTarget:1,casts:2,modifiable:true}]
-    // Pendientes (docs/skills-arquero.md): Congelación prematura, Ramo helado, Tramposa, Expansión de dominio,
-    // Contagio, Trampita, Flecha Explosiva, Flecha Rastreadora.
+    ['Dardo pestilente',2,8,2,4,'corrode','✣',1,{element:'chaos',value:25,poison:2,perTarget:1,casts:2,modifiable:true}],
+    ['Congelación prematura',4,8,4,6,'damage','✳',1,{element:'ice',area:'cross',size:1,freeze:true,casts:1,cooldown:1,modifiable:false}],
+    ['Ramo helado',3,8,3,5,'damage','❆',1,{element:'ice',area:'cone',size:2,inLine:true,casts:1,modifiable:false}],
+    ['Tramposa',4,8,5,8,'snare','⌗',1,{element:'ice',area:'cross',size:1,blast:3,freeze:true,casts:1,cooldown:4,modifiable:false}],
+    ['Expansión de dominio',2,0,0,0,'domain','◎',0,{value:1,turns:2,los:false,casts:1,cooldown:3,modifiable:false}]
+    // Pendientes (docs/skills-arquero.md): Contagio, Trampita, Flecha Explosiva, Flecha Rastreadora.
   ]},
   mistico: {name:'Clérigo', hp:36, initiative:12, skills:[
     ['Luz ardiente',2,4,5,8,'damage','✦',0,{element:'magic',max:{range:1}}],
@@ -174,7 +177,7 @@ export function damageBonus(unit,skill){
 const armorType=(unit,skill)=>skillSchool(unit,skill)==='physical'?'physical':skillElement(unit,skill);
 export const modifiableRange=skill=>skillOptions(skill).modifiable??(skill[2]>1&&!['dash','swap'].includes(skill[5]));
 /** Tipos de habilidad que se lanzan sobre aliados. */
-export const supportKinds=['heal','cleanse','shield','haste','sprint','fury','eclipse','reach'];
+export const supportKinds=['heal','cleanse','shield','haste','sprint','fury','eclipse','reach','domain'];
 /** Veneno de los héroes: daño base (2) que escala con el % de daño caótico de quien lo aplica. */
 export const poisonValue=(unit,base=2)=>Math.max(1,Math.round(base*(1+(unit.stats?.chaos||0)/100)));
 /** Alcance extra para hechizos de alcance modificable: equipo + Ojo de águila. */
@@ -1299,7 +1302,7 @@ function openFloor(s,rng,elite=false,boss=null) {
   }
   s.act=actOf(s.floor);
   s.biome=actBiomes[s.act-1];
-  s.glyphs=[];s.guardZones=[];
+  s.glyphs=[];s.guardZones=[];s.snares=[];
   const w=s.width;
   const mid=Math.floor(s.height/2);
   layout||=makeLayout(s,mapRng);
@@ -1533,6 +1536,7 @@ function move(s,unit,path,voluntary=true,blink=false,style=null) {
     const trap=s.traps?.find(t=>t.pos===pos);
     if(trap&&alive(unit))triggerTrap(s,trap,unit);
     if(s.guardZones?.length&&guardZoneCheck(s,unit,previous))break;
+    if(s.snares?.length&&snareCheck(s,unit))break;
   }
 }
 function beginTurn(s) {
@@ -1542,19 +1546,67 @@ function beginTurn(s) {
   if(s.guardZones?.length)s.guardZones=s.guardZones.filter(z=>z.owner!==u.id);
   if(u.effects.barrier?.untilOwnTurn)delete u.effects.barrier;
   // Efectos que duran «hasta el próximo turno del lanzador» (Dardo pestilente).
-  for(const other of s.units)for(const [key,st] of Object.entries(other.effects||{}))if(st.untilTurnOf===u.id)delete other.effects[key];
+  // Expansión de dominio: «skips» alarga esos efectos un turno más del lanzador.
+  for(const other of s.units)for(const [key,st] of Object.entries(other.effects||{}))
+    if(st.untilTurnOf===u.id){if(st.skips>0)st.skips--;else delete other.effects[key];}
   const bonus=u.enemy?{}:s.mods||{};
   s.casts={};s.castTargets={};
   s.ap=Math.max(1,(u.enemy?4:BASE_AP)+(u.stats?.action||0)+(bonus.ap||0)-(u.effects.weak?.value||0));
   // Los enemigos tienen 4 PM de base (uno más que los héroes).
   // Los de distancia, 3 PM (si no, disparan y huyen sin que se les pueda alcanzar).
-  s.mp=Math.max(0,(u.enemy?(archetypeOf(u)==='ranged'?ENEMY_MP-1:ENEMY_MP):BASE_MP)+(u.stats?.movement||0)+(bonus.mp||0)+(u.effects.haste?.value||0)-(u.effects.slow?.value||0));
+  s.mp=Math.max(0,(u.enemy?(archetypeOf(u)==='ranged'?ENEMY_MP-1:ENEMY_MP):BASE_MP)+(u.stats?.movement||0)+(bonus.mp||0)+(u.effects.haste?.value||0)-(u.effects.slow?.value||0)-(u.effects.chill?.value||0));
   if(s.lab?.infinite&&!u.enemy){s.ap=99;s.mp=99;}
   s.turnStarted=Date.now();
   s.deadline=u.enemy?s.turnStarted+350:s.lab?null:s.turnStarted+60000;
   if(u.effects.poison)hit(s,{name:'Veneno',pos:u.pos},u,u.effects.poison.value,'poison',false,'chaos');
   if(u.effects.burn&&alive(u))hit(s,{name:'Quemadura',pos:u.pos},u,u.effects.burn.value,'burn',false,'fire');
   applyGlyphs(s,u,-1);
+}
+/** Congelamiento: hasta el próximo turno del lanzador (uno más con Expansión de dominio). */
+function freeze(s,caster,target){
+  if(!alive(target))return;
+  target.effects.frozen={value:1,turns:99,untilTurnOf:caster.id,skips:caster.effects?.domain?1:0};
+  note(s,target.name+' queda congelado: el próximo golpe de hielo le hará +50 % y le quitará 1 PM.');
+}
+/** Golpe de hielo sobre un congelado: +50 % de daño, consume el estado y quita 1 PM extra. */
+function frozenHit(target,element){
+  if(element!=='ice'||!target.effects?.frozen)return 1;
+  delete target.effects.frozen;target.frozenPending=true;
+  return 1.5;
+}
+function frozenAfter(s,target){
+  if(!target.frozenPending)return;
+  delete target.frozenPending;
+  if(!alive(target))return;
+  effect(target,'chill',(target.effects.chill?.value||0)+1,1);
+  emit(s,{kind:'mp',unit:target.id,pos:target.pos,amount:1});
+  note(s,target.name+' se rompe el hielo: −1 PM.');
+}
+/** Tramposa: al pisar su cruz, estalla y daña a los enemigos a ≤N casillas; luego los congela. */
+function snareCheck(s,unit){
+  for(const snare of s.snares||[]){
+    const owner=s.units.find(u=>u.id===snare.owner);
+    if(!owner||!alive(unit)||!!owner.enemy===!!unit.enemy)continue;
+    if(distance(s,unit.pos,snare.pos)>1)continue;
+    s.snares=s.snares.filter(t=>t!==snare);
+    const index=classes[owner.classId]?.skills.findIndex(k=>k[0]===snare.skill);
+    const skill=index>=0?skillFor(owner,index,true):null;
+    if(!skill)return true;
+    const o=skillOptions(skill),radius=o.blast||3;
+    const victims=s.units.filter(u=>alive(u)&&!!u.enemy!==!!owner.enemy&&distance(s,u.pos,snare.pos)<=radius);
+    emit(s,{kind:'spell',effect:'blast',actor:owner.id,from:snare.pos,pos:snare.pos,area:victims.map(u=>u.pos).concat(snare.pos),name:'Tramposa',element:'ice'});
+    note(s,unit.name+' pisa la Tramposa de '+owner.name+'.');
+    for(const v of victims){
+      const fall=Math.max(.6,1-.2*distance(s,v.pos,snare.pos));
+      const mult=frozenHit(v,'ice');
+      hit(s,owner,v,scaledDamage(owner,skill,roll(skill[3],skill[4],Math.random),fall*mult),'damage',false,armorType(owner,skill),false);
+      frozenAfter(s,v);
+    }
+    // Primero el daño y después el Congelamiento (si no, la propia trampa lo consumiría).
+    if(o.freeze)for(const v of victims)freeze(s,owner,v);
+    return true;
+  }
+  return false;
 }
 /** Detonadora: al acabar el turno del objetivo, estalla y quema a sus aliados a 2 casillas o menos. */
 function detonate(s,unit){
@@ -2447,7 +2499,7 @@ export function castableCell(s,unit,pos,skill){
     if(!free(s,pos))return false;
     return skillOptions(skill).teleport||paths(s,unit,skill[2]).has(pos);
   }
-  if(skill[5]==='leap'&&!free(s,pos))return false;
+  if((skill[5]==='leap'||skill[5]==='snare')&&!free(s,pos))return false;
   return castsOnCell(skill);
 }
 /** Dirección (una de las 4) desde el lanzador hacia la casilla objetivo. */
@@ -2589,6 +2641,12 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
   const value=opts.value;
   if(supportKinds.includes(kind)){
     if(kind==='shield'){effect(target,'shield',value||25,2);note(s,name+' → '+target.name+': +'+(value||25)+' % de armadura 2 turnos.');emit(s,{kind:'buff',tone:'shield',unit:target.id,pos:target.pos,text:'+'+(value||25)+' % armadura'});return;}
+    if(kind==='domain'){
+      effect(target,'domain',value||1,opts.turns||2);
+      note(s,name+': durante '+(opts.turns||2)+' turnos, tus Congelamientos y Contagios duran 1 turno más.');
+      emit(s,{kind:'buff',tone:'blind',unit:target.id,pos:target.pos,text:'Dominio +1'});
+      return;
+    }
     if(kind==='reach'){
       effect(target,'reach',value||3,opts.turns||2);
       note(s,name+': +'+(value||3)+' de alcance en los hechizos de alcance modificable durante '+(opts.turns||2)+' turnos.');
@@ -2638,7 +2696,9 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
     const burns=opts.burnChance===undefined||rng()*100<opts.burnChance;
     // Lanza abisal: más daño si el objetivo está pegado.
     const melee=opts.meleeBonus&&distance(s,unit.pos,target.pos)===1?1+opts.meleeBonus/100:1;
-    hit(s,unit,target,scaledDamage(unit,skill,roll(min,max,rng),scale*melee),'damage',critical,armorType(unit,skill),burns);
+    const cold=frozenHit(target,element);
+    hit(s,unit,target,scaledDamage(unit,skill,roll(min,max,rng),scale*melee*cold),'damage',critical,armorType(unit,skill),burns);
+    frozenAfter(s,target);
     if(burns)ignite(s,target,before-target.hp,element);
     // Robo de vida de la habilidad (Punzón): un % del daño hecho de verdad.
     if(opts.lifesteal&&alive(unit)){
@@ -2667,6 +2727,7 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
     target.effects.detonate={value:scaledDamage(unit,skill,roll(lo,hi,rng)),turns:1,by:unit.id};
     note(s,target.name+' queda detonado: estallará al acabar su turno.');
   }
+  if(opts.freeze&&kind!=='snare'&&!!target.enemy!==!!unit.enemy)freeze(s,unit,target);
   if(kind==='curse'){effect(target,'weak',value||1,1);note(s,target.name+' pierde '+(value||1)+' PA en su próximo turno.');}
   if(kind==='corrode'){
     // Dura hasta el próximo turno del lanzador.
@@ -2884,7 +2945,13 @@ export function act(s,id,a,rng=Math.random) {
     // «friendly»: golpea a todo lo que haya en el área, aliados incluidos (Flecha Flamígera).
     const hits=s.units.filter(u=>alive(u)&&area.includes(u.pos)&&(skillOptions(skill).friendly?u!==unit:support?!u.enemy:u.enemy))
       .sort((a,b)=>kind==='push'?distance(s,origin,b.pos)-distance(s,origin,a.pos):kind==='pull'?distance(s,unit.pos,a.pos)-distance(s,unit.pos,b.pos):0);
-    if(kind==='guard')guard(s,unit,skill);
+    if(kind==='snare'){
+      // Una sola Tramposa por arquero: la nueva sustituye a la anterior. Dura hasta el final del combate.
+      s.snares=(s.snares||[]).filter(t=>!(t.owner===unit.id&&t.skill===skill[0]));
+      s.snares.push({owner:unit.id,pos:a.pos,skill:skill[0]});
+      note(s,unit.name+' coloca una trampa oculta.');
+    }
+    else if(kind==='guard')guard(s,unit,skill);
     else if(alive(unit))for(const other of hits)applySkill(s,unit,other,skill,rng,areaFalloff(s,a.pos,other.pos,skill),origin);
     // Retroceso del lanzador (Flecha Flamígera): se aleja de la casilla elegida; si choca, se hace daño.
     if(skillOptions(skill).recoil&&alive(unit))shove(s,unit,unit,skillOptions(skill).recoil,false,a.pos);

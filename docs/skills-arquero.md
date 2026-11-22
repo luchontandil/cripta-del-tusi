@@ -44,3 +44,7 @@ El resto, igual.
 - Trampita: visible, 1 casilla, la activa cualquiera (aliado o enemigo): daño + veneno 2 turnos + 30 % de −1 PM. Sin recarga, 1 por turno, dura todo el combate, máximo 3 a la vez (la más vieja desaparece).
 - Flecha Explosiva: círculo de 3, solo enemigos, solo los que se ven desde la casilla del impacto, −20 %/casilla.
 - Flecha Rastreadora: 2 turnos sin necesitar línea de visión contra ese objetivo, solo para las habilidades del arquero que la lanzó.
+
+## Ajustes de equilibrio (22-11-2026, tomando la Valkyria como referencia)
+- Flecha Explosiva: círculo de 3 → círculo de 2. Explosión de Detonadora: 3–5 → 2–3.
+- La IA esquiva las Trampitas (visibles); la Tramposa sigue oculta.

@@ -1809,3 +1809,15 @@ test('Arquero tanda 3: Contagio, Trampita, Flecha Explosiva y Flecha Rastreadora
     s.walls=[a.pos-1];
     assert.ok(inRange(s,a,foes[0].pos,skillFor(a,idx('Flecha helada'))),'sin línea de visión contra el rastreado');}
 });
+
+test('la IA esquiva las Trampitas visibles',()=>{
+  const s=battle('tirador');
+  const hero=s.units[0], foe=s.units[1];
+  const w=s.width;
+  s.height=3;s.walls=[];s.water=[];s.traps=[];s.voids=[];s.mp=4;
+  for(const u of s.units.slice(2))u.hp=0;
+  hero.pos=w+7;foe.pos=w+1;
+  s.snares=[{owner:hero.id,pos:w+3,skill:'Trampita',trigger:0,visible:true}];
+  const plan=planEnemy(s,foe,[hero]);
+  assert.ok(!plan.includes(w+3),'no pisa la trampa: '+plan);
+});

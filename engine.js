@@ -27,7 +27,7 @@ export const classes = {
   tirador: {name:'Arquero', hp:31, initiative:14, skills:[
     ['Flecha helada',2,8,2,3,'slow','❄',2,{element:'ice',value:1,slowBonus:{chance:25,value:2},casts:2,modifiable:true}],
     ['Flecha Flamígera',3,9,5,7,'damage','➵',1,{element:'fire',burnChance:0,area:'line',size:3,inLine:true,friendly:true,recoil:1,casts:1,modifiable:false}],
-    ['Detonadora',2,8,2,4,'detonate','✺',1,{element:'fire',burnChance:0,detonate:[3,5],perTarget:1,casts:2,modifiable:true}],
+    ['Detonadora',2,8,2,4,'detonate','✺',1,{element:'fire',burnChance:0,detonate:[2,3],perTarget:1,casts:2,modifiable:true}],
     ['Flecha Repelente',3,8,3,5,'push','➶',1,{element:'physical',push:2,casts:2,modifiable:true}],
     ['Ojo de águila',2,0,0,0,'reach','◉',0,{value:3,turns:2,los:false,casts:1,cooldown:3,modifiable:false}],
     ['Flecha venenosa',2,8,1,4,'curse','☠',1,{element:'chaos',value:1,casts:2,modifiable:true}],
@@ -38,7 +38,7 @@ export const classes = {
     ['Expansión de dominio',2,0,0,0,'domain','◎',0,{value:1,turns:2,los:false,casts:1,cooldown:3,modifiable:false}],
     ['Contagio',5,8,5,7,'contagion','☣',1,{element:'chaos',value:2,feeble:25,poison:2,poisonTurns:2,spread:2,casts:1,cooldown:3,modifiable:true}],
     ['Trampita',2,4,3,5,'snare','▣',1,{element:'chaos',trigger:0,anyone:true,visible:true,poison:2,poisonTurns:2,slowChance:30,value:1,maxTraps:3,los:false,casts:1,modifiable:false}],
-    ['Flecha Explosiva',3,7,5,7,'damage','✹',1,{element:'fire',burnChance:0,area:'circle',size:3,blastSight:true,casts:1,modifiable:true}],
+    ['Flecha Explosiva',3,7,5,7,'damage','✹',1,{element:'fire',burnChance:0,area:'circle',size:2,blastSight:true,casts:1,modifiable:true}],
     ['Flecha Rastreadora',4,8,6,8,'track','⌖',1,{element:'fire',burnChance:0,turns:2,casts:1,cooldown:3,modifiable:true}]
   ]},
   mistico: {name:'Clérigo', hp:36, initiative:12, skills:[
@@ -1775,7 +1775,8 @@ function attackOptions(s,unit,heroes,pos){
   return heroes.filter(h=>alive(h)&&distance(s,pos,h.pos)<=reach&&lineOfSight(s,pos,h.pos,unit.id))
     .sort((a,b)=>priority(s,unit,b,pos)-priority(s,unit,a,pos));
 }
-const trapsOn=(s,path)=>path.filter(pos=>s.traps?.some(t=>t.pos===pos)).length;
+// Trampas del mapa y trampas visibles de los héroes (Trampita); la Tramposa es oculta y no la esquivan.
+const trapsOn=(s,path)=>path.filter(pos=>s.traps?.some(t=>t.pos===pos)||s.snares?.some(t=>t.visible&&distance(s,t.pos,pos)<=(t.trigger??1))).length;
 /** Casillas peligrosas de un camino: trampas y glifos a punto de estallar. */
 const hazardsOn=(s,path)=>trapsOn(s,path)+path.filter(pos=>s.glyphs?.some(g=>g.warn&&g.cells.includes(pos))).length;
 /** Arquetipo de IA: los que atacan de lejos mantienen la distancia; el resto va de frente. */

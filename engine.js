@@ -1601,7 +1601,7 @@ function snareCheck(s,unit){
     if(!skill)return true;
     // Trampita: solo a quien la pisa (aliado o enemigo): daño, veneno y a veces −1 PM.
     if(!o.blast){
-      emit(s,{kind:'spell',effect:'poison',actor:owner.id,from:snare.pos,pos:snare.pos,area:[snare.pos],name:snare.skill,element:o.element});
+      emit(s,{kind:'spell',effect:'poison',actor:owner.id,from:snare.pos,pos:snare.pos,area:[snare.pos],name:snare.skill,element:o.element,trigger:true});
       note(s,unit.name+' pisa la '+snare.skill+' de '+owner.name+'.');
       hit(s,owner,unit,scaledDamage(owner,skill,roll(skill[3],skill[4],Math.random)),'damage',false,armorType(owner,skill),false);
       if(alive(unit)&&o.poison)effect(unit,'poison',poisonValue(owner,o.poison),o.poisonTurns||2);
@@ -1610,7 +1610,7 @@ function snareCheck(s,unit){
     }
     const radius=o.blast||3;
     const victims=s.units.filter(u=>alive(u)&&!!u.enemy!==!!owner.enemy&&distance(s,u.pos,snare.pos)<=radius);
-    emit(s,{kind:'spell',effect:'blast',actor:owner.id,from:snare.pos,pos:snare.pos,area:victims.map(u=>u.pos).concat(snare.pos),name:'Tramposa',element:'ice'});
+    emit(s,{kind:'spell',effect:'blast',actor:owner.id,from:snare.pos,pos:snare.pos,area:victims.map(u=>u.pos).concat(snare.pos),name:'Tramposa',element:'ice',trigger:true});
     note(s,unit.name+' pisa la Tramposa de '+owner.name+'.');
     for(const v of victims){
       const fall=Math.max(.6,1-.2*distance(s,v.pos,snare.pos));
@@ -1629,7 +1629,7 @@ function detonate(s,unit){
   const d=unit.effects.detonate;delete unit.effects.detonate;
   const caster=s.units.find(u=>u.id===d.by)||{name:'Detonadora',pos:unit.pos,level:1};
   const victims=s.units.filter(u=>u!==unit&&alive(u)&&!!u.enemy===!!unit.enemy&&distance(s,u.pos,unit.pos)<=2);
-  emit(s,{kind:'spell',effect:'blast',actor:caster.id,from:unit.pos,pos:unit.pos,area:victims.map(u=>u.pos).concat(unit.pos),name:'Detonación',element:'fire'});
+  emit(s,{kind:'spell',effect:'blast',actor:caster.id,from:unit.pos,pos:unit.pos,area:victims.map(u=>u.pos).concat(unit.pos),name:'Detonación',element:'fire',trigger:true});
   note(s,unit.name+' estalla'+(victims.length?'.':', pero no hay nadie cerca.'));
   for(const v of victims)hit(s,caster,v,d.value,'damage',false,'fire',false);
 }

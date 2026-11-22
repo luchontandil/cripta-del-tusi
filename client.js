@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=142';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=142';
-import {setupSfx} from './music.js?v=142';
-import {icon} from './icons.js?v=142';
-import {openMapEditor} from './mapeditor.js?v=142';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=143';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=143';
+import {setupSfx} from './music.js?v=143';
+import {icon} from './icons.js?v=143';
+import {openMapEditor} from './mapeditor.js?v=143';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=142').then(({createIso})=>{
+import('./isometric.js?v=143').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1986,7 +1986,7 @@ function stepSounds(event){
 function impact(event){
   eventSound(event);
   if(event.kind==='spell'){
-    if(iso?.active)iso.impact(event);
+    if(iso?.active)return iso.impact(event);
     else{
       for(const pos of event.area||[event.pos]){
         const flash=document.createElement('span');
@@ -2063,7 +2063,12 @@ async function animate(){
     const event=pending.shift();
     playing=event;
     if(!['combat','reward','won','lost'].includes(state.phase))continue;
-    if(event.kind!=='move'){impact(event);continue;}
+    if(event.kind!=='move'){
+      // Algunas habilidades piden esperar a que llegue la flecha antes de mostrar el daño.
+      const wait=impact(event);
+      if(wait>0)await new Promise(r=>setTimeout(r,Math.min(1500,wait)));
+      continue;
+    }
     if(!event.blink)stepSounds(event);
     if(iso?.active){
       await iso.move(event);

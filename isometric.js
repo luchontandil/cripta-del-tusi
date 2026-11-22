@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=142';
-import {playerColors} from './engine.js?v=142';
+import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=143';
+import {playerColors} from './engine.js?v=143';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -271,6 +271,43 @@ export function createIso(mount,onCell){
    * rotation.x negativo alza el brazo hacia delante/arriba; L es la capa de todo el cuerpo
    * (position.z hacia delante, rotation.x positivo inclina hacia delante).
    */
+  /**
+   * Arquero. B = brazo del arco (arms[0]), H = mano de la cuerda (arms[1]).
+   * El arco se mantiene vertical en el mundo (o inclinado hacia atrás al tirar al cielo).
+   */
+  function bowPose(model,type,at,B,H,L,ease){
+    if(!['draw','sky','toss','focus'].includes(type))return false;
+    const seg=(a,b)=>ease(Math.min(1,Math.max(0,(at-a)/(b-a))));
+    const holder=model.bowHolder??=B?.getObjectByName('held')||null;
+    let tilt=0;
+    if(type==='draw'||type==='sky'){
+      const rel=type==='draw'?.58:.59;                     // suelta en bowRelease / duración
+      const raise=seg(0,.22),pull=seg(.18,rel),snap=seg(rel,rel+.08),rest=seg(.8,1);
+      const up=type==='sky'?.85:0;
+      const hold=raise*(1-rest);
+      B.rotation.x=-(1.5+up)*hold;B.rotation.z=.12*hold;
+      // La mano tira de la cuerda hacia la cara y al soltar se abre hacia atrás.
+      H.rotation.x=-(1.45+up)*hold+.55*pull*(1-snap)*hold-.2*snap*(1-rest);
+      H.rotation.z=-.55*pull*(1-snap)*hold-.9*snap*(1-rest);
+      L.rotation.y+=.42*hold;                              // de perfil para tensar
+      L.position.z+=-.05*pull*(1-snap)+.07*snap*(1-rest);  // retroceso al soltar
+      L.rotation.x+=(type==='sky'?-.16:-.04)*hold+.06*snap*(1-rest);
+      L.position.y-=.03*pull*(1-snap);
+      tilt=type==='sky'?-.8*hold:0;
+    }else if(type==='toss'){
+      const crouch=seg(0,.3)*(1-seg(.7,1)),fling=seg(.35,.55)*(1-seg(.75,1));
+      L.position.y-=.12*crouch;L.rotation.x+=.35*crouch;
+      H.rotation.x=-.4*crouch-1.2*fling;H.rotation.z=.2*crouch;
+      B.rotation.x=.3*crouch;
+    }else if(type==='focus'){
+      const k=seg(0,.25)*(1-seg(.75,1));
+      H.rotation.x=-2.5*k;H.rotation.z=.45*k;               // mano a la frente
+      B.rotation.x=-.9*k;B.rotation.z=.25*k;
+      L.rotation.x-=.08*k;L.position.y+=.04*k;
+    }
+    if(holder)holder.rotation.x=tilt-B.rotation.x;
+    return true;
+  }
   function spearPose(model,type,at,S,O,L,ease){
     const seg=(a,b)=>ease((at-a)/(b-a));
     // Ángulo de la lanza en el mundo (0 = vertical con la punta arriba, π/2 = al frente, π = punta abajo):
@@ -332,6 +369,10 @@ export function createIso(mount,onCell){
   }
   function actionLayer(model,now,type,at,walk){
     const [left,right]=model.arms||[];
+    if(model.unit.classId==='tirador'&&left){
+      model.bowHolder??=left.getObjectByName('held')||null;
+      if(model.bowHolder)model.bowHolder.rotation.x=0;
+    }
     if(model.unit.classId==='guardia'&&left){
       model.spearHolder??=left.getObjectByName('held')||null;
       if(model.spearHolder)model.spearHolder.rotation.x=.08;
@@ -362,6 +403,8 @@ export function createIso(mount,onCell){
         L.position.z+=at>.35?.1*Math.sin((at-.35)/.65*Math.PI):0;
       }else if(type==='dash'){
         L.rotation.y+=Math.PI*2*ease(at);
+      }else if(bowPose(model,type,at,left,right,L,ease)){
+        // Poses con arco del Arquero (ver bowPose).
       }else if(spearPose(model,type,at,left,right,L,ease)){
         // Poses con lanza de la Valkyria (ver spearPose).
       }
@@ -862,6 +905,53 @@ export function createIso(mount,onCell){
     add(m,start,dur,(t,now)=>{m.position.lerpVectors(A,B,t);
       if(now-last>18&&!reduced){last=now;const q=m.position;const sp=glowPiece('gem',color,q.x,q.y,q.z,.12,.12,.12,.9);add(sp,now,240,u=>{sp.scale.setScalar(.12*(1-u));sp.material.opacity=.9*(1-u);});}});
   }
+  /** Flecha física: astil, punta y plumas. Vuela recta o en parábola; deja estela. Devuelve cuándo llega (ms). */
+  function arrowFlight(a,b,{start=performance.now(),speed=.045,arc=0,curve=0,tip='#e9edf5',trail=null,y=.75,size=1}={}){
+    const A=a.clone(),B=b.clone();A.y=y;B.y=.55;
+    const dist=A.distanceTo(B),dur=Math.max(120,dist/speed*(arc?1.5:1));
+    const g=new T.Group();g.visible=false;transient.add(g);
+    piece(g,'cube','#7a5435',0,0,-.18*size,.035*size,.035*size,.62*size);
+    piece(g,'cone',tip,0,0,.17*size,.07*size,.16*size,.07*size).rotation.x=Math.PI/2;
+    for(const k of [-1,1])piece(g,'cube','#f2ecd8',.03*k*size,0,-.45*size,.012,.07*size,.12*size);
+    const side=new T.Vector3(B.z-A.z,0,A.x-B.x).normalize();
+    const at=t=>{const p=A.clone().lerp(B,t);p.y+=Math.sin(t*Math.PI)*arc;p.addScaledVector(side,Math.sin(t*Math.PI)*curve);return p;};
+    let last=0;
+    effects.push({mesh:g,start,duration:dur,update:(t,now)=>{
+      const p=at(t),q=at(Math.min(1,t+.02));
+      g.position.copy(p);if(q.distanceToSquared(p)>1e-6)g.lookAt(q);
+      if(trail&&!reduced&&now-last>16){last=now;const c=trail[Math.floor(Math.random()*trail.length)];
+        const sp=glowPiece('gem',c,p.x,p.y,p.z,.11,.11,.11,.9);add(sp,now,300,u=>{sp.scale.setScalar(.12*(1-u));sp.material.opacity=.9*(1-u);sp.position.y-=.002;});}
+    }});
+    return start+dur;
+  }
+  /** Flecha que sube recta al cielo desde el arquero y luego cae vertical sobre el objetivo. */
+  function skyArrow(a,b,{start=performance.now(),tip='#e9edf5',trail=null}={}){
+    const up=a.clone();up.y=.8;const top=a.clone();top.y=6;
+    arrowFlight(up,top,{start,speed:.05,tip,trail,y:.8});
+    const high=b.clone();high.y=6;
+    const fall=start+260;
+    const g=new T.Group();g.visible=false;transient.add(g);
+    piece(g,'cube','#7a5435',0,0,-.18,.04,.04,.7);piece(g,'cone',tip,0,0,.18,.08,.18,.08).rotation.x=Math.PI/2;
+    for(const k of [-1,1])piece(g,'cube','#f2ecd8',.03*k,0,-.47,.012,.08,.13);
+    let last=0;
+    effects.push({mesh:g,start:fall,duration:220,update:(t,now)=>{
+      g.position.set(b.x,6-5.6*t*t,b.z);g.lookAt(b.x,-10,b.z);
+      if(trail&&!reduced&&now-last>16){last=now;const sp=glowPiece('gem',trail[0],b.x,g.position.y+.3,b.z,.13,.13,.13);add(sp,now,280,u=>{sp.scale.setScalar(.13*(1-u));});}
+    }});
+    return fall+220;
+  }
+  /** Nube tóxica: orbes verdes que suben y se dispersan. */
+  function cloud(p,colors,{start=performance.now(),n=10,size=.9,dur=800}={}){
+    for(let i=0;i<(reduced?3:n);i++){
+      const a=Math.random()*Math.PI*2,r=Math.random()*size*.6;
+      const m=glowPiece('orb',colors[i%colors.length],p.x,.3,p.z,.2,.2,.2,.55);
+      add(m,start+Math.random()*120,dur,t=>{const k=.15+size*.35*Math.sin(t*Math.PI*.8);m.scale.setScalar(k);
+        m.position.set(p.x+Math.cos(a)*(r+t*size*.5),.3+t*.7,p.z+Math.sin(a)*(r+t*size*.5));m.material.opacity=.55*(1-t);});
+    }
+  }
+  const toxic=['#8cff5a','#b8ff7a','#4fae2a'],sick=['#9acb4a','#b06ad0','#6a8a2a'];
+  /** Cuánto esperar: hasta que la flecha llega (más un respiro para el impacto). */
+  const hold=(time,land)=>Math.max(0,land-time)+40;
   const fire=['#ff6a2b','#ffb347','#ffe9a8'],volt=['#fff36b','#9fd8ff','#ffffff'],frost=['#a8f0ff','#4fb6e0','#ffffff'];
   /** Coreografías de cada habilidad: ctx = {from, target, area (vectores), time, travel}. */
   const skillFx={
@@ -964,6 +1054,135 @@ export function createIso(mount,onCell){
       }
       quake(.05,400);
     },
+    // ── Arquero: tensa, suelta y la flecha vuela (recta o en parábola). ──
+    'Flecha helada':({from,target,time})=>{
+      const land=arrowFlight(from,target,{start:time+bowRelease.draw,tip:'#bff4ff',trail:frost});
+      spike(target,'#9fe8ff',{start:land,h:.7});sparks(target,frost,{start:land,n:12});shock(target,'#bff4ff',{start:land,size:.6,dur:320});
+      return hold(time,land);
+    },
+    'Flecha Flamígera':({from,target,area,time})=>{
+      const far=area.reduce((m,p)=>p.distanceTo(from)>m.distanceTo(from)?p:m,target);
+      const land=arrowFlight(from,far,{start:time+bowRelease.draw,speed:.06,tip:'#ffd36b',trail:fire,size:1.2});
+      const t0=time+bowRelease.draw;
+      streak(from,far,'#ff7a2e',{start:t0,dur:land-t0+260,width:.12,grow:.7,y:.7});
+      [...area].sort((a,b)=>a.distanceTo(from)-b.distanceTo(from)).forEach((p,i)=>{const t=t0+(land-t0)*(p.distanceTo(from)/from.distanceTo(far));flames(p,{start:t,n:3,h:.65});sparks(p,fire,{start:t,n:6});});
+      setTimeout(()=>quake(.08,260),t0-time);
+      return hold(time,land);
+    },
+    'Detonadora':({from,target,time})=>{
+      const land=arrowFlight(from,target,{start:time+bowRelease.draw,tip:'#ff9a4a',trail:['#ff6a2b','#ffd36b']});
+      sparks(target,fire,{start:land,n:10});
+      const m=glowPiece('orb','#ff4a1a',target.x,.7,target.z,.14,.14,.14,.9);add(m,land,900,t=>{const k=.14+.06*Math.sin(t*30);m.scale.setScalar(k*(1-t*.3));});
+      return hold(time,land);
+    },
+    'Detonación':({target,area,time})=>{
+      dome(target,'#ff7a2e',{start:time,size:1.3,dur:420,opacity:.6});dome(target,'#ffe9a8',{start:time,size:.6,dur:260,opacity:.8});
+      shock(target,'#ffb347',{start:time+40,size:2.3,dur:520,thick:2});
+      sparks(target,fire,{start:time,n:20,spread:1.3,high:1.2});flames(target,{start:time,n:6,radius:.6,h:1});
+      area.forEach(p=>{if(p.distanceTo(target)>.1){flames(p,{start:time+120,n:2,h:.5});sparks(p,fire,{start:time+120,n:5});}});
+      quake(.14,380);
+      return 200;
+    },
+    'Flecha Repelente':({from,target,time})=>{
+      const land=arrowFlight(from,target,{start:time+bowRelease.draw,speed:.07,size:1.25,trail:['#ffffff','#e8e0c8']});
+      shock(target,'#fff1cf',{start:land,size:1,dur:360,thick:2});sparks(target,['#ffffff','#e8d8b0'],{start:land,n:14,spread:.9});
+      streak(target,target.clone().add(target.clone().sub(from).normalize().multiplyScalar(1.6)),'#fff1cf',{start:land,dur:280,width:.1,y:.6});
+      setTimeout(()=>quake(.1,280),land-time);
+      return hold(time,land);
+    },
+    'Ojo de águila':({from,time})=>{
+      const eye=glowPiece('ring','#ffd56a',from.x,1.2,from.z,.3,.3,.3,.9);
+      add(eye,time+120,700,t=>{const k=.3+t*1.2;eye.scale.set(k,k*.55,k);eye.material.opacity=.9*(1-t);});
+      const pupil=glowPiece('orb','#fff1cf',from.x,1.2,from.z,.15,.15,.15,.9);add(pupil,time+120,600,t=>{pupil.scale.setScalar(.18*(1-t));});
+      for(let i=0;i<8;i++){const a=i*Math.PI/4;streak(from.clone().setY(1.2),new T.Vector3(from.x+Math.cos(a)*1.6,1.2,from.z+Math.sin(a)*1.6),'#ffd56a',{start:time+200,dur:380,width:.04});}
+      return 0;
+    },
+    'Flecha venenosa':({from,target,time})=>{
+      const land=arrowFlight(from,target,{start:time+bowRelease.draw,tip:'#b8ff7a',trail:toxic});
+      cloud(target,toxic,{start:land,n:8,size:.8});sparks(target,toxic,{start:land,n:8});
+      return hold(time,land);
+    },
+    'Dardo pestilente':({from,target,time})=>{
+      const land=arrowFlight(from,target,{start:time+bowRelease.draw,speed:.07,size:.7,tip:'#d8ff9a',trail:sick});
+      cloud(target,sick,{start:land,n:12,size:1});
+      const m=glowPiece('ring','#b06ad0',target.x,.08,target.z,.3,.3,.3,.8);m.rotation.x=-Math.PI/2;add(m,land,700,t=>{const k=.3+t*.9;m.scale.set(k,k,k);m.material.opacity=.8*(1-t);});
+      return hold(time,land);
+    },
+    'Congelación prematura':({from,target,area,time})=>{
+      const land=skyArrow(from,target,{start:time+bowRelease.sky,tip:'#bff4ff',trail:frost});
+      area.forEach((p,i)=>{spike(p,'#9fe8ff',{start:land+i*40,h:.9,w:.26,tilt:(Math.random()-.5)*.4});sparks(p,frost,{start:land,n:7});});
+      shock(target,'#bff4ff',{start:land,size:1.4,dur:460,thick:2});dome(target,'#e6fbff',{start:land,size:.6,dur:240,opacity:.7});
+      setTimeout(()=>quake(.11,320),land-time);
+      return hold(time,land);
+    },
+    'Ramo helado':({from,target,area,time})=>{
+      const land=arrowFlight(from,target,{start:time+bowRelease.draw,tip:'#bff4ff',trail:frost});
+      dome(target,'#e6fbff',{start:land,size:.5,dur:220,opacity:.8});
+      [...area].sort((a,b)=>a.distanceTo(target)-b.distanceTo(target)).forEach(p=>{
+        const t=land+p.distanceTo(target)*55;
+        if(p.distanceTo(target)>.1)streak(target,p,'#a8f0ff',{start:land,dur:260+p.distanceTo(target)*40,width:.07,y:.45});
+        spike(p,'#9fe8ff',{start:t,h:.65,tilt:(Math.random()-.5)*.6});sparks(p,frost,{start:t,n:4});
+      });
+      setTimeout(()=>quake(.06),land-time);
+      return hold(time,land);
+    },
+    'Tramposa':({from,target,area,time,event})=>{
+      if(event.trigger){
+        // La trampa salta: estalla un anillo de púas de hielo hasta 3 casillas.
+        dome(target,'#e6fbff',{start:time,size:.9,dur:300,opacity:.8});
+        shock(target,'#bff4ff',{start:time,size:3.2,dur:620,thick:2});shock(target,'#4fb6e0',{start:time+120,size:2.4,dur:560});
+        for(let i=0;i<(reduced?6:16);i++){const a=i/16*Math.PI*2,r=.6+(i%3)*.7;spike(new T.Vector3(target.x+Math.cos(a)*r,0,target.z+Math.sin(a)*r),'#9fe8ff',{start:time+r*60,h:.7+Math.random()*.4,tilt:(Math.random()-.5)*.5});}
+        area.forEach(p=>sparks(p,frost,{start:time+150,n:8}));
+        quake(.14,380);
+        return 220;
+      }
+      const land=arrowFlight(from,target,{start:time+bowRelease.toss,speed:.03,arc:1.2,tip:'#9aa3b0'});
+      shock(target,'#8fe3ff',{start:land,size:.9,dur:420});sparks(target,frost,{start:land,n:6,high:.3});
+      return hold(time,land);
+    },
+    'Expansión de dominio':({from,time})=>{
+      for(let i=0;i<3;i++)shock(from,i%2?'#8cff5a':'#8fe3ff',{start:time+150+i*140,size:1.4+i*.5,dur:700});
+      for(let i=0;i<(reduced?4:12);i++){const a0=i/12*Math.PI*2;const m=glowPiece('gem',i%2?'#8cff5a':'#bff4ff',from.x,.1,from.z,.14,.14,.14);
+        add(m,time+120+i*20,800,t=>{const a=a0+t*3,r=.4+t*1.3;m.position.set(from.x+Math.cos(a)*r,.15+Math.sin(t*Math.PI)*.6,from.z+Math.sin(a)*r);m.scale.setScalar(.15*(1-t));});}
+      return 0;
+    },
+    'Contagio':({from,target,time})=>{
+      const land=arrowFlight(from,target,{start:time+bowRelease.draw,tip:'#b8ff7a',trail:toxic,size:1.15});
+      cloud(target,toxic,{start:land,n:16,size:2.2,dur:1000});
+      shock(target,'#8cff5a',{start:land,size:2.2,dur:700,thick:2});
+      for(let i=0;i<(reduced?3:8);i++){const a=i/8*Math.PI*2;stream(target,new T.Vector3(target.x+Math.cos(a)*2,0,target.z+Math.sin(a)*2),'#8cff5a',{start:land+60,n:1,dur:420});}
+      setTimeout(()=>quake(.07),land-time);
+      return hold(time,land);
+    },
+    'Trampita':({from,target,time,event})=>{
+      if(event.trigger){
+        cloud(target,toxic,{start:time,n:12,size:1});sparks(target,['#c8cdd5','#8cff5a'],{start:time,n:10,high:.5});
+        for(let i=0;i<5;i++)spike(new T.Vector3(target.x+(Math.random()-.5)*.5,0,target.z+(Math.random()-.5)*.5),'#c8cdd5',{start:time,h:.4,w:.1,dur:380});
+        quake(.05,200);
+        return 150;
+      }
+      const land=arrowFlight(from,target,{start:time+bowRelease.toss,speed:.03,arc:1,tip:'#6a8a2a'});
+      sparks(target,toxic,{start:land,n:5,high:.3});
+      return hold(time,land);
+    },
+    'Flecha Explosiva':({from,target,area,time})=>{
+      const land=arrowFlight(from,target,{start:time+bowRelease.sky,speed:.04,arc:2.6,tip:'#ff9a4a',trail:fire,size:1.15});
+      dome(target,'#ffe9a8',{start:land,size:.8,dur:220,opacity:.9});dome(target,'#ff6a2b',{start:land+40,size:2,dur:520,opacity:.5});
+      shock(target,'#ffcf6b',{start:land,size:3.4,dur:620,thick:2.4});shock(target,'#ff5a1f',{start:land+90,size:2.6,dur:560});
+      sparks(target,fire,{start:land,n:24,spread:2,high:1.6,size:.13});
+      area.forEach(p=>{const t=land+p.distanceTo(target)*55;flames(p,{start:t,n:2,h:.55});});
+      setTimeout(()=>quake(.2,460),land-time);
+      return hold(time,land);
+    },
+    'Flecha Rastreadora':({from,target,time})=>{
+      const land=arrowFlight(from,target,{start:time+bowRelease.draw,speed:.04,curve:1.4,tip:'#ffd36b',trail:fire});
+      sparks(target,fire,{start:land,n:12});flames(target,{start:land,n:3,h:.6});
+      // Retícula sobre la presa: se queda un momento marcándola.
+      const ring=glowPiece('ring','#ffe0a0',target.x,.1,target.z,.5,.5,.5,.9);ring.rotation.x=-Math.PI/2;
+      add(ring,land,1400,t=>{const k=.7-.2*Math.min(1,t*4);ring.scale.set(k,k,k);ring.rotation.z=t*4;ring.material.opacity=.9*(1-Math.max(0,t-.6)/.4);});
+      setTimeout(()=>quake(.06),land-time);
+      return hold(time,land);
+    },
     'Furia':({from,time})=>{
       flames(from,{start:time+60,n:8,radius:.45,h:1.1,dur:700});
       shock(from,'#ff5a1f',{start:time+60,size:1.1,dur:450,thick:2});dome(from,'#ff3a1a',{start:time,size:.9,dur:500,opacity:.35});
@@ -975,7 +1194,13 @@ export function createIso(mount,onCell){
   const spearPoses={'Estocada':'thrust','Punzón':'thrust','Lanza abisal':'thrust','Balestra':'thrust','Lanza cargada':'throw',
     'Liberación':'slam','Abrir las aguas':'slam','Lanza del lago':'slam','Barrido':'sweep','Eclipse':'raise','Furia':'raise',
     'En guardia!':'guard','Salto valiente':'leap','Carga heroica':'charge','Pies ligeros':'hop'};
-  const poseLength={thrust:480,throw:560,slam:620,sweep:560,raise:820,guard:760,hop:420};
+  /** Poses del Arquero: tensar y soltar (directa), al cielo (en parábola), lanzar trampa y concentrarse. */
+  const bowPoses={'Flecha helada':'draw','Flecha Flamígera':'draw','Detonadora':'draw','Flecha Repelente':'draw','Flecha venenosa':'draw',
+    'Dardo pestilente':'draw','Ramo helado':'draw','Contagio':'draw','Flecha Rastreadora':'draw',
+    'Congelación prematura':'sky','Flecha Explosiva':'sky','Tramposa':'toss','Trampita':'toss','Ojo de águila':'focus','Expansión de dominio':'focus'};
+  /** Momento (ms) en que suelta la cuerda en cada pose. */
+  const bowRelease={draw:360,sky:400,toss:230,focus:260};
+  const poseLength={draw:620,sky:680,toss:460,focus:760,thrust:480,throw:560,slam:620,sweep:560,raise:820,guard:760,hop:420};
   /** Qué animación hace el que actúa, según el efecto y quién es. */
   function actionFor(unit,effect){
     if(['heal','cleanse'].includes(effect))return 'support';
@@ -1013,16 +1238,16 @@ export function createIso(mount,onCell){
     const from=logical(state,event.from);
     const travel=from.distanceTo(target);
     const model=models.get(event.actor);
-    if(model){
+    if(model&&!event.trigger){
       model.strike=time;
-      const pose=model.unit.classId==='guardia'&&spearPoses[event.name];
+      const pose=model.unit.classId==='guardia'&&spearPoses[event.name]||model.unit.classId==='tirador'&&bowPoses[event.name];
       model.action={type:pose||actionFor(model.unit,event.effect),start:time,
         dur:pose==='charge'?260+travel*80:pose==='leap'?620:pose?poseLength[pose]:null};
       if(travel>.01)model.root.rotation.y=Math.atan2(target.x-from.x,target.z-from.z);
     }
     if(event.name&&skillFx[event.name]){
-      skillFx[event.name]({from,target,area:(event.area||[event.pos]).map(pos=>logical(state,pos)),time,travel});
-      return;
+      // Devuelve cuánto esperar antes de mostrar el daño (p. ej., hasta que la flecha llega).
+      return skillFx[event.name]({from,target,area:(event.area||[event.pos]).map(pos=>logical(state,pos)),time,travel,event})||0;
     }
     const ranged=travel>1.1&&!['heal','cleanse','dash','slash'].includes(event.effect);
     // Proyectil visible: más lento, con halo y estela, del color de su elemento.

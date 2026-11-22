@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=131';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=131';
-import {setupSfx} from './music.js?v=131';
-import {icon} from './icons.js?v=131';
-import {openMapEditor} from './mapeditor.js?v=131';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=132';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=132';
+import {setupSfx} from './music.js?v=132';
+import {icon} from './icons.js?v=132';
+import {openMapEditor} from './mapeditor.js?v=132';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=131').then(({createIso})=>{
+import('./isometric.js?v=132').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -379,7 +379,7 @@ function cardTipNodes(card){
 /** Carta con aspecto de carta: coste, ilustración, nombre, tipo y descripción corta. */
 function cardTile(card,extra=''){
   const skill=card.kind==='active'?classes[card.classId].skills[card.index]:null;
-  const art=h('div','card-art',skill?spellIcon(skill[5],skill[6]):h('span','passive-art',icon('crown')));
+  const art=h('div','card-art',skill?spellIcon(skill[5],skill[6],skill[0]):h('span','passive-art',icon('crown')));
   const cost=skill?h('span','card-cost',String(skill[1]),h('small',null,'PA')):h('span','card-cost passive',icon('crown'));
   const type=skill?(skillSchool({classId:card.classId},skill)==='magic'?'Hechizo':'Físico')+(skill[2]>1?' · alcance '+skill[2]:' · cuerpo a cuerpo'):'Pasiva';
   const tile=h('article','card-tile kind-'+card.kind+' '+extra,cost,art,h('strong','card-name',card.name),h('small','card-kind',type),h('p','card-text',cardBlurb(card)));
@@ -599,7 +599,7 @@ function classPreview(){
   const loadout=myLoadout(kind);
   const skills=h('ul','preview-skills',...loadout.actives.map(id=>{
     const index=cards[id].index,skill=cls.skills[index];
-    const item=h('li',null,spellIcon(skill[5],skill[6]),h('span',null,skill[0]),h('small','stat-pa',skill[1]+' PA'));
+    const item=h('li',null,spellIcon(skill[5],skill[6],skill[0]),h('span',null,skill[0]),h('small','stat-pa',skill[1]+' PA'));
     item.tabIndex=0;
     const show=()=>{
       const rect=item.getBoundingClientRect();
@@ -981,10 +981,11 @@ function areaSketch(skill){
   const hw=7,hh=3.6,cells=[];
   let minX=0,maxX=0,minY=0,maxY=0;
   for(let y=-R;y<=R;y++)for(let x=-R;x<=R;x++){
-    if(Math.abs(x)+Math.abs(y)>R+1)continue;
+    const pos=(c+y)*N+(c+x);
+    // Rombo alrededor del centro, más cualquier casilla del área que quede fuera (esquinas del tridente).
+    if(Math.abs(x)+Math.abs(y)>R+1&&!hit.has(pos))continue;
     const px=(x-y)*hw,py=(x+y)*hh;
     minX=Math.min(minX,px-hw);maxX=Math.max(maxX,px+hw);minY=Math.min(minY,py-hh);maxY=Math.max(maxY,py+hh);
-    const pos=(c+y)*N+(c+x);
     cells.push({px,py,on:hit.has(pos),center:pos===center});
   }
   const ns='http://www.w3.org/2000/svg';
@@ -1051,7 +1052,7 @@ function skillTipNodes(unit,index,skill,rank,hotkey=null){
   const effect=skillEffectText(skill);
   const base=classes[unit.classId]?.skills[index??classes[unit.classId].skills.findIndex(s=>s[0]===name)];
   const bonus=maxBonusText(base||skill);
-  const head=tipHead(spellIcon(kind,symbol),name,rank?'Nivel '+rank+' de 3':'Sin aprender',hotkey?String(hotkey):null);
+  const head=tipHead(spellIcon(kind,symbol,name),name,rank?'Nivel '+rank+' de 3':'Sin aprender',hotkey?String(hotkey):null);
   const tags=scalingTags(unit,skill);
   if(tags.length)head.querySelector('.tip-title').append(h('span','skill-tags','(',...tags.flatMap((key,i)=>[i?', ':'',h('span','skill-tag element-'+key,tagNames[key])]),')'));
   return [head,
@@ -1593,7 +1594,7 @@ function updateTraining(player,ready){
     const base=classes[player.classId].skills[index];
     const choice=actionButton('','train',{skill:index});
     choice.className='training-choice';
-    choice.append(spellIcon(base[5],base[6]),h('span','training-name',name),
+    choice.append(spellIcon(base[5],base[6],base[0]),h('span','training-name',name),
       h('span','training-rank'+(rank?'':' new'),rank?'Mejorar '+rank+'/3 → '+(rank+1)+'/3':'Aprender · nueva'));
     choice.onpointerenter=choice.onfocus=()=>showTrainingCompare(player,unit,index,rank);
     return choice;
@@ -1628,7 +1629,7 @@ function showTrainingCompare(player,unit,index,rank){
   const gain=[!rank?'Nueva habilidad':kind==='dash'?'+1 casilla de alcance':a.utility?'':a.healing?'+2 de curación mínima y máxima':'+2 de daño mínimo y máximo',
     maxBonus?'Rango máximo: '+maxBonus:''].filter(Boolean).join(' · ')||'Mejora la habilidad';
   el('training-compare').replaceChildren(
-    tipHead(spellIcon(kind,symbol),name,rank?'Nivel '+rank+' → '+(rank+1):'Aprender · nivel 1',null),
+    tipHead(spellIcon(kind,symbol,name),name,rank?'Nivel '+rank+' → '+(rank+1):'Aprender · nivel 1',null),
     h('div','compare-grid',...rows),
     h('p','compare-gain',icon('xp'),gain),
     ...(skillEffectText(after)?[h('p','tip-note',skillEffectText(after))]:[]));
@@ -2326,7 +2327,7 @@ function render(){
       const rank=turn.skillRanks[i];
       const key=h('kbd',null,String(hotkey));
       key.setAttribute('aria-hidden','true');
-      b.append(spellIcon(kind,symbol),h('span','ability-name',name),h('span','ability-cost stat-pa',cost+' PA'+(skillOptions(current).mpCost?' +'+skillOptions(current).mpCost+' PM':'')),key);
+      b.append(spellIcon(kind,symbol,name),h('span','ability-name',name),h('span','ability-cost stat-pa',cost+' PA'+(skillOptions(current).mpCost?' +'+skillOptions(current).mpCost+' PM':'')),key);
       if(rank>1)b.append(h('span','ability-rank',rank+'/3'));
       if(!['heal','cleanse','dash'].includes(kind)){
         const element=skillElement(turn,current);

@@ -919,8 +919,8 @@ const P={
 };
 /** Cara pixelada de 16×16 (estilo textura de PS1). */
 const faceTextures=new Map();
-function faceTexture(skin,hair,{scar=false}={}){
-  const key=skin+hair+scar;
+function faceTexture(skin,hair,{scar=false,female=false,eyes='#3d6fa8'}={}){
+  const key=skin+hair+scar+female+eyes;
   if(faceTextures.has(key))return faceTextures.get(key);
   const c=document.createElement('canvas');c.width=c.height=16;
   const g=c.getContext('2d');
@@ -928,18 +928,30 @@ function faceTexture(skin,hair,{scar=false}={}){
   px(0,0,16,16,skin);
   const shade=new T.Color(skin).multiplyScalar(.82).getStyle();
   px(0,12,16,4,shade);px(0,0,2,16,shade);px(14,0,2,16,shade);
-  px(3,5,4,1,hair);px(9,5,4,1,hair);            // cejas
-  px(4,7,2,2,'#f4f0e6');px(10,7,2,2,'#f4f0e6'); // ojos
-  px(5,7,1,2,'#1a1620');px(10,7,1,2,'#1a1620');
-  px(7,8,2,3,shade);                             // nariz
-  px(6,12,4,1,'#6a2e2a');                        // boca
+  if(female){
+    // Cara de mujer: cejas finas, pestañas, ojos claros, mejillas y labios.
+    px(0,12,16,4,skin);px(0,0,1,16,shade);px(15,0,1,16,shade);
+    px(3,5,3,1,hair);px(10,5,3,1,hair);
+    px(3,6,4,1,'#2a1c1c');px(9,6,4,1,'#2a1c1c');                 // pestañas
+    px(4,7,3,2,'#f6f2ea');px(9,7,3,2,'#f6f2ea');
+    px(5,7,2,2,eyes);px(9,7,2,2,eyes);px(5,7,1,1,'#101018');px(10,7,1,1,'#101018');
+    px(7,9,2,2,shade);                                           // nariz
+    px(3,10,2,1,'#e89a8a');px(11,10,2,1,'#e89a8a');              // mejillas
+    px(6,12,4,1,'#b8485a');px(7,13,2,1,'#9a3a4a');               // labios
+  }else{
+    px(3,5,4,1,hair);px(9,5,4,1,hair);            // cejas
+    px(4,7,2,2,'#f4f0e6');px(10,7,2,2,'#f4f0e6'); // ojos
+    px(5,7,1,2,'#1a1620');px(10,7,1,2,'#1a1620');
+    px(7,8,2,3,shade);                             // nariz
+    px(6,12,4,1,'#6a2e2a');                        // boca
+  }
   if(scar)px(11,9,1,3,'#b05a4a');
   const t=new T.CanvasTexture(c);t.magFilter=t.minFilter=T.NearestFilter;t.colorSpace=T.SRGBColorSpace;
   faceTextures.set(key,t);
   return t;
 }
 const ps1Kits={
-  guardia:{cloth:'#8d939c',clothDark:'#5e646d',steel:'#c3c8cf',steelDark:'#767d87',brass:'#d6b664',leather:'#4a3a30',skin:'#e8b896',hair:'#e9c766'},
+  guardia:{cloth:'#4f86c9',clothDark:'#33598c',steel:'#c8cdd5',steelDark:'#8c939e',brass:'#d8b04a',leather:'#4a3a30',skin:'#d9a07c',hair:'#2b2630'},
   tirador:{cloth:'#3f6e3a',clothDark:'#2a4a28',steel:'#9a8a6a',steelDark:'#5a4a36',brass:'#b88a3a',leather:'#6a4428',skin:'#c9906a',hair:'#3a2a1a'},
   mistico:{cloth:'#6a4a94',clothDark:'#46305e',steel:'#e8dcc0',steelDark:'#b8a888',brass:'#d9b25a',leather:'#5a3a2a',skin:'#d9a07c',hair:'#3a2a1a'},
   mago:{cloth:'#34509a',clothDark:'#22345e',steel:'#c0c8d8',steelDark:'#6a7488',brass:'#c9a04f',leather:'#4a3428',skin:'#d9a07c',hair:'#3a2a1a',glow:'#7fe0ff'},
@@ -956,78 +968,115 @@ function hood(body,cloth,dark,{tip=false,y=1.2}={}){
   else lp(body,P.box,cloth,[0,y-.08,-.15],[.2,0,0],[.24,.2,.06]);
 }
 /** Base común: cadera, torso, piernas y brazos. Cada clase añade su equipo antes de fusionar. */
-function ps1Base(k,{robe=false,armored=false,lean=0}={}){
+function ps1Base(k,{robe=false,armored=false,lean=0,slim=false}={}){
   const root=new T.Group(),figure=new T.Group();root.add(figure);
   const body=[];
-  lp(body,P.taper8,k.leather,[0,.62,0],[0,Math.PI/8,0],[.3,.1,.22]);
-  lp(body,P.box,k.brass,[0,.665,.105],[0,0,0],[.08,.06,.03]);
-  lp(body,P.taper8,armored?k.steel:k.cloth,[0,.86,0],[Math.PI,Math.PI/8,0],[.38,.34,.26]);
-  lp(body,P.prism6,armored?k.steelDark:k.clothDark,[0,1.05,0],[0,0,0],[.12,.08,.12]);
+  const w=slim?.84:1;
+  lp(body,P.taper8,k.leather,[0,.62,0],[0,Math.PI/8,0],[.3*(slim?1.02:1),.1,.22*w]);
+  lp(body,P.box,k.brass,[0,.665,.105*w],[0,0,0],[.08,.06,.03]);
+  if(slim){
+    // Torso de mujer: cintura estrecha y pecho.
+    lp(body,P.taper8,armored?k.steel:k.cloth,[0,.8,0],[0,Math.PI/8,0],[.27,.2,.2]);
+    lp(body,P.taper8,armored?k.steel:k.cloth,[0,.95,0],[Math.PI,Math.PI/8,0],[.32,.14,.22]);
+    for(const x of [-.055,.055])lp(body,P.ball,armored?k.steel:k.cloth,[x,.885,.065],[0,0,0],[.1,.08,.055]);
+    lp(body,P.prism6,k.cloth,[0,1.05,0],[0,0,0],[.1,.09,.1]);
+  }else{
+    lp(body,P.taper8,armored?k.steel:k.cloth,[0,.86,0],[Math.PI,Math.PI/8,0],[.38,.34,.26]);
+    lp(body,P.prism6,armored?k.steelDark:k.clothDark,[0,1.05,0],[0,0,0],[.12,.08,.12]);
+  }
   if(robe){
     lp(body,P.taper8,k.cloth,[0,.36,0],[0,Math.PI/8,0],[.44,.56,.36]);            // falda larga
     lp(body,P.prism6,k.brass,[0,.1,0],[0,Math.PI/6,0],[.45,.035,.37]);              // ribete
   }
   const legs=[-1,1].map(s=>{
-    const leg=new T.Group();leg.position.set(s*.09,.6,0);figure.add(leg);
+    const leg=new T.Group();leg.position.set(s*(slim?.075:.09),.6,0);figure.add(leg);
     const p=[];
-    if(!robe)lp(p,P.taper6,k.clothDark,[0,-.13,0],[Math.PI,0,0],[.13,.26,.13]);
-    lp(p,P.taper6,armored?k.steel:k.leather,[0,-.4,0],[Math.PI,0,0],[.12,.26,.12]);
+    if(!robe)lp(p,P.taper6,slim?k.cloth:k.clothDark,[0,-.13,0],[Math.PI,0,0],[.13*w,.26,.13*w]);
+    lp(p,P.taper6,armored?k.steel:k.leather,[0,-.4,0],[Math.PI,0,0],[.12*w,.26,.12*w]);
+    if(slim&&armored)lp(p,P.prism6,k.brass,[0,-.3,0],[0,0,0],[.115,.02,.115]);
     if(armored)lp(p,P.oct,k.steel,[0,-.27,.04],[0,0,0],[.11,.1,.09]);
     lp(p,P.box,k.leather,[0,-.565,.035],[0,0,0],[.13,.07,.21]);
     leg.add(fuse(p,'leg'));
     return leg;
   });
   const arms=[-1,1].map(s=>{
-    const arm=new T.Group();arm.position.set(s*.21,.99,0);figure.add(arm);
+    const arm=new T.Group();arm.position.set(s*(slim?.185:.21),.99,0);figure.add(arm);
     const held=new T.Group();held.name='held';held.position.set(0,-.45,.04);arm.add(held);
     return arm;
   });
   return {root,figure,body,legs,arms};
 }
 /** Brazo básico: hombro, brazo, antebrazo y mano. */
-function ps1Arm(arm,s,k,{armored=false,sleeve=null,bracer=null}={}){
+function ps1Arm(arm,s,k,{armored=false,sleeve=null,bracer=null,slim=false}={}){
   const p=[];
-  if(armored){lp(p,P.dome,k.steel,[s*.02,0,0],[0,0,s*-.35],[.2,.15,.2]);lp(p,P.box,k.brass,[s*.06,-.02,0],[0,0,s*-.35],[.13,.025,.2]);}
+  const w=slim?.82:1;
+  if(armored){lp(p,P.dome,k.steel,[s*.02,0,0],[0,0,s*-.35],[.2*w,.15*w,.2*w]);lp(p,P.box,k.brass,[s*.06*w,-.02,0],[0,0,s*-.35],[.13*w,.025,.2*w]);}
   else lp(p,P.ball,sleeve||k.cloth,[0,-.02,0],[0,0,0],[.15,.13,.15]);
-  lp(p,P.taper6,sleeve||k.clothDark,[0,-.13,0],[Math.PI,0,0],[.1,.22,.1]);
-  lp(p,P.taper6,armored?k.steel:(bracer||k.leather),[0,-.32,0],[Math.PI,0,0],[.11,.2,.11]);
-  lp(p,P.box,k.leather,[0,-.45,.01],[0,0,0],[.09,.08,.09]);
+  lp(p,P.taper6,sleeve||(slim?k.skin:k.clothDark),[0,-.13,0],[Math.PI,0,0],[.1*w,.22,.1*w]);
+  lp(p,P.taper6,armored?k.steel:(bracer||k.leather),[0,-.32,0],[Math.PI,0,0],[.11*w,.2,.11*w]);
+  if(slim&&armored)for(const y of [-.23,-.41])lp(p,P.prism6,k.brass,[0,y,0],[0,0,0],[.1,.02,.1]);
+  lp(p,P.box,slim?k.skin:k.leather,[0,-.45,.01],[0,0,0],[.08*w,.08,.08*w]);
   arm.add(fuse(p,'arm'));
 }
 const ps1Builders={
-  // Lancero: valquiria de armadura gris, yelmo alado, melena rubia y lanza larga.
+  // Lancero: valquiria. Malla del color del jugador bajo una armadura plateada con ribetes dorados,
+  // yelmo cerrado con alas pequeñas, trenza oscura, capa larga y lanza larga con guarda.
   guardia(b,k){
     const {body,arms}=b;
-    lp(body,P.taper8,k.steelDark,[0,.5,0],[0,Math.PI/8,0],[.4,.2,.32]);              // faldar de placas
-    for(let i=0;i<8;i++){const a=i*Math.PI/4+Math.PI/8;lp(body,P.box,k.steel,[Math.sin(a)*.17,.47,Math.cos(a)*.14],[0,a,0],[.09,.18,.02]);}
-    lp(body,P.box,k.cloth,[0,.55,.16],[.08,0,0],[.16,.26,.02]);                      // tabardo
-    lp(body,P.box,k.brass,[0,.86,.135],[0,0,0],[.22,.03,.02]);                       // ribete del peto
-    lp(body,P.box,k.brass,[0,.93,.13],[0,0,0],[.03,.12,.02]);
-    lp(body,P.box,k.cloth,[0,.75,-.15],[.1,0,0],[.36,.6,.03]);                        // capa
-    lp(body,P.box,k.clothDark,[0,1.02,-.12],[0,0,0],[.38,.06,.08]);
-    lp(body,P.taper6,k.steel,[0,1.04,0],[0,Math.PI/6,0],[.27,.06,.23]);               // gorjal
-    lp(body,P.head,k.skin,[0,1.2,0],[0,Math.PI/8,0],[.25,.27,.25]);                   // rostro
-    for(const x of [-.05,.05])lp(body,P.box,SHADOW,[x,1.21,.125],[0,0,0],[.035,.03,.01]);
-    lp(body,P.box,k.hair,[0,1.13,-.11],[.08,0,0],[.27,.34,.08]);                     // melena
-    lp(body,P.box,k.hair,[0,.9,-.16],[.12,0,0],[.08,.26,.06]);                       // trenza
-    lp(body,P.oct,k.brass,[0,.78,-.18],[0,0,0],[.06,.05,.05]);
-    lp(body,P.dome,k.steel,[0,1.27,-.01],[0,Math.PI/8,0],[.3,.24,.3]);                // yelmo
-    lp(body,P.prism6,k.brass,[0,1.265,0],[0,Math.PI/6,0],[.3,.03,.3]);
-    lp(body,P.box,k.steel,[0,1.24,.14],[0,0,0],[.03,.1,.02]);                        // nasal
-    for(const side of [-1,1]){                                                     // alas
-      for(let f=0;f<3;f++)lp(body,P.box,f?'#e8e6e0':'#f6f4ee',[side*(.16+f*.03),1.32+f*.05,-.04-f*.02],[0,0,side*(.55+f*.15)],[.03,.16-f*.02,.1-f*.015]);
+    // Faldellín de tiras de cuero con puntas doradas (amazona) y dos escarcelas de acero delante (valquiria).
+    for(let i=0;i<12;i++){
+      const a=i*Math.PI/6;
+      lp(body,P.box,i%2?k.leather:'#6b4a34',[Math.sin(a)*.15,.5,Math.cos(a)*.115],[-.2*Math.cos(a),a,0],[.065,.2,.015]);
+      lp(body,P.box,k.brass,[Math.sin(a)*.151,.405,Math.cos(a)*.116],[-.2*Math.cos(a),a,0],[.065,.02,.017]);
     }
-    arms.forEach((arm,i)=>ps1Arm(arm,i?1:-1,k,{armored:true}));
+    for(const a of [-.5,.5]){
+      lp(body,P.box,k.steel,[Math.sin(a)*.16,.57,Math.cos(a)*.125],[-.25,a,0],[.12,.11,.02]);
+      lp(body,P.box,k.brass,[Math.sin(a)*.162,.515,Math.cos(a)*.127],[-.25,a,0],[.12,.016,.022]);
+    }
+    lp(body,P.taper8,k.brass,[0,.65,0],[0,Math.PI/8,0],[.28,.035,.2]);            // cinturón
+    lp(body,P.oct,k.brass,[0,.65,.1],[0,0,0],[.05,.05,.025]);
+    // Peto: placa del vientre con ribete y gema en el cuello.
+    lp(body,P.box,k.steelDark,[0,.74,.098],[0,0,0],[.15,.1,.02]);
+    lp(body,P.box,k.brass,[0,.795,.1],[0,0,0],[.15,.015,.02]);
+    lp(body,P.oct,'#4fa3ff',[0,1.0,.07],[0,0,0],[.04,.04,.03]);
+    lp(body,P.box,k.brass,[0,1.0,.06],[0,0,0],[.12,.02,.02]);
+    // Capa larga desde los hombros, que se abre hacia los tobillos.
+    lp(body,P.box,k.cloth,[0,.58,-.15],[.1,0,0],[.36,.9,.025]);
+    for(const x of [-1,1])lp(body,P.box,k.clothDark,[x*.2,.45,-.1],[.1,x*.5,0],[.12,.66,.02]);
+    for(const x of [-.14,.14])lp(body,P.oct,k.brass,[x,1.0,.03],[0,0,0],[.045,.045,.045]);
+    // Cabeza: rostro con textura dentro de un yelmo cerrado.
+    lp(body,P.head,k.skin,[0,1.19,0],[0,Math.PI/8,0],[.21,.24,.2]);
+    lp(body,P.dome,k.steel,[0,1.25,-.005],[0,Math.PI/8,0],[.27,.24,.27]);          // cúpula
+    lp(body,P.taper8,k.steel,[0,1.2,-.035],[0,Math.PI/8,0],[.27,.2,.22]);         // nuca
+    for(const x of [-1,1])lp(body,P.box,k.steel,[x*.112,1.15,.04],[0,0,x*.08],[.035,.17,.13]); // carrilleras
+    lp(body,P.box,k.steel,[0,1.29,.11],[.15,0,0],[.22,.06,.04]);                   // frente
+    lp(body,P.oct,k.brass,[0,1.31,.13],[0,0,0],[.045,.06,.03]);                    // gema de la frente
+    lp(body,P.box,k.steelDark,[0,1.38,-.03],[0,0,0],[.025,.04,.14]);               // cresta
+    for(const x of [-1,1]){                                                       // alas pequeñas
+      for(let f=0;f<3;f++){
+        const len=.17-f*.03,tilt=.3+f*.3;
+        lp(body,P.box,f%2?'#cfd5dd':'#eef1f5',[x*(.15+Math.sin(tilt)*len*.45),1.3+Math.cos(tilt)*len*.45,-.03-f*.02],[-.3,0,x*-tilt],[.022,len,.06]);
+      }
+    }
+    // Trenza oscura que cae sobre el hombro izquierdo, por delante.
+    for(let i=0;i<7;i++)lp(body,P.oct,k.hair,[.1+i*.006,1.06-i*.07,.08+i*.005],[0,0,.18],[.065-i*.004,.085,.058]);
+    lp(body,P.oct,k.brass,[.142,.58,.115],[0,0,0],[.035,.03,.035]);
+    lp(body,P.cone6,k.hair,[.145,.53,.115],[Math.PI,0,0],[.04,.06,.04]);
+    arms.forEach((arm,i)=>ps1Arm(arm,i?1:-1,k,{armored:true,slim:true}));
+    // Lanza larga, de pie a su lado (mano derecha): hoja larga, guarda dorada con gema.
     const wp=[];
-    lp(wp,P.prism6,'#6a4a30',[0,.25,0],[0,0,0],[.035,1.4,.035]);                    // asta
-    lp(wp,P.prism6,k.leather,[0,0,0],[0,0,0],[.045,.14,.045]);                      // empuñadura
-    lp(wp,P.prism6,k.brass,[0,.92,0],[0,0,0],[.055,.03,.055]);
-    lp(wp,P.oct,k.steel,[0,1.04,0],[0,0,0],[.07,.2,.025]);                          // hoja
-    lp(wp,P.cone6,k.steel,[0,1.19,0],[0,0,0],[.045,.12,.025]);
-    lp(wp,P.box,k.cloth,[0,.88,.0],[0,0,.2],[.02,.12,.06]);                          // banderola
-    lp(wp,P.cone6,k.steelDark,[0,-.45,0],[Math.PI,0,0],[.03,.08,.03]);              // regatón
-    const holder=arms[1].getObjectByName('held');holder.add(fuse(wp,'spear'));holder.rotation.x=.25;
-    return {height:1.5};
+    lp(wp,P.prism6,'#5e4230',[0,.2,0],[0,0,0],[.03,1.4,.03]);
+    for(const y of [-.02,.12,.62])lp(wp,P.prism6,k.leather,[0,y,0],[0,0,0],[.038,.05,.038]);
+    lp(wp,P.prism6,k.steel,[0,-.52,0],[0,0,0],[.04,.04,.04]);
+    lp(wp,P.box,k.brass,[0,.93,0],[0,0,0],[.18,.03,.04]);
+    lp(wp,P.oct,'#4fa3ff',[0,.93,.02],[0,0,0],[.045,.045,.03]);
+    lp(wp,P.box,k.steel,[0,1.13,0],[0,0,0],[.055,.36,.018]);
+    lp(wp,P.box,k.steelDark,[0,1.13,.006],[0,0,0],[.012,.34,.018]);
+    lp(wp,P.cone6,k.steel,[0,1.35,0],[0,0,0],[.055,.09,.018]);
+    const holder=arms[0].getObjectByName('held');holder.add(fuse(wp,'spear'));holder.rotation.x=.08;
+    const face=new T.Mesh(new T.PlaneGeometry(.16,.16),new T.MeshLambertMaterial({map:faceTexture(k.skin,k.hair,{female:true,eyes:'#5a3a24'})}));
+    face.position.set(0,1.18,.101);
+    return {height:1.5,extras:[face]};
   },
   tirador(b,k){
     const {body,arms}=b;
@@ -1125,10 +1174,11 @@ function ps1Hero(kind,tint){
   const k={...ps1Kits[kind]};
   if(tint){k.cloth=tint.hex;k.clothDark=tint.dark;}
   const robe=kind==='mistico'||kind==='mago';
-  const b=ps1Base(k,{robe,armored:kind==='guardia'});
+  const b=ps1Base(k,{robe,armored:kind==='guardia',slim:kind==='guardia'});
   const info=ps1Builders[kind](b,k);
   const {root,figure,legs,arms}=b;
   const torso=fuse(b.body,'body');figure.add(torso);
+  for(const extra of info.extras||[])torso.add(extra);
   const lean=info.lean||0;
   const animate=(t,{gait,swing,walking,phase})=>{
     const breath=Math.sin(t*2.4+phase);

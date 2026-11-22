@@ -2518,7 +2518,7 @@ function applySkill(s,unit,target,skill,rng,scale=1){
   const value=opts.value;
   if(supportKinds.includes(kind)){
     if(kind==='shield'){effect(target,'shield',value||25,2);note(s,name+' → '+target.name+': +'+(value||25)+' % de armadura 2 turnos.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
-    if(kind==='sprint'){s.mp+=value||2;note(s,name+': +'+(value||2)+' PM este turno.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
+    if(kind==='sprint'){s.mp+=value||2;note(s,name+': +'+(value||2)+' PM este turno.');emit(s,{kind:'mp',gain:true,unit:target.id,pos:target.pos,amount:value||2});return;}
     if(kind==='fury'){effect(target,'fury',value||10,opts.turns||2);note(s,name+': +'+(value||10)+' % de daño final (más con daño de fuego) durante 2 turnos.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
     if(kind==='haste'){effect(target,'haste',value||2,target===unit?2:1);note(s,name+' → '+target.name+': +'+(value||2)+' PM en su próximo turno.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
     const amount=Math.min(target.max-target.hp,Math.round((roll(min,max,rng)+Math.floor(unit.level/2))*(1+(passiveEffects(unit).healPct||0)/100)));

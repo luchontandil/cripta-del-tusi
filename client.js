@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=124';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=124';
-import {setupSfx} from './music.js?v=124';
-import {icon} from './icons.js?v=124';
-import {openMapEditor} from './mapeditor.js?v=124';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=125';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=125';
+import {setupSfx} from './music.js?v=125';
+import {icon} from './icons.js?v=125';
+import {openMapEditor} from './mapeditor.js?v=125';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=124').then(({createIso})=>{
+import('./isometric.js?v=125').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1994,10 +1994,10 @@ function impact(event){
   }
   // PM quitados: «−N PM» justo debajo del número de daño.
   if(event.kind==='mp'){
-    const tag=h('span','impact mp-loss','−'+event.amount+' PM');
-    tag.title='Pierde '+event.amount+' PM en su próximo turno';
-    Object.assign(tag.style,boardPoint(event.pos,1.48));
-    tag.style.setProperty('--float-offset','34px');
+    const tag=h('span','impact mp-loss',(event.gain?'+':'−')+event.amount+' PM');
+    tag.title=event.gain?'Gana '+event.amount+' PM este turno':'Pierde '+event.amount+' PM en su próximo turno';
+    Object.assign(tag.style,boardPoint(event.pos,event.gain?1.1:1.48));
+    tag.style.setProperty('--float-offset',event.gain?'-30px':'34px');
     el('animations').append(tag);
     setTimeout(()=>tag.remove(),hitDuration);
     return;

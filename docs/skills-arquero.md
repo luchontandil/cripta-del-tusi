@@ -30,4 +30,5 @@ El resto, igual.
 - Flecha Flamígera: casilla elegida + 3 más en línea recta; daña también a aliados; el arquero retrocede 1 (con daño si choca).
 - Detonadora: 2 por turno, 1 por objetivo; la explosión hace 3–5 de fuego a los aliados del objetivo a ≤2 casillas al acabar su turno.
 - Flecha Repelente: choque normal. Ojo de águila: solo hechizos de alcance modificable.
-- Flecha venenosa: −1 PA no acumulable. Dardo pestilente: −25 a todas las resistencias 1 turno + veneno de 2 PV 1 turno; 1 por objetivo.
+- Flecha venenosa: −1 PA no acumulable. Dardo pestilente: −25 a todas las resistencias hasta el próximo turno del arquero + veneno de 1 turno; 1 por objetivo.
+- Venenos de héroe (también la Cuchilla envenenada del Ninja): 2 de daño base × (1 + % de daño caótico de quien lo aplica).

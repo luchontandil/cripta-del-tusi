@@ -54,7 +54,7 @@ export const classes = {
   ]},
   sombra: {name:'Ninja', hp:35, initiative:15, skills:[
     ['Shuriken',2,5,5,8,'damage','✧',1,{element:'physical',max:{crit:15}}],
-    ['Cuchilla envenenada',2,4,3,5,'venom','✧',0,{element:'chaos',value:3,max:{value:2}}],
+    ['Cuchilla envenenada',2,4,3,5,'venom','✧',0,{element:'chaos',value:2,max:{value:2}}],
     ['Paso de sombra',2,3,0,0,'dash','↢',1,{teleport:true,max:{range:1}}],
     ['Puñalada trasera',3,1,12,16,'damage','⚔',0,{element:'chaos',max:{crit:20}}],
     ['Bomba de humo',2,4,2,4,'slow','❄',0,{element:'chaos',area:'cross',value:1,max:{value:1}}],
@@ -175,6 +175,8 @@ const armorType=(unit,skill)=>skillSchool(unit,skill)==='physical'?'physical':sk
 export const modifiableRange=skill=>skillOptions(skill).modifiable??(skill[2]>1&&!['dash','swap'].includes(skill[5]));
 /** Tipos de habilidad que se lanzan sobre aliados. */
 export const supportKinds=['heal','cleanse','shield','haste','sprint','fury','eclipse','reach'];
+/** Veneno de los héroes: daño base (2) que escala con el % de daño caótico de quien lo aplica. */
+export const poisonValue=(unit,base=2)=>Math.max(1,Math.round(base*(1+(unit.stats?.chaos||0)/100)));
 /** Alcance extra para hechizos de alcance modificable: equipo + Ojo de águila. */
 export const reachBonus=unit=>(unit.stats?.reach||0)+(unit.effects?.reach?.value||0);
 /** ¿Se apunta a una casilla (área, teletransporte) en lugar de a una unidad? */
@@ -1539,6 +1541,8 @@ function beginTurn(s) {
   // En guardia!: el escudo y la zona duran hasta el próximo turno del lanzador.
   if(s.guardZones?.length)s.guardZones=s.guardZones.filter(z=>z.owner!==u.id);
   if(u.effects.barrier?.untilOwnTurn)delete u.effects.barrier;
+  // Efectos que duran «hasta el próximo turno del lanzador» (Dardo pestilente).
+  for(const other of s.units)for(const [key,st] of Object.entries(other.effects||{}))if(st.untilTurnOf===u.id)delete other.effects[key];
   const bonus=u.enemy?{}:s.mods||{};
   s.casts={};s.castTargets={};
   s.ap=Math.max(1,(u.enemy?4:BASE_AP)+(u.stats?.action||0)+(bonus.ap||0)-(u.effects.weak?.value||0));
@@ -2657,7 +2661,7 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
     drainMp(s,target,amount,1);
     if(opts.slowChance!==undefined)note(s,target.name+' queda ralentizado: −'+(value||2)+' PM.');
   }
-  if(kind==='venom'){effect(target,'poison',value||3,2);note(s,target.name+' queda envenenado.');}
+  if(kind==='venom'){effect(target,'poison',poisonValue(unit,value||2),2);note(s,target.name+' queda envenenado.');}
   if(kind==='detonate'&&!!target.enemy!==!!unit.enemy){
     const [lo,hi]=opts.detonate||[3,5];
     target.effects.detonate={value:scaledDamage(unit,skill,roll(lo,hi,rng)),turns:1,by:unit.id};
@@ -2665,8 +2669,9 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
   }
   if(kind==='curse'){effect(target,'weak',value||1,1);note(s,target.name+' pierde '+(value||1)+' PA en su próximo turno.');}
   if(kind==='corrode'){
-    effect(target,'corrode',value||25,1);
-    if(opts.poison)effect(target,'poison',opts.poison,1);
+    // Dura hasta el próximo turno del lanzador.
+    effect(target,'corrode',value||25,99);target.effects.corrode.untilTurnOf=unit.id;
+    if(opts.poison)effect(target,'poison',poisonValue(unit,opts.poison),1);
     note(s,target.name+': −'+(value||25)+' % a todas sus resistencias y envenenado.');
   }
   if(kind==='push')shove(s,unit,target,opts.push||1,false,origin??unit.pos);

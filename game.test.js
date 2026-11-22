@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost,setAway,castsLeft,scaledDamage,hit,_test,setCustomMaps,cleanMap,mapWarnings,testCustomMap,actStart,midBossFloor,labCombat,labEnemyOptions} from './engine.js';
+import {poisonValue,actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost,setAway,castsLeft,scaledDamage,hit,_test,setCustomMaps,cleanMap,mapWarnings,testCustomMap,actStart,midBossFloor,labCombat,labEnemyOptions} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -1711,4 +1711,23 @@ test('Detonadora: estalla al acabar el turno del objetivo y quema a sus aliados 
   for(let i=0;i<6&&foe.effects.detonate;i++)timeout(s);
   assert.ok(!foe.effects.detonate,'ya estalló');
   assert.ok(buddy.hp<300,'quemó al aliado cercano');
+});
+
+test('venenos de héroe: 2 de base que escalan con el daño caótico; Dardo pestilente dura hasta el turno del arquero',()=>{
+  assert.equal(poisonValue({stats:{}}),2);
+  assert.equal(poisonValue({stats:{chaos:50}}),3);
+  const s=battle('tirador');
+  s.walls=[];s.water=[];s.traps=[];s.voids=[];
+  const a=s.units.find(u=>!u.enemy);a.skillRanks=classes.tirador.skills.map(()=>1);a.stats.chaos=100;
+  const foe=s.units.find(u=>u.enemy);
+  for(const f of s.units.filter(u=>u.enemy&&u!==foe))f.hp=0;
+  foe.hp=foe.max=300;foe.stats.movement=-9;
+  s.turn=s.units.indexOf(a);s.ap=20;s.casts={};s.castTargets={};
+  a.pos=2*s.width+2;foe.pos=a.pos+4;
+  act(s,a.id,{type:'skill',skill:classes.tirador.skills.findIndex(k=>k[0]==='Dardo pestilente'),pos:foe.pos},()=>.5);
+  assert.equal(foe.effects.poison.value,4,'2 × (1 + 100 %)');
+  act(s,a.id,{type:'end'},()=>.5);
+  for(let i=0;i<6&&s.units[s.turn]!==a;i++)timeout(s);
+  assert.equal(s.units[s.turn],a,'vuelve a ser su turno');
+  assert.ok(!foe.effects.corrode,'se acaba al empezar el turno del arquero');
 });

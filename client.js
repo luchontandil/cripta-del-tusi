@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=137';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=137';
-import {setupSfx} from './music.js?v=137';
-import {icon} from './icons.js?v=137';
-import {openMapEditor} from './mapeditor.js?v=137';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=138';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=138';
+import {setupSfx} from './music.js?v=138';
+import {icon} from './icons.js?v=138';
+import {openMapEditor} from './mapeditor.js?v=138';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=137').then(({createIso})=>{
+import('./isometric.js?v=138').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -911,8 +911,8 @@ function skillEffectText(skill){
   const area='';   // el área ya se ve en su fila con el croquis
   const text={
     expose:'Vulnerable 2 turnos: los ataques contra el objetivo hacen +'+(o.value||3),
-    slow:o.slowBonus?'Ralentiza: −'+(o.value||1)+' PM en el próximo turno del objetivo ('+o.slowBonus.chance+' % de probabilidad de −'+o.slowBonus.value+')':(o.slowChance!==undefined?o.slowChance+' % de probabilidad de ralentizar: ':'Ralentiza: ')+'−'+(o.value||2)+' PM en el próximo turno del objetivo',
-    venom:'Veneno: '+(o.value||3)+' PV por turno durante 2 turnos',
+    slow:o.slowBonus?'Quita PM en el próximo turno del objetivo: −'+(o.value||1)+' PM ('+(100-o.slowBonus.chance)+' % de las veces) o −'+o.slowBonus.value+' PM ('+o.slowBonus.chance+' %)':(o.slowChance!==undefined?o.slowChance+' % de probabilidad de ralentizar: ':'Ralentiza: ')+'−'+(o.value||2)+' PM en el próximo turno del objetivo',
+    venom:'Veneno: '+(o.value||2)+' PV por turno durante 2 turnos (+ tu % de daño caótico)',
     blast:'',
     push:o.area?'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' a los enemigos alcanzados, alejándolos '+(o.pushFrom==='center'?'del centro del área':'de ti')+'. Si chocan: 2 de daño por casilla que falte + la mitad de tu nivel':'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' en línea. Si choca: 2 de daño por casilla que falte + la mitad de tu nivel',
     pull:o.area?'Atrae '+(o.pull||1)+(o.pull>1?' casillas':' casilla')+' hacia ti a los enemigos alcanzados':o.pull==='melee'?'Atrae al objetivo (aliado o enemigo) hasta el cuerpo a cuerpo; a los aliados no les hace daño':'Atrae '+(o.pull||1)+(o.pull>1?' casillas':' casilla')+' hacia ti',
@@ -924,7 +924,7 @@ function skillEffectText(skill){
     detonate:'Detonado: al acabar su turno estalla y quema a sus aliados a 2 casillas o menos ('+(o.detonate||[3,5]).join('-')+' de fuego). Una vez por objetivo y turno',
     reach:'+'+(o.value||3)+' de alcance en tus hechizos de alcance modificable durante '+(o.turns||2)+' turnos',
     curse:'−'+(o.value||1)+' PA en el próximo turno del objetivo (no se acumula)',
-    corrode:'−'+(o.value||25)+' % a todas las resistencias del objetivo durante 1 turno y veneno de '+(o.poison||2)+' PV. Una vez por objetivo y turno',
+    corrode:'−'+(o.value||25)+' % a todas las resistencias del objetivo hasta tu próximo turno, y veneno de '+(o.poison||2)+' PV (+ tu % de daño caótico) en su próximo turno. Una vez por objetivo y turno',
     eclipse:'Todos los enemigos del mapa pierden '+(o.value||6)+' de alcance en su próximo turno (mínimo 1)',
     fury:'+'+(o.value||10)+' % de daño final durante 2 turnos (contando este); se multiplica por tu % de daño de fuego',
     guard:'Escudo del 10 % de tu vida máxima + tu nivel hasta tu próximo turno. Al terminar tu turno, el primer paso de cada enemigo dentro del área le hace este daño y lo empuja 2 casillas (una vez por enemigo). Pasa el turno',

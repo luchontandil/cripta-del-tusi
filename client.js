@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=128';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=128';
-import {setupSfx} from './music.js?v=128';
-import {icon} from './icons.js?v=128';
-import {openMapEditor} from './mapeditor.js?v=128';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=129';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=129';
+import {setupSfx} from './music.js?v=129';
+import {icon} from './icons.js?v=129';
+import {openMapEditor} from './mapeditor.js?v=129';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=128').then(({createIso})=>{
+import('./isometric.js?v=129').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -863,6 +863,9 @@ const skillLore={
   'Balestra':'Un salto adelante, la punta por delante, y cuando el enemigo se gira ya estás a su espalda.',
   'Salto valiente':'Te lanzas por los aires y caes como un rayo en medio de la refriega.',
   'Carga heroica':'Bajas la lanza y corres: cuanto más larga la carrera, más lejos sale despedido.',
+  'Lanza cargada':'Cada estocada carga la punta de electricidad: la siguiente pica más fuerte.',
+  'Barrido':'Un giro amplio con el asta helada que barre todo lo que tienes delante.',
+  'Lanza abisal':'Una punta forjada en el fondo del lago: hiela hasta el hueso, y más de cerca.',
   'Abrir las aguas':'Clavas la lanza y el suelo se parte en tres: el frío aparta a todo lo que toca.',
   'Furia':'El fuego de la batalla te enciende por dentro: cada golpe pega más fuerte.',
   // Arquero
@@ -926,9 +929,10 @@ function skillEffectText(skill){
     leap:'Saltas a una casilla libre y golpeas a todos los enemigos a tu alrededor (−20 % por casilla de distancia)',
     dash:o.teleport?(o.los===false?'Teletransporte (sin necesitar línea de visión)':'Teletransporte a una casilla libre que veas, sin gastar PM'):'Desplazamiento por una ruta libre sin gastar PM'
   }[kind]||'';
+  const extra=(o.stack?'+'+o.stack.value+' de daño base de esta habilidad por cada uso durante '+(o.stack.turns||2)+' turnos (acumulable '+(o.stack.max||3)+' veces, cada carga dura lo suyo)':'')+(o.meleeBonus?'+'+o.meleeBonus+' % de daño si el objetivo está adyacente':'');
   const steal=o.lifesteal?' · Te curas el '+o.lifesteal+' % del daño hecho':'';
   const burn=o.element==='fire'&&o.burnChance!==0?' · '+(o.burnChance!==undefined?o.burnChance+' % de probabilidad de quemar: ':'Quemadura: ')+'arde 2 turnos y pierde ¼ del daño al empezar cada uno':'';
-  return (text+area+steal+burn).replace(/^ · /,'');
+  return ([text,extra].filter(Boolean).join(' · ')+area+steal+burn).replace(/^ · /,'');
 }
 /** Con qué escala el daño de una habilidad: (Magia, Hielo), (Físico), (Magia, Físico)... */
 const tagNames={physical:'Físico',magic:'Magia',fire:'Fuego',ice:'Hielo',lightning:'Rayo',chaos:'Caótico'};
@@ -1024,7 +1028,8 @@ function skillRows(unit,skill){
     rows.push(row);
   }
   if(o.push||o.pull)rows.push(statRow('mp',o.push?'Empuje':'Atrae',o.pull==='melee'?'Hasta el contacto':(o.push||o.pull)+((o.push||o.pull)>1?' casillas':' casilla')));
-  if(o.inLine)rows.push(statRow('move','Lanzar','En línea recta'));
+  if(o.inLine)rows.push(statRow('move','Lanzar',o.inLine==='diagonal'?'En línea recta o diagonal':'En línea recta'));
+  if(o.stack&&unit.stacks?.[skill[0]]?.length)rows.push(statRow('attack','Cargas',unit.stacks[skill[0]].length+' de '+(o.stack.max||3)+' · +'+unit.stacks[skill[0]].length*o.stack.value+' de daño'));
   if(o.casts)rows.push(statRow('clock','Usos por turno',state?.phase==='combat'&&unit.id===state.units[state.turn]?.id?Math.max(0,castsLeft(state,unit,skill))+' de '+o.casts:String(o.casts)));
   if(o.cooldown){
     const left=cooldownLeft(unit,skill);

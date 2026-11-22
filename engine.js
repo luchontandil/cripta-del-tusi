@@ -6,7 +6,7 @@
  */
 export const classes = {
   // Valkyria (antes Guardián/Lancero). Las tres primeras son las de inicio. Física: escala con daño físico + su elemento.
-  // Pendientes de la hoja (docs/skills-valkyria.md): Lanza cargada, Eclipse, Barrido, Lanza abisal.
+  // Pendiente de la hoja (docs/skills-valkyria.md): Eclipse.
   guardia: {name:'Valkyria', hp:58, initiative:10, skills:[
     ['Estocada',3,2,5,7,'push','➶',1,{element:'fire',inLine:true,burnChance:0,area:'line',size:2,push:2,los:false,casts:2,modifiable:false}],
     ['Lanza del lago',3,5,2,7,'pull','↢',1,{element:'lightning',area:'trident',inLine:true,pull:1,casts:1,cooldown:1,modifiable:true}],
@@ -18,6 +18,9 @@ export const classes = {
     ['Salto valiente',4,4,5,8,'leap','⤒',2,{element:'fire',burnChance:0,area:'circle',size:2,lifesteal:10,los:false,casts:1,cooldown:3,modifiable:false}],
     ['Carga heroica',3,5,2,8,'charge','⇶',1,{element:'lightning',inLine:true,clearPath:true,anyTarget:true,casts:1,modifiable:false}],
     ['Abrir las aguas',4,5,3,6,'push','⊥',0,{element:'ice',area:'tee',size:2,push:1,pushFrom:'center',inLine:true,casts:1,cooldown:2,modifiable:false}],
+    ['Lanza cargada',3,7,1,9,'damage','➹',1,{element:'lightning',inLine:'diagonal',crit:15,casts:2,stack:{value:1,turns:2,max:3},modifiable:false}],
+    ['Barrido',3,5,4,5,'slow','⟷',1,{element:'ice',area:'wave',width:3,size:1,value:1,slowChance:30,casts:1,modifiable:false}],
+    ['Lanza abisal',3,3,6,9,'damage','◆',1,{element:'ice',los:false,meleeBonus:35,casts:1,modifiable:false}],
     ['Furia',2,0,0,0,'fury','✹',0,{element:'fire',burnChance:0,value:10,turns:2,los:false,casts:1,cooldown:4,modifiable:false}]
   ]},
   tirador: {name:'Arquero', hp:31, initiative:14, skills:[
@@ -89,6 +92,9 @@ export function skillFor(unit,index,preview=false){
   const perRank=opts.perRank??(isAreaDamage(base)?1:2);
   if(rank>1&&skill[5]!=='dash'&&skill[4]>0){skill[3]+=(rank-1)*perRank;skill[4]+=(rank-1)*perRank;}
   if(rank>1&&skill[5]==='dash')skill[2]+=rank-1;
+  // Cargas (Lanza cargada): +N de daño base por carga activa.
+  const stacks=opts.stack?unit.stacks?.[base[0]]?.length||0:0;
+  if(stacks){skill[3]+=stacks*opts.stack.value;skill[4]+=stacks*opts.stack.value;}
   if(rank>=3){
     const bonus=opts.max||{};
     if(bonus.range)skill[2]+=bonus.range;
@@ -1546,6 +1552,11 @@ function endEffects(unit) {
     if(--status.turns<=0)delete unit.effects[key];
   }
   for(const [name,left] of Object.entries(unit.cooldowns||{}))if(left<=1)delete unit.cooldowns[name];else unit.cooldowns[name]=left-1;
+  // Cada carga tiene su propia duración.
+  for(const [name,list] of Object.entries(unit.stacks||{})){
+    const rest=list.map(t=>t-1).filter(t=>t>0);
+    if(rest.length)unit.stacks[name]=rest;else delete unit.stacks[name];
+  }
 }
 function finish(s,rng) {
   if(!s.units.some(u=>!u.enemy&&alive(u))){
@@ -2362,7 +2373,11 @@ export function hasRange(s,unit,pos,skill) {
   if(!onBoard(s,pos)||s.walls.includes(pos)||cost>s.ap||castsLeft(s,unit,skill)<=0)return false;
   const d=distance(s,unit.pos,pos);
   // Hechizos en línea recta: solo en la misma fila o columna que el lanzador.
-  if(skillOptions(skill).inLine&&pos%s.width!==unit.pos%s.width&&Math.floor(pos/s.width)!==Math.floor(unit.pos/s.width))return false;
+  const line=skillOptions(skill).inLine;
+  if(line){
+    const dx=Math.abs(pos%s.width-unit.pos%s.width),dy=Math.abs(Math.floor(pos/s.width)-Math.floor(unit.pos/s.width));
+    if(dx&&dy&&!(line==='diagonal'&&dx===dy))return false;
+  }
   // Cargas (Balestra, Carga heroica): nada en medio de la recta (las trampas no cuentan).
   if(skillOptions(skill).clearPath&&!clearLine(s,unit.pos,pos))return false;
   return d>=min&&d<=range+(modifiableRange(skill)?(unit.stats?.reach||0):0);
@@ -2381,6 +2396,13 @@ function countCast(s,unit,skill){
   const cooldown=skillOptions(skill).cooldown;
   // Se guarda N+1: baja 1 al terminar cada turno propio, y con 0 vuelve a estar lista (N turnos después).
   if(cooldown)(unit.cooldowns||={})[skill[0]]=cooldown+1;
+  // Lanza cargada: suma una carga (máximo N; con el máximo, la más vieja se sustituye por la nueva).
+  const stack=skillOptions(skill).stack;
+  if(stack){
+    const list=((unit.stacks||={})[skill[0]]||=[]);
+    if(list.length<(stack.max||3))list.push(stack.turns||2);
+    else{list.sort((a,b)=>a-b);list[0]=stack.turns||2;}
+  }
   if(!skillOptions(skill).casts)return;
   s.casts=s.casts||{};
   const key=unit.id+':'+skill[0];
@@ -2578,7 +2600,9 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
     const before=target.hp;
     // Con «burnChance», el fuego solo quema con esa probabilidad (si no, siempre).
     const burns=opts.burnChance===undefined||rng()*100<opts.burnChance;
-    hit(s,unit,target,scaledDamage(unit,skill,roll(min,max,rng),scale),'damage',critical,armorType(unit,skill),burns);
+    // Lanza abisal: más daño si el objetivo está pegado.
+    const melee=opts.meleeBonus&&distance(s,unit.pos,target.pos)===1?1+opts.meleeBonus/100:1;
+    hit(s,unit,target,scaledDamage(unit,skill,roll(min,max,rng),scale*melee),'damage',critical,armorType(unit,skill),burns);
     if(burns)ignite(s,target,before-target.hp,element);
     // Robo de vida de la habilidad (Punzón): un % del daño hecho de verdad.
     if(opts.lifesteal&&alive(unit)){

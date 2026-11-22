@@ -1581,3 +1581,47 @@ test('Valkyria tanda 2: Balestra, Salto valiente, Carga heroica, Abrir las aguas
     assert.equal(foes[0].pos,center-2,'empujado a un lado');
     if(foes[1])assert.equal(foes[1].pos,center-3*w,'empujado lejos');}
 });
+
+test('Valkyria tanda 3: Lanza cargada, Barrido, Lanza abisal',()=>{
+  const rng=()=>.5;
+  const names=classes.guardia.skills.map(k=>k[0]);
+  const idx=n=>names.indexOf(n);
+  const setup=()=>{
+    const s=battle('guardia');
+    s.walls=[];s.water=[];s.traps=[];s.voids=[];
+    const v=s.units.find(u=>!u.enemy);
+    v.skillRanks=names.map(()=>1);
+    const foes=s.units.filter(u=>u.enemy);
+    for(const f of foes){f.pos=-99;f.hp=f.max=300;f.stats.ward=0;f.resist={};}
+    s.turn=s.units.indexOf(v);s.ap=20;s.mp=3;s.casts={};s.phase='combat';
+    v.pos=5*s.width+8;
+    return {s,v,foes,w:s.width};
+  };
+  // Lanza cargada: diagonal sí, en «L» no; cada uso suma +1 al daño base (máx. 3), cada carga con su duración.
+  {const {s,v,foes,w}=setup();const k=idx('Lanza cargada');foes[0].pos=v.pos-3;
+    assert.ok(hasRange(s,v,v.pos-2*w-2,skillFor(v,k)),'diagonal');
+    assert.ok(!hasRange(s,v,v.pos-2*w-1,skillFor(v,k)),'fuera de línea');
+    act(s,v.id,{type:'skill',skill:k,pos:v.pos-3},rng);
+    assert.deepEqual(skillFor(v,k).slice(3,5),[2,10]);
+    act(s,v.id,{type:'skill',skill:k,pos:v.pos-3},rng);
+    assert.deepEqual(skillFor(v,k).slice(3,5),[3,11]);
+    const back=()=>{act(s,v.id,{type:'end'},rng);s.turn=s.units.indexOf(v);s.casts={};s.ap=20;s.phase='combat';};
+    back();
+    assert.deepEqual(skillFor(v,k).slice(3,5),[3,11],'siguen las 2 cargas');
+    act(s,v.id,{type:'skill',skill:k,pos:v.pos-3},rng);
+    back();
+    assert.deepEqual(skillFor(v,k).slice(3,5),[2,10],'las 2 viejas caducan, queda la nueva');
+  }
+  // Barrido: franja de 3 de lado; se puede lanzar en una casilla vacía.
+  {const {s,v,foes,w}=setup();
+    foes[0].pos=v.pos-2*w+1;
+    act(s,v.id,{type:'skill',skill:idx('Barrido'),pos:v.pos-2*w},rng);
+    assert.ok(foes[0].hp<300,'golpea al lado de la casilla elegida');}
+  // Lanza abisal: +35 % pegado.
+  {const a=setup(),b=setup();
+    a.foes[0].pos=a.v.pos-1;b.foes[0].pos=b.v.pos-3;
+    act(a.s,a.v.id,{type:'skill',skill:idx('Lanza abisal'),pos:a.foes[0].pos},rng);
+    act(b.s,b.v.id,{type:'skill',skill:idx('Lanza abisal'),pos:b.foes[0].pos},rng);
+    const near=300-a.foes[0].hp,far=300-b.foes[0].hp;
+    assert.ok(near>far,near+' vs '+far);}
+});

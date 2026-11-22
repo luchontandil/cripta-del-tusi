@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=133';
-import {playerColors} from './engine.js?v=133';
+import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=134';
+import {playerColors} from './engine.js?v=134';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -266,6 +266,59 @@ export function createIso(mount,onCell){
     models.delete(id);
   }
   /** Poses de acción, golpe recibido y muerte, aplicadas encima de la animación de cada modelo. */
+  /**
+   * Poses de la Valkyria al usar cada habilidad. S = brazo de la lanza (arms[0]), O = el otro.
+   * rotation.x negativo alza el brazo hacia delante/arriba; L es la capa de todo el cuerpo
+   * (position.z hacia delante, rotation.x positivo inclina hacia delante).
+   */
+  function spearPose(model,type,at,S,O,L,ease){
+    const seg=(a,b)=>ease((at-a)/(b-a));
+    if(type==='thrust'){                        // recoger y lanzar la estocada
+      const back=seg(0,.3),hit=seg(.3,.5),rest=seg(.7,1);
+      const k=hit*(1-rest);
+      S.rotation.x=-.5*back*(1-hit)-1.6*k;S.rotation.z=.25*back*(1-hit);
+      O.rotation.x=.5*back*(1-hit)-.6*k;
+      L.rotation.y+=.45*back*(1-hit)-.25*k;
+      L.position.z+=-.1*back*(1-hit)+.22*k;L.rotation.x+=.18*k;
+    }else if(type==='throw'){                   // lanza por encima del hombro y latigazo
+      const wind=seg(0,.4),fly=seg(.4,.58),rest=seg(.7,1);
+      S.rotation.x=-2.9*wind*(1-fly)-1.3*fly*(1-rest);S.rotation.z=.35*wind*(1-fly);
+      O.rotation.x=-1.3*wind*(1-rest);O.rotation.z=-.3*wind*(1-rest);
+      L.rotation.y+=.5*wind*(1-fly)-.35*fly*(1-rest);
+      L.rotation.x+=-.12*wind*(1-fly)+.22*fly*(1-rest);L.position.z+=.12*fly*(1-rest);
+    }else if(type==='slam'){                    // alzar la lanza con las dos manos y clavarla
+      const lift=seg(0,.4),drop=seg(.4,.55),rest=seg(.75,1);
+      const up=lift*(1-drop),down=drop*(1-rest);
+      S.rotation.x=-2.9*up-1.1*down;O.rotation.x=-2.7*up-1.1*down;O.rotation.z=-.3*up;
+      L.position.y+=.12*up-.08*down;L.rotation.x+=-.12*up+.35*down;L.position.z+=.08*down;
+    }else if(type==='sweep'){                   // barrido de lado a lado
+      const wind=seg(0,.3),cut=seg(.3,.65),rest=seg(.75,1);
+      S.rotation.x=-1.4*(wind+cut>0?1:0)*(1-rest);
+      S.rotation.z=(1.1*wind-2.2*cut)*(1-rest);
+      O.rotation.x=-.5*(1-rest)*wind;
+      L.rotation.y+=(.8*wind-1.7*cut)*(1-rest);L.rotation.x+=.12*cut*(1-rest);
+    }else if(type==='raise'){                   // lanza al cielo (Furia, Eclipse)
+      const up=seg(0,.35)*(1-seg(.75,1));
+      S.rotation.x=-3.05*up;O.rotation.x=-.6*up;O.rotation.z=-1.1*up;
+      L.position.y+=.1*up;L.rotation.x+=-.14*up;
+    }else if(type==='guard'){                   // agacharse tras la lanza en guardia
+      const k=seg(0,.3)*(1-seg(.75,1));
+      S.rotation.x=-1.35*k;S.rotation.z=-.2*k;O.rotation.x=-1.1*k;O.rotation.z=.35*k;
+      L.position.y-=.07*k;L.rotation.x+=.14*k;
+    }else if(type==='leap'){                    // agacharse, volar con la lanza en alto y clavarla al caer
+      const crouch=seg(0,.15)*(1-seg(.15,.3)),air=seg(.15,.35)*(1-seg(.62,.72)),stab=seg(.62,.72)*(1-seg(.85,1));
+      L.position.y-=.1*crouch;L.rotation.x+=.25*crouch-.15*air+.4*stab;
+      S.rotation.x=-.4*crouch-2.8*air-.9*stab;O.rotation.x=-1.6*air-.8*stab;O.rotation.z=-.5*air;
+    }else if(type==='charge'){                  // lanza en ristre e inclinado hacia delante
+      const k=seg(0,.15)*(1-seg(.85,1));
+      S.rotation.x=-1.55*k;O.rotation.x=.6*k;
+      L.rotation.x+=.32*k;L.position.z+=.08*k;
+    }else if(type==='hop'){                     // saltito ligero
+      const up=Math.sin(Math.min(1,at)*Math.PI);
+      L.position.y+=.16*up;S.rotation.x=-.4*up;O.rotation.x=.4*up;
+    }else return false;
+    return true;
+  }
   function actionLayer(model,now,type,at,walk){
     const [left,right]=model.arms||[];
     const L=model.layer;
@@ -294,6 +347,8 @@ export function createIso(mount,onCell){
         L.position.z+=at>.35?.1*Math.sin((at-.35)/.65*Math.PI):0;
       }else if(type==='dash'){
         L.rotation.y+=Math.PI*2*ease(at);
+      }else if(spearPose(model,type,at,left,right,L,ease)){
+        // Poses con lanza de la Valkyria (ver spearPose).
       }
     }else if(type&&!left){                      // criaturas sin brazos: saltito y estirón
       const up=Math.sin(Math.min(1,at)*Math.PI);
@@ -901,6 +956,11 @@ export function createIso(mount,onCell){
       quake(.05,240);
     },
   };
+  /** Pose de la Valkyria según la habilidad. */
+  const spearPoses={'Estocada':'thrust','Punzón':'thrust','Lanza abisal':'thrust','Balestra':'thrust','Lanza cargada':'throw',
+    'Liberación':'slam','Abrir las aguas':'slam','Lanza del lago':'slam','Barrido':'sweep','Eclipse':'raise','Furia':'raise',
+    'En guardia!':'guard','Salto valiente':'leap','Carga heroica':'charge','Pies ligeros':'hop'};
+  const poseLength={thrust:480,throw:560,slam:620,sweep:560,raise:820,guard:760,hop:420};
   /** Qué animación hace el que actúa, según el efecto y quién es. */
   function actionFor(unit,effect){
     if(['heal','cleanse'].includes(effect))return 'support';
@@ -940,7 +1000,9 @@ export function createIso(mount,onCell){
     const model=models.get(event.actor);
     if(model){
       model.strike=time;
-      model.action={type:actionFor(model.unit,event.effect),start:time};
+      const pose=model.unit.classId==='guardia'&&spearPoses[event.name];
+      model.action={type:pose||actionFor(model.unit,event.effect),start:time,
+        dur:pose==='charge'?260+travel*80:pose==='leap'?620:pose?poseLength[pose]:null};
       if(travel>.01)model.root.rotation.y=Math.atan2(target.x-from.x,target.z-from.z);
     }
     if(event.name&&skillFx[event.name]){
@@ -1033,7 +1095,7 @@ export function createIso(mount,onCell){
       }
       const strike=Math.max(0,1-(now-(model.strike??-10000))/285);
       let swing=Math.sin(strike*Math.PI);
-      const act=model.action,actDur={melee:460,shoot:560,cast:620,support:640,push:420,pull:460,dash:300}[act?.type]||400;
+      const act=model.action,actDur=act?.dur||{melee:460,shoot:560,cast:620,support:640,push:420,pull:460,dash:300}[act?.type]||400;
       const at=act?(now-act.start)/actDur:2;
       if(at<1){
         // Anticipación (hacia atrás) y golpe: la curva se pasa a la animación propia del modelo.

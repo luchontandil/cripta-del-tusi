@@ -172,7 +172,7 @@ const creatureArt={
   }
 };
 const palettes = {
-  guardia:['#315251','#73937a','#d7b169','#f7dda0'],
+  guardia:['#4a4f57','#9aa0a9','#cfd3d9','#f2d58a'],
   tirador:['#283e2d','#51865b','#b28455','#f2ce92'],
   mistico:['#4e3869','#8a6caf','#f3b363','#fff2bf'],
   mago:['#243451','#5675ad','#99b6ef','#f6d1ff'],
@@ -218,7 +218,14 @@ export function portrait(look,tint=null) {
   }else if(look==='boss'){
     rect(7,3,12,4,light);for(const x of [7,12,17])rect(x,0,2,5,shine);
     rect(4,11,4,10,dark);rect(18,11,4,10,dark);rect(11,12,4,4,shine);
-  }else if(look==='guardia'||look==='elite'){
+  }else if(look==='guardia'){
+    // Lancero: yelmo alado gris, melena rubia y lanza.
+    rect(8,6,2,8,'#e3bd5c');rect(16,6,2,8,'#e3bd5c');
+    rect(8,3,10,3,mid);rect(9,2,8,2,light);rect(12,5,2,3,light);
+    rect(5,1,3,2,'#f4f2ec');rect(4,3,4,2,'#f4f2ec');rect(6,5,2,1,'#dcd9d0');
+    rect(18,1,3,2,'#f4f2ec');rect(18,3,4,2,'#f4f2ec');rect(18,5,2,1,'#dcd9d0');
+    rect(22,5,1,22,'#7a5a3a');rect(21,2,3,3,light);rect(22,0,1,2,shine);rect(21,7,3,1,'#d6b664');
+  }else if(look==='elite'){
     rect(7,6,12,2,light);rect(8,3,10,3,mid);rect(11,2,4,2,shine);
     rect(18,12,6,8,ink);rect(19,12,4,7,light);rect(20,13,2,5,dark);
     rect(3,9,2,11,shine);rect(2,17,5,2,light);

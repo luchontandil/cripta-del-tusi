@@ -1,10 +1,10 @@
 import {setCustomMaps,testCustomMap,labCombat,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=112';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=112';
-import {setupSfx} from './music.js?v=112';
-import {icon} from './icons.js?v=112';
-import {openMapEditor} from './mapeditor.js?v=112';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=113';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=113';
+import {setupSfx} from './music.js?v=113';
+import {icon} from './icons.js?v=113';
+import {openMapEditor} from './mapeditor.js?v=113';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -27,8 +27,8 @@ el('server').value=localStorage.getItem('amber-server')||(onPages?'https://cript
 const error=message=>{el('error').textContent=message;};
 const iconName={expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',burn:'Quemadura',weak:'Maldito',haste:'Prisa',shield:'Escudo'};
 const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo'};
-const specs={guardia:'Primera línea · debilita al enemigo',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
-const roles={guardia:'Tanque',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
+const specs={guardia:'Primera línea con su lanza · debilita al enemigo',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
+const roles={guardia:'Lancero',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
 // Editor de SFX desactivado por ahora; poner true para volver a mostrarlo al admin.
 const SFX_EDITOR=false;
 const sfx=setupSfx(el('field-sfx'));
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=112').then(({createIso})=>{
+import('./isometric.js?v=113').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -526,7 +526,7 @@ const classEmblems={
   // Sombrero de mago con estrella
   mago:'<path d="M100 38 L132 128 Q100 120 68 128 Z" /><path d="M48 132 Q100 112 152 132 Q154 146 100 150 Q46 146 48 132 Z"/><path d="M104 58 l4 9 10 1 -8 6 3 10 -9 -6 -9 6 3 -10 -8 -6 10 -1 z" fill="#100c12"/>',
   // Espada cruzada con escudo
-  guardia:'<path d="M70 50 h60 v34 q0 34 -30 52 q-30 -18 -30 -52 z"/><path d="M96 30 h8 v90 h-8 z" /><path d="M78 120 h44 v8 h-44 z"/><path d="M96 128 h8 v26 h-8 z"/><circle cx="100" cy="158" r="7"/>',
+  guardia:'<path d="M97 34 h6 v136 h-6 z"/><path d="M100 10 l12 26 l-12 10 l-12 -10 z"/><path d="M90 52 h20 v6 h-20 z"/><path d="M70 96 q30 -22 60 0 v14 h-60 z"/><path d="M66 100 q-26 -20 -36 -48 q22 10 40 34 z"/><path d="M134 100 q26 -20 36 -48 q-22 10 -40 34 z"/>',
   // Arco y flecha
   tirador:'<path d="M78 40 Q138 100 78 160" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/><path d="M78 40 L78 160" stroke="currentColor" stroke-width="3"/><path d="M60 100 H150" stroke="currentColor" stroke-width="6"/><path d="M150 100 l-16 -10 v20 z"/><path d="M60 100 l-10 -8 m10 8 l-10 8" stroke="currentColor" stroke-width="5" fill="none"/>',
   // Símbolo sagrado: sol con cruz
@@ -853,7 +853,7 @@ const areaNames={cross:'cruz',circle:'círculo',cone:'cono',line:'línea',wave:'
 /** Texto del efecto de una habilidad, con sus valores reales (rango y bonificaciones incluidos). */
 /** Qué hace cada habilidad, en una frase (los números exactos van en la ficha). */
 const skillLore={
-  // Guardián
+  // Lancero (habilidades heredadas del Guardián)
   'Tajo':'Un corte seco y sin adornos contra quien tengas delante.',
   'Quebrar armadura':'Golpeas donde la armadura cede: el enemigo queda expuesto y todo el grupo le pega más fuerte.',
   'Segundo aliento':'Aprietas los dientes, tomas aire y vuelves a ponerte en pie con fuerzas renovadas.',

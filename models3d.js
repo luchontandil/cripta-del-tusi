@@ -24,7 +24,7 @@ export function piece(parent,shape,color,x,y,z,sx,sy,sz,glow=false){
   return mesh;
 }
 const looks={
-  guardia:['#527571','#e8b475','#294445','#e5b090'],
+  guardia:['#8d939c','#d6b664','#5e646d','#e8b896'],
   tirador:['#47765b','#e7ae69','#314632','#ddb38d'],
   mistico:['#79548b','#ffd894','#493156','#efbc91'],
   mago:['#425c9a','#9dd6fd','#293858','#f1b490'],
@@ -939,7 +939,7 @@ function faceTexture(skin,hair,{scar=false}={}){
   return t;
 }
 const ps1Kits={
-  guardia:{cloth:'#3f7a74',clothDark:'#2a5450',steel:'#a9b8b6',steelDark:'#5f6f70',brass:'#c9963f',leather:'#5a3a26',skin:'#d9a07c',hair:'#4a2e1e'},
+  guardia:{cloth:'#8d939c',clothDark:'#5e646d',steel:'#c3c8cf',steelDark:'#767d87',brass:'#d6b664',leather:'#4a3a30',skin:'#e8b896',hair:'#e9c766'},
   tirador:{cloth:'#3f6e3a',clothDark:'#2a4a28',steel:'#9a8a6a',steelDark:'#5a4a36',brass:'#b88a3a',leather:'#6a4428',skin:'#c9906a',hair:'#3a2a1a'},
   mistico:{cloth:'#6a4a94',clothDark:'#46305e',steel:'#e8dcc0',steelDark:'#b8a888',brass:'#d9b25a',leather:'#5a3a2a',skin:'#d9a07c',hair:'#3a2a1a'},
   mago:{cloth:'#34509a',clothDark:'#22345e',steel:'#c0c8d8',steelDark:'#6a7488',brass:'#c9a04f',leather:'#4a3428',skin:'#d9a07c',hair:'#3a2a1a',glow:'#7fe0ff'},
@@ -995,45 +995,39 @@ function ps1Arm(arm,s,k,{armored=false,sleeve=null,bracer=null}={}){
   arm.add(fuse(p,'arm'));
 }
 const ps1Builders={
+  // Lancero: valquiria de armadura gris, yelmo alado, melena rubia y lanza larga.
   guardia(b,k){
     const {body,arms}=b;
-    lp(body,P.box,k.steelDark,[0,.86,.125],[0,0,0],[.04,.3,.03]);
-    lp(body,P.box,k.cloth,[0,.6,.12],[.08,0,0],[.2,.3,.03]);
-    lp(body,P.box,k.cloth,[0,.6,-.12],[-.08,0,0],[.22,.3,.03]);
-    lp(body,P.box,k.brass,[0,.74,.135],[0,0,0],[.2,.025,.02]);
-    lp(body,P.taper6,k.steelDark,[0,1.04,0],[0,Math.PI/6,0],[.28,.06,.24]);
-    lp(body,P.head,k.steel,[0,1.2,0],[0,Math.PI/8,0],[.27,.28,.27]);
-    lp(body,P.box,SHADOW,[0,1.215,.128],[0,0,0],[.19,.03,.02]);
-    lp(body,P.box,k.steelDark,[0,1.13,.125],[0,0,0],[.14,.07,.02]);
-    for(const x of [-.04,0,.04])lp(body,P.box,SHADOW,[x,1.13,.137],[0,0,0],[.012,.04,.01]);
-    lp(body,P.dome,k.steel,[0,1.27,0],[0,Math.PI/8,0],[.31,.24,.31]);
-    lp(body,P.prism6,k.brass,[0,1.275,0],[0,Math.PI/6,0],[.31,.03,.31]);
-    lp(body,P.box,k.steel,[0,1.19,.135],[0,0,0],[.03,.1,.02]);
-    lp(body,P.box,k.steel,[0,1.15,-.1],[.15,0,0],[.27,.2,.07]);
-    lp(body,P.box,k.cloth,[0,1.42,-.02],[0,0,0],[.04,.12,.28]);
-    lp(body,P.box,k.clothDark,[0,1.44,-.17],[.5,0,0],[.04,.08,.1]);
+    lp(body,P.taper8,k.steelDark,[0,.5,0],[0,Math.PI/8,0],[.4,.2,.32]);              // faldar de placas
+    for(let i=0;i<8;i++){const a=i*Math.PI/4+Math.PI/8;lp(body,P.box,k.steel,[Math.sin(a)*.17,.47,Math.cos(a)*.14],[0,a,0],[.09,.18,.02]);}
+    lp(body,P.box,k.cloth,[0,.55,.16],[.08,0,0],[.16,.26,.02]);                      // tabardo
+    lp(body,P.box,k.brass,[0,.86,.135],[0,0,0],[.22,.03,.02]);                       // ribete del peto
+    lp(body,P.box,k.brass,[0,.93,.13],[0,0,0],[.03,.12,.02]);
+    lp(body,P.box,k.cloth,[0,.75,-.15],[.1,0,0],[.36,.6,.03]);                        // capa
+    lp(body,P.box,k.clothDark,[0,1.02,-.12],[0,0,0],[.38,.06,.08]);
+    lp(body,P.taper6,k.steel,[0,1.04,0],[0,Math.PI/6,0],[.27,.06,.23]);               // gorjal
+    lp(body,P.head,k.skin,[0,1.2,0],[0,Math.PI/8,0],[.25,.27,.25]);                   // rostro
+    for(const x of [-.05,.05])lp(body,P.box,SHADOW,[x,1.21,.125],[0,0,0],[.035,.03,.01]);
+    lp(body,P.box,k.hair,[0,1.13,-.11],[.08,0,0],[.27,.34,.08]);                     // melena
+    lp(body,P.box,k.hair,[0,.9,-.16],[.12,0,0],[.08,.26,.06]);                       // trenza
+    lp(body,P.oct,k.brass,[0,.78,-.18],[0,0,0],[.06,.05,.05]);
+    lp(body,P.dome,k.steel,[0,1.27,-.01],[0,Math.PI/8,0],[.3,.24,.3]);                // yelmo
+    lp(body,P.prism6,k.brass,[0,1.265,0],[0,Math.PI/6,0],[.3,.03,.3]);
+    lp(body,P.box,k.steel,[0,1.24,.14],[0,0,0],[.03,.1,.02]);                        // nasal
+    for(const side of [-1,1]){                                                     // alas
+      for(let f=0;f<3;f++)lp(body,P.box,f?'#e8e6e0':'#f6f4ee',[side*(.16+f*.03),1.32+f*.05,-.04-f*.02],[0,0,side*(.55+f*.15)],[.03,.16-f*.02,.1-f*.015]);
+    }
     arms.forEach((arm,i)=>ps1Arm(arm,i?1:-1,k,{armored:true}));
-    const shieldShape=new T.Shape();
-    shieldShape.moveTo(-.2,.2);shieldShape.lineTo(.2,.2);shieldShape.lineTo(.2,-.02);shieldShape.lineTo(0,-.26);shieldShape.lineTo(-.2,-.02);shieldShape.closePath();
-    const shieldGeo=new T.ExtrudeGeometry(shieldShape,{depth:.04,bevelEnabled:false});
-    const sp=[];
-    lp(sp,shieldGeo,k.steelDark,[0,0,0],[0,0,0],[1.08,1.08,1]);
-    lp(sp,shieldGeo,k.cloth,[0,.005,.035],[0,0,0],[.9,.9,.4]);
-    lp(sp,P.box,k.brass,[0,.03,.06],[0,0,0],[.05,.3,.02]);
-    lp(sp,P.box,k.brass,[0,.08,.06],[0,0,0],[.24,.05,.02]);
-    lp(sp,P.oct,k.brass,[0,.08,.075],[0,0,0],[.07,.07,.04]);
-    const shield=fuse(sp,'shield');shield.position.set(-.06,.02,.08);shield.rotation.y=-.35;
-    arms[0].getObjectByName('held').add(shield);
     const wp=[];
-    lp(wp,P.prism6,'#6a4a30',[0,.17,0],[0,0,0],[.04,.4,.04]);
-    lp(wp,P.prism6,k.leather,[0,0,0],[0,0,0],[.05,.12,.05]);
-    lp(wp,P.oct,k.brass,[0,-.08,0],[0,0,0],[.06,.06,.06]);
-    lp(wp,P.prism6,k.steelDark,[0,.43,0],[0,0,0],[.09,.16,.09]);
-    for(let i=0;i<6;i++){const a=i*Math.PI/3;lp(wp,P.box,k.steel,[Math.sin(a)*.065,.43,Math.cos(a)*.065],[0,a,0],[.025,.17,.07]);}
-    lp(wp,P.cone6,k.steel,[0,.55,0],[0,0,0],[.06,.07,.06]);
-    lp(wp,P.prism6,k.brass,[0,.33,0],[0,0,0],[.07,.025,.07]);
-    const holder=arms[1].getObjectByName('held');holder.add(fuse(wp,'mace'));holder.rotation.x=1.25;
-    return {height:1.46};
+    lp(wp,P.prism6,'#6a4a30',[0,.25,0],[0,0,0],[.035,1.4,.035]);                    // asta
+    lp(wp,P.prism6,k.leather,[0,0,0],[0,0,0],[.045,.14,.045]);                      // empuñadura
+    lp(wp,P.prism6,k.brass,[0,.92,0],[0,0,0],[.055,.03,.055]);
+    lp(wp,P.oct,k.steel,[0,1.04,0],[0,0,0],[.07,.2,.025]);                          // hoja
+    lp(wp,P.cone6,k.steel,[0,1.19,0],[0,0,0],[.045,.12,.025]);
+    lp(wp,P.box,k.cloth,[0,.88,.0],[0,0,.2],[.02,.12,.06]);                          // banderola
+    lp(wp,P.cone6,k.steelDark,[0,-.45,0],[Math.PI,0,0],[.03,.08,.03]);              // regatón
+    const holder=arms[1].getObjectByName('held');holder.add(fuse(wp,'spear'));holder.rotation.x=.25;
+    return {height:1.5};
   },
   tirador(b,k){
     const {body,arms}=b;

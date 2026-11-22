@@ -5,7 +5,7 @@
  * max: bonificación al llegar a rango 3 → {range:1}|{modifiable:true}|{crit:10}|{cost:-1}|{value:1}|{push:1}|{size:1}.
  */
 export const classes = {
-  guardia: {name:'Guardián', hp:58, initiative:10, skills:[
+  guardia: {name:'Lancero', hp:58, initiative:10, skills:[
     ['Tajo',2,1,7,10,'damage','⚔',0,{element:'physical',max:{crit:15}}],
     ['Quebrar armadura',2,1,3,5,'expose','✷',0,{element:'physical',value:3,max:{value:2}}],
     ['Segundo aliento',2,0,5,8,'heal','✚',0,{max:{range:2}}],

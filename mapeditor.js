@@ -1,6 +1,6 @@
 // Editor de mapas (solo administradores): estilo «modo construcción», con catálogo de casillas abajo.
 // Crea, edita, prueba y guarda mapas; cada mapa pertenece a una zona (acto + tipo de sala) y tiene una frecuencia.
-import {cleanMap,mapWarnings,MAP_LIMITS,ROOM_KINDS,obstacleNames,actNames,actBiomes,ACTS,setCustomMaps,adjacent,classes,passiveCards,labEnemyOptions} from './engine.js?v=134';
+import {cleanMap,mapWarnings,MAP_LIMITS,ROOM_KINDS,obstacleNames,actNames,actBiomes,ACTS,setCustomMaps,adjacent,classes,passiveCards,labEnemyOptions} from './engine.js?v=135';
 
 const liquidNames={crypt:'Agua',jungle:'Ciénaga',hell:'Lava'};
 const floorColors={crypt:['#2f3446','#383c50'],jungle:['#2c4322','#344d27'],hell:['#2a2624','#322c29']};

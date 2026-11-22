@@ -6,7 +6,6 @@
  */
 export const classes = {
   // Valkyria (antes Guardián/Lancero). Las tres primeras son las de inicio. Física: escala con daño físico + su elemento.
-  // Pendiente de la hoja (docs/skills-valkyria.md): Eclipse.
   guardia: {name:'Valkyria', hp:58, initiative:10, skills:[
     ['Estocada',3,2,5,7,'push','➶',1,{element:'fire',inLine:true,burnChance:0,area:'line',size:2,push:2,los:false,casts:2,modifiable:false}],
     ['Lanza del lago',3,5,2,7,'pull','↢',1,{element:'lightning',area:'trident',inLine:true,pull:1,casts:1,cooldown:1,modifiable:true}],
@@ -21,6 +20,7 @@ export const classes = {
     ['Lanza cargada',3,7,1,9,'damage','➹',1,{element:'lightning',inLine:'diagonal',crit:15,casts:2,stack:{value:1,turns:2,max:3},modifiable:false}],
     ['Barrido',3,5,4,5,'slow','⟷',1,{element:'ice',inLine:true,area:'wave',width:3,size:1,value:1,slowChance:30,casts:1,modifiable:false}],
     ['Lanza abisal',3,3,6,9,'damage','◆',1,{element:'ice',los:false,meleeBonus:35,casts:1,modifiable:false}],
+    ['Eclipse',2,0,0,0,'eclipse','◐',0,{mpCost:2,value:6,los:false,casts:1,cooldown:5,modifiable:false}],
     ['Furia',2,0,0,0,'fury','✹',0,{element:'fire',burnChance:0,value:10,turns:2,los:false,casts:1,cooldown:4,modifiable:false}]
   ]},
   tirador: {name:'Arquero', hp:31, initiative:14, skills:[
@@ -172,7 +172,7 @@ export function damageBonus(unit,skill){
 const armorType=(unit,skill)=>skillSchool(unit,skill)==='physical'?'physical':skillElement(unit,skill);
 export const modifiableRange=skill=>skillOptions(skill).modifiable??(skill[2]>1&&!['dash','swap'].includes(skill[5]));
 /** Tipos de habilidad que se lanzan sobre aliados. */
-export const supportKinds=['heal','cleanse','shield','haste','sprint','fury'];
+export const supportKinds=['heal','cleanse','shield','haste','sprint','fury','eclipse'];
 /** ¿Se apunta a una casilla (área, teletransporte) en lugar de a una unidad? */
 export const castsOnCell=skill=>!!skillOptions(skill).area||skill[5]==='dash'||skill[5]==='blast';
 /** Tipos de objeto de equipo (el talismán ya no existe). */
@@ -1674,7 +1674,7 @@ function castGlyph(s,boss,heroes) {
   note(s,boss.name+' anuncia '+glyphInfo[kind].name.toLowerCase()+'.');
 }
 /** Alcance actual de un monstruo (el escupitajo de la babosa llega más lejos cuando está listo). */
-const reachOf=unit=>unit.look==='slug'&&skillReady(unit)?3:unit.range;
+const reachOf=unit=>Math.max(1,(unit.look==='slug'&&skillReady(unit)?3:unit.range)-(unit.effects?.blind?.value||0));
 /** Qué tan apetecible es un héroe: remata a quien pueda matar, va a por sanadores y frágiles. */
 function priority(s,unit,hero,pos){
   const ward=hero.stats?.ward||0;
@@ -2370,7 +2370,7 @@ function spellCue(s,unit,pos,kind,area,skill){
 }
 export function hasRange(s,unit,pos,skill) {
   const [,cost,range,,,,,min=0]=skill;
-  if(!onBoard(s,pos)||s.walls.includes(pos)||cost>s.ap||castsLeft(s,unit,skill)<=0)return false;
+  if(!onBoard(s,pos)||s.walls.includes(pos)||cost>s.ap||(skillOptions(skill).mpCost||0)>s.mp||castsLeft(s,unit,skill)<=0)return false;
   const d=distance(s,unit.pos,pos);
   // Hechizos en línea recta: solo en la misma fila o columna que el lanzador.
   const line=skillOptions(skill).inLine;
@@ -2394,6 +2394,8 @@ export function castsLeft(s,unit,skill){
 export const cooldownLeft=(unit,skill)=>Math.max(0,(unit.cooldowns?.[skill[0]]||0)-1);
 function countCast(s,unit,skill){
   const cooldown=skillOptions(skill).cooldown;
+  // Habilidades que además cuestan PM (Eclipse).
+  if(skillOptions(skill).mpCost)s.mp=Math.max(0,s.mp-skillOptions(skill).mpCost);
   // Se guarda N+1: baja 1 al terminar cada turno propio, y con 0 vuelve a estar lista (N turnos después).
   if(cooldown)(unit.cooldowns||={})[skill[0]]=cooldown+1;
   // Lanza cargada: suma una carga (máximo N; con el máximo, la más vieja se sustituye por la nueva).
@@ -2565,6 +2567,12 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
   const value=opts.value;
   if(supportKinds.includes(kind)){
     if(kind==='shield'){effect(target,'shield',value||25,2);note(s,name+' → '+target.name+': +'+(value||25)+' % de armadura 2 turnos.');emit(s,{kind:'buff',tone:'shield',unit:target.id,pos:target.pos,text:'+'+(value||25)+' % armadura'});return;}
+    if(kind==='eclipse'){
+      const foes=s.units.filter(u=>alive(u)&&!!u.enemy!==!!unit.enemy);
+      for(const foe of foes){effect(foe,'blind',value||6,1);emit(s,{kind:'buff',tone:'blind',unit:foe.id,pos:foe.pos,text:'−'+(value||6)+' alcance'});}
+      note(s,name+': todos los enemigos pierden '+(value||6)+' de alcance en su próximo turno.');
+      return;
+    }
     if(kind==='sprint'){s.mp+=value||2;note(s,name+': +'+(value||2)+' PM este turno.');emit(s,{kind:'mp',gain:true,unit:target.id,pos:target.pos,amount:value||2});return;}
     if(kind==='fury'){effect(target,'fury',value||10,opts.turns||2);note(s,name+': +'+(value||10)+' % de daño final (más con daño de fuego) durante 2 turnos.');emit(s,{kind:'buff',tone:'fury',unit:target.id,pos:target.pos,text:'+'+Math.round((furyBonus(target)-1)*100)+' % daño'});return;}
     if(kind==='haste'){effect(target,'haste',value||2,target===unit?2:1);note(s,name+' → '+target.name+': +'+(value||2)+' PM en su próximo turno.');emit(s,{kind:'buff',tone:'mp',unit:target.id,pos:target.pos,text:'+'+(value||2)+' PM'});return;}

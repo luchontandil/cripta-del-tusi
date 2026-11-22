@@ -1625,3 +1625,19 @@ test('Valkyria tanda 3: Lanza cargada, Barrido, Lanza abisal',()=>{
     const near=300-a.foes[0].hp,far=300-b.foes[0].hp;
     assert.ok(near>far,near+' vs '+far);}
 });
+
+test('Valkyria: Eclipse',()=>{
+  const rng=()=>.5;
+  const names=classes.guardia.skills.map(k=>k[0]);
+  const s=battle('guardia');
+  const v=s.units.find(u=>!u.enemy);
+  v.skillRanks=names.map(()=>1);
+  s.turn=s.units.indexOf(v);s.ap=20;s.casts={};s.phase='combat';
+  const k=names.indexOf('Eclipse');
+  s.mp=1;
+  assert.throws(()=>act(s,v.id,{type:'skill',skill:k,pos:v.pos},rng),'sin 2 PM no se puede');
+  s.mp=3;
+  act(s,v.id,{type:'skill',skill:k,pos:v.pos},rng);
+  assert.equal(s.mp,1,'gasta 2 PM');assert.equal(s.ap,18);
+  for(const f of s.units.filter(u=>u.enemy))assert.equal(f.effects.blind.value,6);
+});

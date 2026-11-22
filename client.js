@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=130';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=130';
-import {setupSfx} from './music.js?v=130';
-import {icon} from './icons.js?v=130';
-import {openMapEditor} from './mapeditor.js?v=130';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=131';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=131';
+import {setupSfx} from './music.js?v=131';
+import {icon} from './icons.js?v=131';
+import {openMapEditor} from './mapeditor.js?v=131';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -25,8 +25,8 @@ function lootReady(){
 const onPages=location.hostname.endsWith('.github.io');
 el('server').value=localStorage.getItem('amber-server')||(onPages?'https://cripta-del-tusi.onrender.com':location.origin);
 const error=message=>{el('error').textContent=message;};
-const iconName={expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',burn:'Quemadura',weak:'Maldito',haste:'Prisa',shield:'Escudo'};
-const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo'};
+const iconName={expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',burn:'Quemadura',weak:'Maldito',haste:'Prisa',shield:'Escudo',fury:'Furia',barrier:'Guardia',blind:'Eclipse'};
+const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo',fury:v=>'+'+v+' % de daño',barrier:v=>v+' de escudo',blind:v=>'−'+v+' de alcance'};
 const specs={guardia:'Lanza, empujes y escudo · controla el frente',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
 const roles={guardia:'Valkyria',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
 // Editor de SFX desactivado por ahora; poner true para volver a mostrarlo al admin.
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=130').then(({createIso})=>{
+import('./isometric.js?v=131').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -866,6 +866,7 @@ const skillLore={
   'Lanza cargada':'Cada estocada carga la punta de electricidad: la siguiente pica más fuerte.',
   'Barrido':'Un giro amplio con el asta helada que barre todo lo que tienes delante.',
   'Lanza abisal':'Una punta forjada en el fondo del lago: hiela hasta el hueso, y más de cerca.',
+  'Eclipse':'Alzas la lanza al cielo y la luz se apaga: nadie ve más allá de su nariz.',
   'Abrir las aguas':'Clavas la lanza y el suelo se parte en tres: el frío aparta a todo lo que toca.',
   'Furia':'El fuego de la batalla te enciende por dentro: cada golpe pega más fuerte.',
   // Arquero
@@ -921,6 +922,7 @@ function skillEffectText(skill){
     shield:'+'+(o.value||3)+' de armadura durante 2 turnos',
     haste:'+'+(o.value||2)+' PM en el próximo turno del aliado',
     sprint:'Ganas +'+(o.value||2)+' PM este turno',
+    eclipse:'Todos los enemigos del mapa pierden '+(o.value||6)+' de alcance en su próximo turno (mínimo 1)',
     fury:'+'+(o.value||10)+' % de daño final durante 2 turnos (contando este); se multiplica por tu % de daño de fuego',
     guard:'Escudo del 10 % de tu vida máxima + tu nivel hasta tu próximo turno. Al terminar tu turno, el primer paso de cada enemigo dentro del área le hace este daño y lo empuja 2 casillas (una vez por enemigo). Pasa el turno',
     swap:'Intercambia tu posición con la del objetivo',
@@ -1001,7 +1003,7 @@ function areaSketch(skill){
 /** Filas de la ficha de una habilidad. */
 function skillRows(unit,skill){
   const f=skillFacts(unit,skill),o=skillOptions(skill);
-  const rows=[statRow('ap','Coste',f.cost+' PA')];
+  const rows=[statRow('ap','Coste',f.cost+' PA'+(o.mpCost?' + '+o.mpCost+' PM':''))];
   // Daño y curación como filas: valor a la derecha, con el icono y el color de su tipo (sin rótulo de elemento).
   const amount=(cls,iconName,low,high,title)=>{
     const row=h('div','tip-row tip-amount '+cls,icon(cls==='heal'?'heal':'attack'),h('span','tip-label',title),
@@ -2324,7 +2326,7 @@ function render(){
       const rank=turn.skillRanks[i];
       const key=h('kbd',null,String(hotkey));
       key.setAttribute('aria-hidden','true');
-      b.append(spellIcon(kind,symbol),h('span','ability-name',name),h('span','ability-cost stat-pa',cost+' PA'),key);
+      b.append(spellIcon(kind,symbol),h('span','ability-name',name),h('span','ability-cost stat-pa',cost+' PA'+(skillOptions(current).mpCost?' +'+skillOptions(current).mpCost+' PM':'')),key);
       if(rank>1)b.append(h('span','ability-rank',rank+'/3'));
       if(!['heal','cleanse','dash'].includes(kind)){
         const element=skillElement(turn,current);

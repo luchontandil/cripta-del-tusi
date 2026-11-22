@@ -312,6 +312,8 @@ summary{cursor:pointer}
 @keyframes damage-rise{0%{opacity:0;translate:0 var(--float-offset,0px);scale:.6}12%{opacity:1;scale:1.18}25%{scale:1}60%{opacity:1}100%{opacity:0;translate:0 calc(var(--float-offset,0px) - 40px)}}
 /* PM quitados por un hechizo: debajo del número de daño, en el verde de los PM. */
 .impact.mp-loss{color:var(--pm);font-size:clamp(.95rem,1.9vw,1.25rem);font-family:var(--font-ui);font-weight:800;line-height:1;white-space:nowrap;-webkit-text-stroke:1.2px #0f1d0c;paint-order:stroke fill;text-shadow:0 2px 0 #0b140a,0 0 8px #000a;animation:damage-rise 1s var(--ease) both}
+.impact.buff{font-size:clamp(.9rem,1.8vw,1.15rem);font-family:var(--font-ui);font-weight:800;line-height:1;white-space:nowrap;-webkit-text-stroke:1.2px #111;paint-order:stroke fill;text-shadow:0 2px 0 #000,0 0 8px #000a;animation:damage-rise 1s var(--ease) both}
+.impact.buff-shield{color:#d8c27a}.impact.buff-fury{color:#ff8a3d}.impact.buff-mp{color:var(--pm)}
 .fire-flash,.spell-burst{position:absolute;transform:translate(-50%,-50%);width:8%;aspect-ratio:1;border-radius:50%;animation:burst 550ms ease-out both}
 .fire-flash{background:radial-gradient(#fff6b5,#ff8b27 36%,#dd4d2c55 64%,transparent 72%)}
 .spell-burst{background:radial-gradient(#fff9d7,#f8af66,transparent 68%)}

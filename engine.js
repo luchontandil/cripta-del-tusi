@@ -2481,7 +2481,7 @@ function guard(s,unit,skill){
   const amount=Math.round(unit.max*.1)+(unit.level||0);
   unit.effects.barrier={value:amount,turns:99,untilOwnTurn:true};
   unit.guardPending={skill:skill[0],size:skillOptions(skill).size||3,push:2};
-  emit(s,{kind:'heal',unit:unit.id,from:unit.pos,pos:unit.pos,amount:0});
+  emit(s,{kind:'buff',tone:'shield',unit:unit.id,pos:unit.pos,text:'⛨ '+amount});
   note(s,unit.name+' se pone en guardia: escudo de '+amount+'. Al terminar su turno, quien se acerque será rechazado.');
 }
 /** Zona de En guardia!: se activa cuando un enemigo entra en ella (una vez por enemigo). */
@@ -2517,10 +2517,10 @@ function applySkill(s,unit,target,skill,rng,scale=1){
   const opts=skillOptions(skill);
   const value=opts.value;
   if(supportKinds.includes(kind)){
-    if(kind==='shield'){effect(target,'shield',value||25,2);note(s,name+' → '+target.name+': +'+(value||25)+' % de armadura 2 turnos.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
+    if(kind==='shield'){effect(target,'shield',value||25,2);note(s,name+' → '+target.name+': +'+(value||25)+' % de armadura 2 turnos.');emit(s,{kind:'buff',tone:'shield',unit:target.id,pos:target.pos,text:'+'+(value||25)+' % armadura'});return;}
     if(kind==='sprint'){s.mp+=value||2;note(s,name+': +'+(value||2)+' PM este turno.');emit(s,{kind:'mp',gain:true,unit:target.id,pos:target.pos,amount:value||2});return;}
-    if(kind==='fury'){effect(target,'fury',value||10,opts.turns||2);note(s,name+': +'+(value||10)+' % de daño final (más con daño de fuego) durante 2 turnos.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
-    if(kind==='haste'){effect(target,'haste',value||2,target===unit?2:1);note(s,name+' → '+target.name+': +'+(value||2)+' PM en su próximo turno.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
+    if(kind==='fury'){effect(target,'fury',value||10,opts.turns||2);note(s,name+': +'+(value||10)+' % de daño final (más con daño de fuego) durante 2 turnos.');emit(s,{kind:'buff',tone:'fury',unit:target.id,pos:target.pos,text:'+'+Math.round((furyBonus(target)-1)*100)+' % daño'});return;}
+    if(kind==='haste'){effect(target,'haste',value||2,target===unit?2:1);note(s,name+' → '+target.name+': +'+(value||2)+' PM en su próximo turno.');emit(s,{kind:'buff',tone:'mp',unit:target.id,pos:target.pos,text:'+'+(value||2)+' PM'});return;}
     const amount=Math.min(target.max-target.hp,Math.round((roll(min,max,rng)+Math.floor(unit.level/2))*(1+(passiveEffects(unit).healPct||0)/100)));
     target.hp+=amount;
     if(kind==='cleanse')for(const key of ['poison','burn','slow','expose','weak'])delete target.effects[key];

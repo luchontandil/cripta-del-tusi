@@ -23,15 +23,17 @@ export const classes = {
     ['Eclipse',2,0,0,0,'eclipse','◐',0,{mpCost:2,value:6,los:false,casts:1,cooldown:5,modifiable:false}],
     ['Furia',2,0,0,0,'fury','✹',0,{element:'fire',burnChance:0,value:20,turns:2,los:false,casts:1,cooldown:4,modifiable:false}]
   ]},
+  // Arquero: hoja nueva (docs/skills-arquero.md). «Veneno» = escala con daño caótico.
   tirador: {name:'Arquero', hp:31, initiative:14, skills:[
-    ['Flecha precisa',2,7,6,8,'damage','➶',2,{element:'physical',max:{crit:15}}],
-    ['Flecha de lastre',2,6,3,5,'slow','❄',2,{element:'ice',value:2,max:{value:1}}],
-    ['Flecha perforante',3,8,9,12,'expose','✷',3,{element:'physical',value:3,max:{range:1}}],
-    ['Paso atrás',1,1,2,3,'push','↢',0,{element:'physical',push:2,max:{push:1}}],
-    ['Lluvia de flechas',3,7,3,6,'blast','✹',3,{element:'physical',area:'cross',max:{cost:-1}}],
-    ['Flecha penetrante',3,6,5,8,'damage','➶',2,{element:'physical',area:'line',size:2,max:{size:1}}],
-    ['Flecha de retroceso',2,5,3,5,'push','➶',2,{element:'physical',push:2,max:{push:1}}],
-    ['Flecha ígnea',2,6,6,9,'damage','✹',2,{element:'fire',max:{crit:15}}]
+    ['Flecha helada',2,8,2,3,'slow','❄',2,{element:'ice',value:1,slowBonus:{chance:25,value:2},casts:2,modifiable:true}],
+    ['Flecha Flamígera',3,9,5,7,'damage','➵',1,{element:'fire',burnChance:0,area:'line',size:3,inLine:true,friendly:true,recoil:1,casts:1,modifiable:false}],
+    ['Detonadora',2,8,2,4,'detonate','✺',1,{element:'fire',burnChance:0,detonate:[3,5],perTarget:1,casts:2,modifiable:true}],
+    ['Flecha Repelente',3,8,3,5,'push','➶',1,{element:'physical',push:2,casts:2,modifiable:true}],
+    ['Ojo de águila',2,0,0,0,'reach','◉',0,{value:3,turns:2,los:false,casts:1,cooldown:3,modifiable:false}],
+    ['Flecha venenosa',2,8,1,4,'curse','☠',1,{element:'chaos',value:1,casts:2,modifiable:true}],
+    ['Dardo pestilente',2,8,2,4,'corrode','✣',1,{element:'chaos',value:25,poison:2,perTarget:1,casts:2,modifiable:true}]
+    // Pendientes (docs/skills-arquero.md): Congelación prematura, Ramo helado, Tramposa, Expansión de dominio,
+    // Contagio, Trampita, Flecha Explosiva, Flecha Rastreadora.
   ]},
   mistico: {name:'Clérigo', hp:36, initiative:12, skills:[
     ['Luz ardiente',2,4,5,8,'damage','✦',0,{element:'magic',max:{range:1}}],
@@ -172,7 +174,9 @@ export function damageBonus(unit,skill){
 const armorType=(unit,skill)=>skillSchool(unit,skill)==='physical'?'physical':skillElement(unit,skill);
 export const modifiableRange=skill=>skillOptions(skill).modifiable??(skill[2]>1&&!['dash','swap'].includes(skill[5]));
 /** Tipos de habilidad que se lanzan sobre aliados. */
-export const supportKinds=['heal','cleanse','shield','haste','sprint','fury','eclipse'];
+export const supportKinds=['heal','cleanse','shield','haste','sprint','fury','eclipse','reach'];
+/** Alcance extra para hechizos de alcance modificable: equipo + Ojo de águila. */
+export const reachBonus=unit=>(unit.stats?.reach||0)+(unit.effects?.reach?.value||0);
 /** ¿Se apunta a una casilla (área, teletransporte) en lugar de a una unidad? */
 export const castsOnCell=skill=>!!skillOptions(skill).area||skill[5]==='dash'||skill[5]==='blast';
 /** Tipos de objeto de equipo (el talismán ya no existe). */
@@ -1390,7 +1394,8 @@ export function armorPercent(target,element){
 }
 function netDamage(target,raw,element,critical,extra=0){
   // Resistencia (o debilidad, si es negativa) al tipo de daño y armadura: ambas en %.
-  const resist=Math.max(-100,Math.min(90,target.resist?.[element]||0));
+  // Dardo pestilente: −N a todas las resistencias mientras dure.
+  const resist=Math.max(-100,Math.min(90,(target.resist?.[element]||0)-(target.effects?.corrode?.value||0)));
   const taken=element==='physical'?passiveEffects(target).takenPhysical||0:0;
   const total=(raw+extra)*(critical?1.5:1)*(1-resist/100)*(1-armorPercent(target,element)/100)*(1+taken/100);
   return Math.max(raw+extra>0?1:0,Math.round(total));
@@ -1535,7 +1540,7 @@ function beginTurn(s) {
   if(s.guardZones?.length)s.guardZones=s.guardZones.filter(z=>z.owner!==u.id);
   if(u.effects.barrier?.untilOwnTurn)delete u.effects.barrier;
   const bonus=u.enemy?{}:s.mods||{};
-  s.casts={};
+  s.casts={};s.castTargets={};
   s.ap=Math.max(1,(u.enemy?4:BASE_AP)+(u.stats?.action||0)+(bonus.ap||0)-(u.effects.weak?.value||0));
   // Los enemigos tienen 4 PM de base (uno más que los héroes).
   // Los de distancia, 3 PM (si no, disparan y huyen sin que se les pueda alcanzar).
@@ -1546,6 +1551,15 @@ function beginTurn(s) {
   if(u.effects.poison)hit(s,{name:'Veneno',pos:u.pos},u,u.effects.poison.value,'poison',false,'chaos');
   if(u.effects.burn&&alive(u))hit(s,{name:'Quemadura',pos:u.pos},u,u.effects.burn.value,'burn',false,'fire');
   applyGlyphs(s,u,-1);
+}
+/** Detonadora: al acabar el turno del objetivo, estalla y quema a sus aliados a 2 casillas o menos. */
+function detonate(s,unit){
+  const d=unit.effects.detonate;delete unit.effects.detonate;
+  const caster=s.units.find(u=>u.id===d.by)||{name:'Detonadora',pos:unit.pos,level:1};
+  const victims=s.units.filter(u=>u!==unit&&alive(u)&&!!u.enemy===!!unit.enemy&&distance(s,u.pos,unit.pos)<=2);
+  emit(s,{kind:'spell',effect:'blast',actor:caster.id,from:unit.pos,pos:unit.pos,area:victims.map(u=>u.pos).concat(unit.pos),name:'Detonación',element:'fire'});
+  note(s,unit.name+' estalla'+(victims.length?'.':', pero no hay nadie cerca.'));
+  for(const v of victims)hit(s,caster,v,d.value,'damage',false,'fire',false);
 }
 function endEffects(unit) {
   for(const [key,status] of Object.entries(unit.effects)) {
@@ -1609,6 +1623,7 @@ function advance(s,rng) {
     delete ending.guardPending;
     note(s,ending.name+' queda en guardia hasta su próximo turno.');
   }
+  if(ending?.effects?.detonate&&alive(ending))detonate(s,ending);
   endEffects(ending);
   while(!finish(s,rng)){
     do {
@@ -2380,7 +2395,7 @@ export function hasRange(s,unit,pos,skill) {
   }
   // Cargas (Balestra, Carga heroica): nada en medio de la recta (las trampas no cuentan).
   if(skillOptions(skill).clearPath&&!clearLine(s,unit.pos,pos))return false;
-  return d>=min&&d<=range+(modifiableRange(skill)?(unit.stats?.reach||0):0);
+  return d>=min&&d<=range+(modifiableRange(skill)?reachBonus(unit):0);
 }
 /** Lanzamientos que le quedan este turno a una habilidad con límite (Infinity si no tiene). */
 export function castsLeft(s,unit,skill){
@@ -2392,7 +2407,9 @@ export function castsLeft(s,unit,skill){
 }
 /** Turnos de recarga que le quedan a una habilidad (0 si está lista). */
 export const cooldownLeft=(unit,skill)=>Math.max(0,(unit.cooldowns?.[skill[0]]||0)-1);
-function countCast(s,unit,skill){
+function countCast(s,unit,skill,target=null){
+  // Una vez por objetivo y turno (Detonadora, Dardo pestilente).
+  if(target&&skillOptions(skill).perTarget)((s.castTargets||={})[skill[0]]||=[]).push(target.id);
   const cooldown=skillOptions(skill).cooldown;
   // Habilidades que además cuestan PM (Eclipse).
   if(skillOptions(skill).mpCost)s.mp=Math.max(0,s.mp-skillOptions(skill).mpCost);
@@ -2496,6 +2513,7 @@ export function spellArea(s,pos,skill,caster=null) {
   return [...cells].filter(c=>onBoard(s,c)&&!s.walls.includes(c));
 }
 export function targetable(s,unit,target,skill) {
+  if(skillOptions(skill).perTarget&&target&&s.castTargets?.[skill[0]]?.includes(target.id))return false;
   if(!target||!alive(target)||!inRange(s,unit,target.pos,skill))return false;
   if(skill[5]==='swap'||skillOptions(skill).anyTarget)return target!==unit;
   return !!target.enemy!==supportKinds.includes(skill[5]);
@@ -2567,6 +2585,12 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
   const value=opts.value;
   if(supportKinds.includes(kind)){
     if(kind==='shield'){effect(target,'shield',value||25,2);note(s,name+' → '+target.name+': +'+(value||25)+' % de armadura 2 turnos.');emit(s,{kind:'buff',tone:'shield',unit:target.id,pos:target.pos,text:'+'+(value||25)+' % armadura'});return;}
+    if(kind==='reach'){
+      effect(target,'reach',value||3,opts.turns||2);
+      note(s,name+': +'+(value||3)+' de alcance en los hechizos de alcance modificable durante '+(opts.turns||2)+' turnos.');
+      emit(s,{kind:'buff',tone:'mp',unit:target.id,pos:target.pos,text:'+'+(value||3)+' alcance'});
+      return;
+    }
     if(kind==='eclipse'){
       const foes=s.units.filter(u=>alive(u)&&!!u.enemy!==!!unit.enemy);
       for(const foe of foes){effect(foe,'blind',value||6,1);emit(s,{kind:'buff',tone:'blind',unit:foe.id,pos:foe.pos,text:'−'+(value||6)+' alcance'});}
@@ -2601,8 +2625,8 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
     traveled=distance(s,start,unit.pos);
     if(!alive(unit))return;
   }
-  // Los hechizos que pueden apuntar a aliados (como el Gancho) no les hacen daño.
-  if(max>0&&!!target.enemy!==!!unit.enemy){
+  // Los hechizos que pueden apuntar a aliados (como el Gancho) no les hacen daño; los «friendly» sí.
+  if(max>0&&(opts.friendly||!!target.enemy!==!!unit.enemy)){
     const element=skillElement(unit,skill);
     const critical=rng()<Math.min(1,critChance(unit)+(opts.crit||0)/100);
     const before=target.hp;
@@ -2628,10 +2652,23 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
   if(kind==='charge')shove(s,unit,target,traveled+1,false,unit.pos,!!target.enemy!==!!unit.enemy);
   if(kind==='expose'){effect(target,'expose',value||3,2);note(s,target.name+' queda vulnerable: todos los atacantes infligen +'+(value||3)+'.');}
   if(kind==='slow'&&(opts.slowChance===undefined||rng()*100<opts.slowChance)){
-    drainMp(s,target,value||2,1);
+    // Flecha helada: siempre −1 PM y a veces −2.
+    const amount=opts.slowBonus&&rng()*100<opts.slowBonus.chance?opts.slowBonus.value:value||2;
+    drainMp(s,target,amount,1);
     if(opts.slowChance!==undefined)note(s,target.name+' queda ralentizado: −'+(value||2)+' PM.');
   }
   if(kind==='venom'){effect(target,'poison',value||3,2);note(s,target.name+' queda envenenado.');}
+  if(kind==='detonate'&&!!target.enemy!==!!unit.enemy){
+    const [lo,hi]=opts.detonate||[3,5];
+    target.effects.detonate={value:scaledDamage(unit,skill,roll(lo,hi,rng)),turns:1,by:unit.id};
+    note(s,target.name+' queda detonado: estallará al acabar su turno.');
+  }
+  if(kind==='curse'){effect(target,'weak',value||1,1);note(s,target.name+' pierde '+(value||1)+' PA en su próximo turno.');}
+  if(kind==='corrode'){
+    effect(target,'corrode',value||25,1);
+    if(opts.poison)effect(target,'poison',opts.poison,1);
+    note(s,target.name+': −'+(value||25)+' % a todas sus resistencias y envenenado.');
+  }
   if(kind==='push')shove(s,unit,target,opts.push||1,false,origin??unit.pos);
   if(kind==='pull')shove(s,unit,target,opts.pull==='melee'?Math.max(0,distance(s,unit.pos,target.pos)-1):opts.pull||1,true);
 }
@@ -2839,17 +2876,20 @@ export function act(s,id,a,rng=Math.random) {
     const support=supportKinds.includes(kind);
     // Empujes en área: primero los más lejanos, para que no se bloqueen entre ellos.
     const origin=skillOptions(skill).pushFrom==='center'?a.pos:unit.pos;
-    const hits=s.units.filter(u=>alive(u)&&area.includes(u.pos)&&(support?!u.enemy:u.enemy))
+    // «friendly»: golpea a todo lo que haya en el área, aliados incluidos (Flecha Flamígera).
+    const hits=s.units.filter(u=>alive(u)&&area.includes(u.pos)&&(skillOptions(skill).friendly?u!==unit:support?!u.enemy:u.enemy))
       .sort((a,b)=>kind==='push'?distance(s,origin,b.pos)-distance(s,origin,a.pos):kind==='pull'?distance(s,unit.pos,a.pos)-distance(s,unit.pos,b.pos):0);
     if(kind==='guard')guard(s,unit,skill);
     else if(alive(unit))for(const other of hits)applySkill(s,unit,other,skill,rng,areaFalloff(s,a.pos,other.pos,skill),origin);
+    // Retroceso del lanzador (Flecha Flamígera): se aleja de la casilla elegida; si choca, se hace daño.
+    if(skillOptions(skill).recoil&&alive(unit))shove(s,unit,unit,skillOptions(skill).recoil,false,a.pos);
     finish(s,rng);
     // Habilidades que pasan el turno al lanzarse (En guardia!).
     if(s.phase==='combat'&&(!alive(unit)||skillOptions(skill).endsTurn))advance(s,rng);
     return;
   }
   if(!targetable(s,unit,target,skill))fail('Objetivo inválido, fuera de alcance o sin línea de visión.');
-  s.ap-=cost;countCast(s,unit,skill);
+  s.ap-=cost;countCast(s,unit,skill,target);
   spellCue(s,unit,target.pos,kind,undefined,skill);
   applySkill(s,unit,target,skill,rng);
   finish(s,rng);

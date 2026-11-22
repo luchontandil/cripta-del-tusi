@@ -24,3 +24,10 @@ Hoja hecha por un amigo del usuario, tal cual llegó (22-11-2026). Daños ajusta
 Flecha Explosiva 13–16 → 5–7 · Flecha Repelente 7–10 → 3–5 · Flecha Flamigera 9–10 → 5–7 · Flecha Rastreadora 10–12 → 6–8 ·
 Contagio 9–10 → 5–7 · Tramposa 8–12 → 5–8 · Congelacion prematura 6–8 → 4–6 · Ramo helado 5–6 → 3–5 · Trampita 4–6 → 3–5.
 El resto, igual.
+
+## Tanda 1 — decisiones (22-11-2026)
+- «Veneno» = elemento caótico. Flecha helada: −1 PM (75 %) o −2 PM (25 %).
+- Flecha Flamígera: casilla elegida + 3 más en línea recta; daña también a aliados; el arquero retrocede 1 (con daño si choca).
+- Detonadora: 2 por turno, 1 por objetivo; la explosión hace 3–5 de fuego a los aliados del objetivo a ≤2 casillas al acabar su turno.
+- Flecha Repelente: choque normal. Ojo de águila: solo hechizos de alcance modificable.
+- Flecha venenosa: −1 PA no acumulable. Dardo pestilente: −25 a todas las resistencias 1 turno + veneno de 2 PV 1 turno; 1 por objetivo.

@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
-  BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=136';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=136';
-import {setupSfx} from './music.js?v=136';
-import {icon} from './icons.js?v=136';
-import {openMapEditor} from './mapeditor.js?v=136';
+  BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=137';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=137';
+import {setupSfx} from './music.js?v=137';
+import {icon} from './icons.js?v=137';
+import {openMapEditor} from './mapeditor.js?v=137';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -25,8 +25,8 @@ function lootReady(){
 const onPages=location.hostname.endsWith('.github.io');
 el('server').value=localStorage.getItem('amber-server')||(onPages?'https://cripta-del-tusi.onrender.com':location.origin);
 const error=message=>{el('error').textContent=message;};
-const iconName={expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',burn:'Quemadura',weak:'Maldito',haste:'Prisa',shield:'Escudo',fury:'Furia',barrier:'Guardia',blind:'Eclipse'};
-const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo',fury:v=>'+'+v+' % de daño',barrier:v=>v+' de escudo',blind:v=>'−'+v+' de alcance'};
+const iconName={reach:'Ojo de águila',corrode:'Corroído',detonate:'Detonado',expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',burn:'Quemadura',weak:'Maldito',haste:'Prisa',shield:'Escudo',fury:'Furia',barrier:'Guardia',blind:'Eclipse'};
+const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',reach:v=>'+'+v+' de alcance',corrode:v=>'−'+v+' % a todas las resistencias',detonate:v=>'estalla al acabar su turno ('+v+' de fuego a 2 casillas)',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo',fury:v=>'+'+v+' % de daño',barrier:v=>v+' de escudo',blind:v=>'−'+v+' de alcance'};
 const specs={guardia:'Lanza, empujes y escudo · controla el frente',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
 const roles={guardia:'Valkyria',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
 // Editor de SFX desactivado por ahora; poner true para volver a mostrarlo al admin.
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=136').then(({createIso})=>{
+import('./isometric.js?v=137').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -869,15 +869,6 @@ const skillLore={
   'Eclipse':'Alzas la lanza al cielo y la luz se apaga: nadie ve más allá de su nariz.',
   'Abrir las aguas':'Clavas la lanza y el suelo se parte en tres: el frío aparta a todo lo que toca.',
   'Furia':'El fuego de la batalla te enciende por dentro: cada golpe pega más fuerte.',
-  // Arquero
-  'Flecha precisa':'Respiras, apuntas y sueltas. Una flecha limpia a cualquier enemigo a la vista.',
-  'Flecha de lastre':'Una punta helada que entumece las piernas: el enemigo apenas podrá moverse en su próximo turno.',
-  'Flecha perforante':'Busca la rendija de la armadura y la abre para que el resto del grupo remate.',
-  'Paso atrás':'Golpe rápido al que se te ha pegado y lo apartas para recuperar tu distancia.',
-  'Lluvia de flechas':'Tensas hacia el cielo y dejas que la gravedad haga el resto sobre toda la zona.',
-  'Flecha penetrante':'Atraviesa al primero y sigue su camino: todo lo que esté en la línea recibe.',
-  'Flecha de retroceso':'Un disparo tan potente que tira al enemigo hacia atrás.',
-  'Flecha ígnea':'Prendes la punta antes de soltarla: el blanco sigue ardiendo después del impacto.',
   // Clérigo
   'Luz ardiente':'Un destello sagrado que quema a los enemigos que se acercan demasiado.',
   'Restaurar':'Posas la mano y la luz cierra las heridas, tuyas o de un aliado.',
@@ -897,6 +888,14 @@ const skillLore={
   'Onda de choque':'Una sacudida de energía que golpea y aparta al enemigo.',
   'Teletransporte':'Te desvaneces y reapareces en otro punto, aunque no lo veas.',
   'Rayo umbrío':'Energía caótica que se retuerce camino del blanco.',
+  // Arquero (hoja nueva)
+  'Flecha helada':'Una punta de escarcha que entumece las piernas del blanco.',
+  'Flecha Flamígera':'Una flecha que arde en línea recta; el retroceso del disparo te empuja hacia atrás.',
+  'Detonadora':'La flecha se queda clavada, chisporroteando… y revienta cuando menos se lo esperan.',
+  'Flecha Repelente':'El impacto es tan fuerte que aparta al enemigo de un empujón.',
+  'Ojo de águila':'Respiras hondo, fijas la vista y el campo de batalla se acerca.',
+  'Flecha venenosa':'El veneno agarrota los músculos: al enemigo le cuesta actuar.',
+  'Dardo pestilente':'Un dardo podrido que corroe cualquier defensa.',
   // Ninja
   'Shuriken':'Una estrella de acero que vuela rápida y silenciosa hacia el blanco.',
   'Cuchilla envenenada':'Un corte pequeño, pero el veneno sigue trabajando turno tras turno.',
@@ -912,7 +911,7 @@ function skillEffectText(skill){
   const area='';   // el área ya se ve en su fila con el croquis
   const text={
     expose:'Vulnerable 2 turnos: los ataques contra el objetivo hacen +'+(o.value||3),
-    slow:(o.slowChance!==undefined?o.slowChance+' % de probabilidad de ralentizar: ':'Ralentiza: ')+'−'+(o.value||2)+' PM en el próximo turno del objetivo',
+    slow:o.slowBonus?'Ralentiza: −'+(o.value||1)+' PM en el próximo turno del objetivo ('+o.slowBonus.chance+' % de probabilidad de −'+o.slowBonus.value+')':(o.slowChance!==undefined?o.slowChance+' % de probabilidad de ralentizar: ':'Ralentiza: ')+'−'+(o.value||2)+' PM en el próximo turno del objetivo',
     venom:'Veneno: '+(o.value||3)+' PV por turno durante 2 turnos',
     blast:'',
     push:o.area?'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' a los enemigos alcanzados, alejándolos '+(o.pushFrom==='center'?'del centro del área':'de ti')+'. Si chocan: 2 de daño por casilla que falte + la mitad de tu nivel':'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' en línea. Si choca: 2 de daño por casilla que falte + la mitad de tu nivel',
@@ -922,6 +921,10 @@ function skillEffectText(skill){
     shield:'+'+(o.value||3)+' de armadura durante 2 turnos',
     haste:'+'+(o.value||2)+' PM en el próximo turno del aliado',
     sprint:'Ganas +'+(o.value||2)+' PM este turno',
+    detonate:'Detonado: al acabar su turno estalla y quema a sus aliados a 2 casillas o menos ('+(o.detonate||[3,5]).join('-')+' de fuego). Una vez por objetivo y turno',
+    reach:'+'+(o.value||3)+' de alcance en tus hechizos de alcance modificable durante '+(o.turns||2)+' turnos',
+    curse:'−'+(o.value||1)+' PA en el próximo turno del objetivo (no se acumula)',
+    corrode:'−'+(o.value||25)+' % a todas las resistencias del objetivo durante 1 turno y veneno de '+(o.poison||2)+' PV. Una vez por objetivo y turno',
     eclipse:'Todos los enemigos del mapa pierden '+(o.value||6)+' de alcance en su próximo turno (mínimo 1)',
     fury:'+'+(o.value||10)+' % de daño final durante 2 turnos (contando este); se multiplica por tu % de daño de fuego',
     guard:'Escudo del 10 % de tu vida máxima + tu nivel hasta tu próximo turno. Al terminar tu turno, el primer paso de cada enemigo dentro del área le hace este daño y lo empuja 2 casillas (una vez por enemigo). Pasa el turno',
@@ -931,7 +934,7 @@ function skillEffectText(skill){
     leap:'Saltas a una casilla libre y golpeas a todos los enemigos a tu alrededor (−20 % por casilla de distancia)',
     dash:o.teleport?(o.los===false?'Teletransporte (sin necesitar línea de visión)':'Teletransporte a una casilla libre que veas, sin gastar PM'):'Desplazamiento por una ruta libre sin gastar PM'
   }[kind]||'';
-  const extra=(o.stack?'+'+o.stack.value+' de daño base de esta habilidad por cada uso durante '+(o.stack.turns||2)+' turnos (acumulable '+(o.stack.max||3)+' veces, cada carga dura lo suyo)':'')+(o.meleeBonus?'+'+o.meleeBonus+' % de daño si el objetivo está adyacente':'');
+  const extra=(o.stack?'+'+o.stack.value+' de daño base de esta habilidad por cada uso durante '+(o.stack.turns||2)+' turnos (acumulable '+(o.stack.max||3)+' veces, cada carga dura lo suyo)':'')+(o.meleeBonus?'+'+o.meleeBonus+' % de daño si el objetivo está adyacente':'')+(o.friendly?'Daña también a los aliados del área':'')+(o.recoil?(o.friendly?' · ':'')+'Retrocedes '+o.recoil+' casilla al disparar (si chocas, te haces daño)':'');
   const steal=o.lifesteal?' · Te curas el '+o.lifesteal+' % del daño hecho':'';
   const burn=o.element==='fire'&&o.burnChance!==0?' · '+(o.burnChance!==undefined?o.burnChance+' % de probabilidad de quemar: ':'Quemadura: ')+'arde 2 turnos y pierde ¼ del daño al empezar cada uno':'';
   return ([text,extra].filter(Boolean).join(' · ')+area+steal+burn).replace(/^ · /,'');
@@ -948,7 +951,7 @@ function scalingTags(unit,skill){
 /** Datos calculados de una habilidad para un personaje (con su equipo, si lo tiene). */
 function skillFacts(unit,skill){
   const [,cost,range,min,max,kind,,minRange=0]=skill;
-  const reach=modifiableRange(skill)?(unit.stats?.reach||0):0;
+  const reach=modifiableRange(skill)?reachBonus(unit):0;
   const healing=['heal','cleanse'].includes(kind);
   const utility=['dash','shield','haste','swap'].includes(kind)||max<=0;
   const element=skillElement(unit,skill);
@@ -2335,7 +2338,7 @@ function render(){
       }
       if(modifiableRange(current))b.append(h('span','ability-reach',icon('reach')));
       b.setAttribute('aria-keyshortcuts',String(hotkey));
-      const maxRange=range+(modifiableRange(current)?turn.stats.reach:0);
+      const maxRange=range+(modifiableRange(current)?reachBonus(turn):0);
       const healing=['heal','cleanse'].includes(kind);
       b.setAttribute('aria-description',cost+' PA · alcance '+minRange+'–'+maxRange);
       b.onpointerenter=b.onfocus=()=>{

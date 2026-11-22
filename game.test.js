@@ -73,7 +73,8 @@ test('la vulnerabilidad se aplica a otro atacante y el clérigo cura a un aliado
   enemy.pos=34;
   enemy.hp=80;
   archer.hp=16;
-  act(s,'p0',{type:'skill',skill:2,pos:34},rng);
+  // Vulnerable (+3 a todos los atacantes), como deja el Sello de fragilidad.
+  enemy.effects.expose={value:3,turns:2};
   act(s,'p0',{type:'end'},rng);
   const hp=enemy.hp;
   act(s,'p1',{type:'skill',skill:0,pos:34},rng);
@@ -171,12 +172,13 @@ test('la vista previa aplica el crítico ×1,5 y la armadura frena las habilidad
   // +20 % de daño físico contra un 30 % de armadura: (base × 1,2) × 0,7.
   hero.stats.physical=20;
   foe.stats.ward=30;foe.resist={};
-  const [,,,lo,hi]=classes.tirador.skills[0];
+  const plain=classes.tirador.skills.find(k=>k[0]==='Flecha Repelente');
+  const [,,,lo,hi]=plain;
   const net=(b,crit=1)=>Math.round(Math.floor(b*1.2)*crit*.7);
-  assert.deepEqual(damagePreview(hero,foe,classes.tirador.skills[0]),{element:'physical',normal:[net(lo),net(hi)],critical:[net(lo,1.5),net(hi,1.5)],chance:.12});
-  // Flecha ígnea es física de fuego: suma físico + fuego, y la armadura la frena.
+  assert.deepEqual(damagePreview(hero,foe,plain),{element:'physical',normal:[net(lo),net(hi)],critical:[net(lo,1.5),net(hi,1.5)],chance:.12});
+  // Detonadora es física de fuego: suma físico + fuego, y la armadura la frena.
   hero.stats.fire=50;
-  const embers=classes.tirador.skills.at(-1);
+  const embers=classes.tirador.skills.find(k=>k[0]==='Detonadora');
   const hot=b=>Math.round(Math.floor(b*1.7)*.7);
   assert.deepEqual(damagePreview(hero,foe,embers).normal,[hot(embers[3]),hot(embers[4])]);
 });
@@ -596,15 +598,15 @@ test('una partida completa recorre los 3 actos y termina en victoria',()=>{
 test('colores fijos por puesto y mazo de cartas aplicado a la partida',()=>{
   const s=create();
   // Mazo del tirador: 2 de inicio + una comprada, y la pasiva Ojo de halcón (+1 alcance, −15 % de vida).
-  const deck={actives:['tirador.flecha-precisa','tirador.flecha-perforante','tirador.lluvia-de-flechas'],passive:'tirador.ojo-de-halcon'};
-  join(s,'a','Uno','tirador',{loadouts:{tirador:cleanLoadout('tirador',deck,['tirador.lluvia-de-flechas','tirador.ojo-de-halcon'])}});
+  const deck={actives:['tirador.flecha-helada','tirador.detonadora','tirador.flecha-repelente'],passive:'tirador.ojo-de-halcon'};
+  join(s,'a','Uno','tirador',{loadouts:{tirador:cleanLoadout('tirador',deck,['tirador.flecha-repelente','tirador.ojo-de-halcon'])}});
   join(s,'b','Dos','tirador');
   assert.deepEqual(s.players.map(p=>p.color),['red','blue']);
   const [a0,b0]=s.players;
   assert.equal(a0.gold,0);
   const names=p=>classes.tirador.skills.filter((_,i)=>p.skillRanks[i]>0).map(sk=>sk[0]);
-  assert.deepEqual(names(a0),['Flecha precisa','Flecha perforante','Lluvia de flechas']);
-  assert.deepEqual(names(b0),['Flecha precisa','Flecha de lastre','Flecha perforante'],'sin cuenta: las de inicio');
+  assert.deepEqual(names(a0),['Flecha helada','Detonadora','Flecha Repelente']);
+  assert.deepEqual(names(b0),['Flecha helada','Flecha Flamígera','Detonadora'],'sin cuenta: las de inicio');
   act(s,'a',{type:'start'},rng);
   enterCombat(s);
   const [a,b]=['a','b'].map(id=>s.units.find(u=>u.id===id));
@@ -692,7 +694,7 @@ test('habilidades estilo Dofus: Ninja con shuriken, cono, línea, empuje con cho
   assert.ok(classes.sombra.skills[0][2]>1);
   for(const [id,cls] of Object.entries(classes)){
     // El Mago y la Valkyria tienen kits nuevos (sin bonus fijo de rango máximo).
-    if(id==='mago'||id==='guardia')continue;
+    if(id==='mago'||id==='guardia'||id==='tirador')continue;
     assert.ok(cls.skills.length>=8,cls.name);
     const elementsUsed=new Set(cls.skills.map(sk=>sk[8]?.element).filter(Boolean));
     assert.ok(elementsUsed.size>=2,cls.name);
@@ -938,16 +940,16 @@ test('daño: físicas suman físico + su elemento; hechizos suman mágico + su e
   const stats={physical:3,magic:5,fire:7,ice:11,lightning:13,chaos:17};
   const archer={classId:'tirador',stats},mage={classId:'mago',stats};
   const skill=(cls,name)=>classes[cls].skills.find(sk=>sk[0]===name);
-  assert.equal(damagePercent(archer,skill('tirador','Flecha ígnea')),3+7,'física de fuego: físico + fuego');
+  assert.equal(damagePercent(archer,skill('tirador','Detonadora')),3+7,'física de fuego: físico + fuego');
   assert.equal(damagePercent(mage,skill('mago','Bola de fuego')),5+7);
   assert.equal(damagePercent(mage,skill('mago','Escarcha')),5+11);
   assert.equal(damagePercent(mage,skill('mago','Misil mágico')),5+3,'el Misil escala con mágico y físico');
-  assert.equal(skillSchool(archer,skill('tirador','Flecha ígnea')),'physical');
+  assert.equal(skillSchool(archer,skill('tirador','Detonadora')),'physical');
   // La armadura (en %) solo frena lo físico.
   const target={stats:{ward:40},effects:{}};
-  const phys=damagePreview(archer,target,skill('tirador','Flecha ígnea')).normal[0];
+  const phys=damagePreview(archer,target,skill('tirador','Detonadora')).normal[0];
   const magic=damagePreview(mage,target,skill('mago','Bola de fuego')).normal[0];
-  assert.equal(phys,Math.round(Math.floor(skill('tirador','Flecha ígnea')[3]*1.10)*.6));
+  assert.equal(phys,Math.round(Math.floor(skill('tirador','Detonadora')[3]*1.10)*.6));
   assert.equal(magic,Math.floor(skill('mago','Bola de fuego')[3]*1.12));
 });
 
@@ -1640,4 +1642,73 @@ test('Valkyria: Eclipse',()=>{
   act(s,v.id,{type:'skill',skill:k,pos:v.pos},rng);
   assert.equal(s.mp,1,'gasta 2 PM');assert.equal(s.ap,18);
   for(const f of s.units.filter(u=>u.enemy))assert.equal(f.effects.blind.value,6);
+});
+
+test('Arquero tanda 1: helada, flamígera, detonadora, repelente, ojo de águila, venenosa y pestilente',()=>{
+  const names=classes.tirador.skills.map(k=>k[0]);
+  const idx=n=>names.indexOf(n);
+  const setup=(r=()=>.5)=>{
+    const s=battle('tirador');
+    s.walls=[];s.water=[];s.traps=[];s.voids=[];
+    const a=s.units.find(u=>!u.enemy);
+    a.skillRanks=names.map(()=>1);
+    const foes=s.units.filter(u=>u.enemy);
+    for(const f of foes){f.pos=-99;f.hp=f.max=300;f.stats.ward=0;f.resist={};}
+    s.turn=s.units.indexOf(a);s.ap=20;s.mp=3;s.casts={};s.castTargets={};s.phase='combat';
+    a.pos=5*s.width+8;
+    return {s,a,foes,w:s.width,r};
+  };
+  // Flecha helada: −1 PM (75 %) o −2 (25 %).
+  {const {s,a,foes}=setup();foes[0].pos=a.pos-4;
+    act(s,a.id,{type:'skill',skill:idx('Flecha helada'),pos:foes[0].pos},()=>.5);
+    assert.equal(foes[0].effects.slow.value,1);
+    const t=setup();t.foes[0].pos=t.a.pos-4;
+    act(t.s,t.a.id,{type:'skill',skill:idx('Flecha helada'),pos:t.foes[0].pos},()=>.1);
+    assert.equal(t.foes[0].effects.slow.value,2);}
+  // Flecha Flamígera: línea de 4 desde la casilla elegida y el arquero retrocede 1.
+  {const {s,a,foes}=setup();const start=a.pos;foes[0].pos=a.pos-5;
+    act(s,a.id,{type:'skill',skill:idx('Flecha Flamígera'),pos:a.pos-2},()=>.5);
+    assert.ok(foes[0].hp<300,'la 4.ª casilla también');assert.equal(a.pos,start+1,'retrocede');}
+  // Detonadora: una vez por objetivo; al acabar su turno, quema a los aliados cercanos.
+  {const {s,a,foes}=setup();foes[0].pos=a.pos-4;
+    const k=idx('Detonadora');
+    act(s,a.id,{type:'skill',skill:k,pos:foes[0].pos},()=>.5);
+    assert.ok(foes[0].effects.detonate);
+    assert.throws(()=>act(s,a.id,{type:'skill',skill:k,pos:foes[0].pos},()=>.5),'una vez por objetivo');}
+  // Flecha Repelente: empuja 2.
+  {const {s,a,foes}=setup();foes[0].pos=a.pos-3;
+    act(s,a.id,{type:'skill',skill:idx('Flecha Repelente'),pos:foes[0].pos},()=>.5);
+    assert.equal(foes[0].pos,a.pos-5);}
+  // Ojo de águila: +3 de alcance a las modificables, no a las fijas.
+  {const {s,a,foes}=setup();
+    act(s,a.id,{type:'skill',skill:idx('Ojo de águila'),pos:a.pos},()=>.5);
+    assert.ok(hasRange(s,a,a.pos-8-3,skillFor(a,idx('Flecha helada'))),'modificable: 8+3');
+    assert.ok(!hasRange(s,a,a.pos-9-1,skillFor(a,idx('Flecha Flamígera'))),'fija: 9');}
+  // Flecha venenosa: −1 PA que no se acumula.
+  {const {s,a,foes}=setup();foes[0].pos=a.pos-3;const k=idx('Flecha venenosa');
+    act(s,a.id,{type:'skill',skill:k,pos:foes[0].pos},()=>.5);act(s,a.id,{type:'skill',skill:k,pos:foes[0].pos},()=>.5);
+    assert.equal(foes[0].effects.weak.value,1);}
+  // Dardo pestilente: −25 a todas las resistencias y veneno.
+  {const {s,a,foes}=setup();foes[0].pos=a.pos-3;foes[0].resist={fire:30};
+    act(s,a.id,{type:'skill',skill:idx('Dardo pestilente'),pos:foes[0].pos},()=>.5);
+    assert.equal(foes[0].effects.corrode.value,25);assert.ok(foes[0].effects.poison);}
+});
+
+test('Detonadora: estalla al acabar el turno del objetivo y quema a sus aliados cercanos',()=>{
+  const s=battle('tirador');
+  s.walls=[];s.water=[];s.traps=[];s.voids=[];
+  const a=s.units.find(u=>!u.enemy);
+  a.skillRanks=classes.tirador.skills.map(()=>1);
+  const foe=s.units.find(u=>u.enemy);
+  for(const f of s.units.filter(u=>u.enemy&&u!==foe))f.hp=0;
+  foe.hp=foe.max=300;foe.resist={};foe.stats.ward=0;foe.stats.movement=-9;
+  const buddy={...structuredClone(foe),id:'buddy',hp:300,max:300};
+  s.units.push(buddy);
+  s.turn=s.units.indexOf(a);s.ap=20;s.casts={};s.castTargets={};
+  a.pos=2*s.width+2;foe.pos=a.pos+5;buddy.pos=foe.pos+s.width;
+  act(s,a.id,{type:'skill',skill:classes.tirador.skills.findIndex(k=>k[0]==='Detonadora'),pos:foe.pos},()=>.5);
+  act(s,a.id,{type:'end'},()=>.5);
+  for(let i=0;i<6&&foe.effects.detonate;i++)timeout(s);
+  assert.ok(!foe.effects.detonate,'ya estalló');
+  assert.ok(buddy.hp<300,'quemó al aliado cercano');
 });

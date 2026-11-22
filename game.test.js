@@ -769,15 +769,15 @@ test('Valkyria: Estocada empuja la línea, Liberación aparta alrededor, choques
     endTurn();assert.equal(castsLeft(s,v,skill),0,'turno 2: en recarga');
     endTurn();assert.equal(castsLeft(s,v,skill),0,'turno 3: en recarga');
     endTurn();assert.ok(castsLeft(s,v,skill)>0,'turno 4: lista');}
-  // Furia: +10 % de daño final × (1 + % de fuego).
+  // Furia: +20 % de daño final × (1 + % de fuego).
   {const {s,v}=setup();
     v.stats.fire=20;
     const est=skillFor(v,idx('Estocada'));
     const before=scaledDamage(v,est,100);
     act(s,v.id,{type:'skill',skill:idx('Furia'),pos:v.pos},rng);
     assert.equal(v.effects.fury.turns,2);
-    assert.equal(scaledDamage(v,est,100),Math.floor(before*1.12)||scaledDamage(v,est,100));
-    assert.ok(Math.abs(scaledDamage(v,est,100)/before-1.12)<.02);}
+    assert.equal(scaledDamage(v,est,100),Math.floor(before*1.24)||scaledDamage(v,est,100));
+    assert.ok(Math.abs(scaledDamage(v,est,100)/before-1.24)<.02);}
   // En guardia!: escudo del 10 % de la vida + nivel hasta su próximo turno; al terminar el turno, zona (radio 2) que
   // daña y empuja 2 a cada enemigo que entre (una vez por enemigo).
   {const {s,v,foes,w}=setup();
@@ -1602,15 +1602,15 @@ test('Valkyria tanda 3: Lanza cargada, Barrido, Lanza abisal',()=>{
     assert.ok(hasRange(s,v,v.pos-2*w-2,skillFor(v,k)),'diagonal');
     assert.ok(!hasRange(s,v,v.pos-2*w-1,skillFor(v,k)),'fuera de línea');
     act(s,v.id,{type:'skill',skill:k,pos:v.pos-3},rng);
-    assert.deepEqual(skillFor(v,k).slice(3,5),[2,10]);
+    assert.deepEqual(skillFor(v,k).slice(3,5),[2,7]);
     act(s,v.id,{type:'skill',skill:k,pos:v.pos-3},rng);
-    assert.deepEqual(skillFor(v,k).slice(3,5),[3,11]);
+    assert.deepEqual(skillFor(v,k).slice(3,5),[3,8]);
     const back=()=>{act(s,v.id,{type:'end'},rng);s.turn=s.units.indexOf(v);s.casts={};s.ap=20;s.phase='combat';};
     back();
-    assert.deepEqual(skillFor(v,k).slice(3,5),[3,11],'siguen las 2 cargas');
+    assert.deepEqual(skillFor(v,k).slice(3,5),[3,8],'siguen las 2 cargas');
     act(s,v.id,{type:'skill',skill:k,pos:v.pos-3},rng);
     back();
-    assert.deepEqual(skillFor(v,k).slice(3,5),[2,10],'las 2 viejas caducan, queda la nueva');
+    assert.deepEqual(skillFor(v,k).slice(3,5),[2,7],'las 2 viejas caducan, queda la nueva');
   }
   // Barrido: franja de 3 de lado; se puede lanzar en una casilla vacía.
   {const {s,v,foes,w}=setup();

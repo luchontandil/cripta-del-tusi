@@ -7,21 +7,21 @@
 export const classes = {
   // Valkyria (antes Guardián/Lancero). Las tres primeras son las de inicio. Física: escala con daño físico + su elemento.
   guardia: {name:'Valkyria', hp:58, initiative:10, skills:[
-    ['Estocada',3,2,5,7,'push','➶',1,{element:'fire',inLine:true,burnChance:0,area:'line',size:2,push:2,los:false,casts:2,modifiable:false}],
+    ['Estocada',3,2,4,6,'push','➶',1,{element:'fire',inLine:true,burnChance:0,area:'line',size:2,push:2,los:false,casts:2,modifiable:false}],
     ['Lanza del lago',3,5,2,7,'pull','↢',1,{element:'lightning',area:'trident',inLine:true,pull:1,casts:1,cooldown:1,modifiable:true}],
     ['En guardia!',3,0,2,2,'guard','⛨',0,{area:'circle',size:2,los:false,casts:1,cooldown:2,modifiable:false,perRank:0,endsTurn:true}],
-    ['Punzón',2,4,3,4,'damage','✧',1,{element:'physical',casts:2,lifesteal:25,modifiable:true}],
+    ['Punzón',2,4,4,6,'damage','✧',1,{element:'physical',casts:2,lifesteal:25,modifiable:true}],
     ['Liberación',3,0,3,6,'push','✹',0,{element:'fire',burnChance:0,area:'circle',size:2,push:2,los:false,casts:1,modifiable:false}],
     ['Pies ligeros',2,0,0,0,'sprint','➝',0,{value:2,los:false,casts:1,cooldown:2,modifiable:false}],
     ['Balestra',3,6,2,9,'lunge','⇥',1,{element:'lightning',inLine:true,clearPath:true,anyTarget:true,casts:1,cooldown:1,modifiable:false}],
     ['Salto valiente',4,4,5,8,'leap','⤒',2,{element:'fire',burnChance:0,area:'circle',size:2,lifesteal:10,los:false,casts:1,cooldown:3,modifiable:false}],
-    ['Carga heroica',3,5,2,8,'charge','⇶',1,{element:'lightning',inLine:true,clearPath:true,anyTarget:true,casts:1,modifiable:false}],
-    ['Abrir las aguas',4,5,3,6,'push','⊥',0,{element:'ice',area:'tee',size:2,push:1,pushFrom:'center',inLine:true,casts:1,cooldown:2,modifiable:false}],
-    ['Lanza cargada',3,7,1,9,'damage','➹',1,{element:'lightning',inLine:'diagonal',crit:15,casts:2,stack:{value:1,turns:2,max:3},modifiable:false}],
+    ['Carga heroica',3,5,2,8,'charge','⇶',1,{element:'lightning',inLine:true,clearPath:true,anyTarget:true,casts:1,cooldown:1,modifiable:false}],
+    ['Abrir las aguas',3,5,3,6,'push','⊥',0,{element:'ice',area:'tee',size:2,push:1,pushFrom:'center',inLine:true,casts:1,cooldown:2,modifiable:false}],
+    ['Lanza cargada',3,7,1,6,'damage','➹',1,{element:'lightning',inLine:'diagonal',crit:15,casts:2,stack:{value:1,turns:2,max:3},modifiable:false}],
     ['Barrido',3,5,4,5,'slow','⟷',1,{element:'ice',inLine:true,area:'wave',width:3,size:1,value:1,slowChance:30,casts:1,modifiable:false}],
     ['Lanza abisal',3,3,6,9,'damage','◆',1,{element:'ice',los:false,meleeBonus:35,casts:1,modifiable:false}],
     ['Eclipse',2,0,0,0,'eclipse','◐',0,{mpCost:2,value:6,los:false,casts:1,cooldown:5,modifiable:false}],
-    ['Furia',2,0,0,0,'fury','✹',0,{element:'fire',burnChance:0,value:10,turns:2,los:false,casts:1,cooldown:4,modifiable:false}]
+    ['Furia',2,0,0,0,'fury','✹',0,{element:'fire',burnChance:0,value:20,turns:2,los:false,casts:1,cooldown:4,modifiable:false}]
   ]},
   tirador: {name:'Arquero', hp:31, initiative:14, skills:[
     ['Flecha precisa',2,7,6,8,'damage','➶',2,{element:'physical',max:{crit:15}}],

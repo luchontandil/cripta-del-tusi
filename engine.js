@@ -19,7 +19,7 @@ export const classes = {
     ['Carga heroica',3,5,2,8,'charge','⇶',1,{element:'lightning',inLine:true,clearPath:true,anyTarget:true,casts:1,modifiable:false}],
     ['Abrir las aguas',4,5,3,6,'push','⊥',0,{element:'ice',area:'tee',size:2,push:1,pushFrom:'center',inLine:true,casts:1,cooldown:2,modifiable:false}],
     ['Lanza cargada',3,7,1,9,'damage','➹',1,{element:'lightning',inLine:'diagonal',crit:15,casts:2,stack:{value:1,turns:2,max:3},modifiable:false}],
-    ['Barrido',3,5,4,5,'slow','⟷',1,{element:'ice',area:'wave',width:3,size:1,value:1,slowChance:30,casts:1,modifiable:false}],
+    ['Barrido',3,5,4,5,'slow','⟷',1,{element:'ice',inLine:true,area:'wave',width:3,size:1,value:1,slowChance:30,casts:1,modifiable:false}],
     ['Lanza abisal',3,3,6,9,'damage','◆',1,{element:'ice',los:false,meleeBonus:35,casts:1,modifiable:false}],
     ['Furia',2,0,0,0,'fury','✹',0,{element:'fire',burnChance:0,value:10,turns:2,los:false,casts:1,cooldown:4,modifiable:false}]
   ]},

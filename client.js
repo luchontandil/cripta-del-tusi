@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=122';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=122';
-import {setupSfx} from './music.js?v=122';
-import {icon} from './icons.js?v=122';
-import {openMapEditor} from './mapeditor.js?v=122';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=123';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=123';
+import {setupSfx} from './music.js?v=123';
+import {icon} from './icons.js?v=123';
+import {openMapEditor} from './mapeditor.js?v=123';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=122').then(({createIso})=>{
+import('./isometric.js?v=123').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -915,7 +915,7 @@ function skillEffectText(skill){
     haste:'+'+(o.value||2)+' PM en el próximo turno del aliado',
     sprint:'Ganas +'+(o.value||2)+' PM este turno',
     fury:'+'+(o.value||10)+' % de daño final durante 2 turnos (contando este); se multiplica por tu % de daño de fuego',
-    guard:'Escudo del 10 % de tu vida máxima + tu nivel hasta tu próximo turno. Al terminar tu turno, el primer paso de cada enemigo dentro del área le hace este daño y lo empuja 2 casillas (una vez por enemigo)',
+    guard:'Escudo del 10 % de tu vida máxima + tu nivel hasta tu próximo turno. Al terminar tu turno, el primer paso de cada enemigo dentro del área le hace este daño y lo empuja 2 casillas (una vez por enemigo). Pasa el turno',
     swap:'Intercambia tu posición con la del objetivo',
     dash:o.teleport?(o.los===false?'Teletransporte (sin necesitar línea de visión)':'Teletransporte a una casilla libre que veas, sin gastar PM'):'Desplazamiento por una ruta libre sin gastar PM'
   }[kind]||'';

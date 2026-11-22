@@ -785,12 +785,11 @@ test('Valkyria: Estocada empuja la línea, Liberación aparta alrededor, choques
     act(s,v.id,{type:'skill',skill:idx('En guardia!'),pos:v.pos},rng);
     const shield=Math.round(v.max*.1)+5;
     assert.equal(v.effects.barrier.value,shield);
-    assert.ok(!s.guardZones?.length,'la zona aún no existe');
+    assert.equal(s.guardZones.length,1,'pasa el turno y la zona aparece');
+    assert.notEqual(s.units[s.turn],v,'ya no es su turno');
     const hp=v.hp;
     hit(s,foes[0],v,4,'damage',false,'neutral');
     assert.equal(v.hp,hp,'el escudo absorbe primero');
-    act(s,v.id,{type:'end'},rng);
-    assert.equal(s.guardZones.length,1,'la zona aparece al terminar el turno');
     const foe=foes[0];foe.pos=v.pos-4;
     const before=foe.hp;
     // El enemigo camina hacia ella: al entrar (distancia 2) recibe daño y sale despedido 2.

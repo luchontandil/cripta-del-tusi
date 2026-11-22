@@ -182,6 +182,46 @@ const palettes = {
   elite:['#392c51','#755e91','#c69980','#ffe0a9'],
   boss:['#572938','#b34a63','#df9a54','#fff0a2']
 };
+/** Retrato del Lancero: valquiria esbelta con yelmo alado, trenza oscura, capa y lanza. */
+function lancerPortrait(c,dark,mid){
+  const r=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
+  const ink='#201820',steel='#c8cdd5',steelHi='#eef1f5',steelLo='#8c939e',gold='#d8b04a',skin='#e1b48f',skinLo='#c48f6c',hair='#e2bf63',wing='#f6f8fb',wingLo='#c9ced6';
+  r(7,27,13,2,'#19151e90');
+  r(8,12,11,13,ink);r(9,12,9,12,dark);                                  // capa por detrás
+  // Piernas: malla y grebas.
+  r(10,20,6,7,ink);r(10,20,2,2,mid);r(14,20,2,2,mid);
+  r(10,22,2,4,steel);r(14,22,2,4,steel);r(10,22,2,1,gold);r(14,22,2,1,gold);r(10,26,2,1,steelLo);r(14,26,2,1,steelLo);
+  // Faldellín de tiras de cuero.
+  r(9,18,8,3,ink);for(let x=10;x<16;x++)r(x,18,1,2,x%2?'#6b4a34':'#4a3a30');r(10,20,6,1,gold);
+  // Torso esbelto: malla, peto y cinturón.
+  r(10,11,6,8,ink);r(10,12,6,6,mid);r(11,12,4,4,steel);r(11,12,4,1,steelHi);r(12,15,2,1,steelLo);r(10,17,6,1,gold);
+  // Brazos descubiertos con brazales.
+  r(8,13,2,6,ink);r(16,13,2,6,ink);r(8,13,2,2,skin);r(16,13,2,2,skin);r(8,15,2,2,steel);r(16,15,2,2,steel);r(8,17,2,1,skin);r(16,17,2,1,skin);
+  r(7,11,3,2,steel);r(16,11,3,2,steel);r(7,12,3,1,gold);r(16,12,3,1,gold);     // hombreras
+  // Cabeza: rostro y yelmo con carrilleras.
+  r(10,4,6,7,ink);r(11,6,4,4,skin);r(11,9,4,1,skinLo);
+  r(11,7,1,1,'#6f9bb8');r(14,7,1,1,'#6f9bb8');r(12,9,2,1,'#c98378');
+  r(10,3,6,3,steel);r(11,2,4,1,steelHi);r(10,6,1,4,steel);r(15,6,1,4,steel);r(12,3,2,1,gold);
+  // Alas del yelmo, abiertas hacia arriba.
+  // Cada ala: plumas en abanico hacia fuera y algo hacia arriba, con las puntas separadas.
+  for(const [side,x0] of [[-1,9],[1,16]]){
+    const X=(dx,w)=>side<0?x0-dx-w+1:x0+dx;
+    r(X(0,2),5,2,1,wingLo);
+    r(X(0,4),4,4,1,wing);
+    r(X(0,5),3,5,1,wing);
+    r(X(1,4),2,4,1,wing);
+    r(X(2,3),1,3,1,wing);
+    r(X(4,1),0,1,1,wing);
+    for(const dx of [1,3])r(X(dx,1),4,1,1,wingLo);                   // separación de plumas
+    r(X(4,1),3,1,1,wingLo);
+  }
+  // Trenza rubia sobre el hombro izquierdo.
+  r(15,9,2,8,hair);r(16,17,1,2,hair);r(15,16,2,1,gold);
+  // Lanza: asta, punta afilada y guarda dorada.
+  r(3,8,1,19,'#5e4230');
+  r(3,0,1,2,steelHi);r(2,2,3,4,'#d8dde4');r(3,2,1,4,steelHi);r(3,6,1,1,'#aab1bb');
+  r(1,7,5,1,gold);r(3,7,1,1,'#4fa3ff');r(2,13,1,2,skin);r(4,13,1,2,skin);
+}
 export function portrait(look,tint=null) {
   const image=document.createElement('canvas');
   image.width=26;
@@ -193,6 +233,7 @@ export function portrait(look,tint=null) {
   // Color del jugador: la ropa toma el color de su puesto.
   if(tint){dark=tint.dark;mid=tint.hex;}
   const ink='#201820';
+  if(look==='guardia'){lancerPortrait(c,dark,mid);return image;}
   const rect=(x,y,w,h,color)=>{c.fillStyle=color;c.fillRect(x,y,w,h);};
   rect(5,26,16,2,'#19151e90');
   rect(7,20,12,6,ink);
@@ -218,17 +259,6 @@ export function portrait(look,tint=null) {
   }else if(look==='boss'){
     rect(7,3,12,4,light);for(const x of [7,12,17])rect(x,0,2,5,shine);
     rect(4,11,4,10,dark);rect(18,11,4,10,dark);rect(11,12,4,4,shine);
-  }else if(look==='guardia'){
-    // Lancero: valquiria-amazona. Yelmo plateado con alas pequeñas, trenza oscura y lanza a su derecha.
-    rect(8,3,10,3,'#c8cdd5');rect(9,2,8,2,'#e8ebf0');rect(8,6,2,6,'#c8cdd5');rect(16,6,2,6,'#c8cdd5');
-    rect(12,3,2,2,'#d8b04a');
-    rect(5,1,2,4,'#f4f6f9');rect(6,3,2,2,'#dfe3e9');rect(19,1,2,4,'#f4f6f9');rect(18,3,2,2,'#dfe3e9');
-    rect(16,12,2,8,'#2b2630');rect(17,19,1,2,'#d8b04a');
-    rect(7,11,3,3,'#c8cdd5');rect(16,11,3,3,'#c8cdd5');
-    // Lanza: asta, punta afilada (se estrecha hasta un píxel) y guarda dorada.
-    rect(3,8,1,19,'#5e4230');
-    rect(3,0,1,2,'#f4f6f9');rect(2,2,3,4,'#d8dde4');rect(3,2,1,4,'#f4f6f9');rect(3,6,1,1,'#aab1bb');
-    rect(1,7,5,1,'#d8b04a');rect(3,7,1,1,'#4fa3ff');
   }else if(look==='elite'){
     rect(7,6,12,2,light);rect(8,3,10,3,mid);rect(11,2,4,2,shine);
     rect(18,12,6,8,ink);rect(19,12,4,7,light);rect(20,13,2,5,dark);

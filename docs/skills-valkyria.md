@@ -1,0 +1,28 @@
+# Skills de la Valkyria (id de clase: `guardia`)
+
+Hoja del usuario, con las correcciones acordadas en el chat ya aplicadas a los skills implementados.
+Estado: ✅ implementado · ⏳ pendiente.
+
+| Estado | Nombre | Tipo | Elemento | Coste | Daño base | Lanzamiento / Área | Alcance | Modificable | Línea de visión | Usos / Recarga | Efecto secundario | Descripción |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ✅ | Furia | Buff | Fuego | 2 PA | – | – | 0 | No | No | 1 por turno, 4 turnos de recarga | – | Dura 2 turnos (contando el del lanzamiento): +10 % de daño final × (1 + % de daño de fuego). Afecta a todo el daño. |
+| ✅ inicial | Estocada | Activo | Físico, Fuego | 3 PA | 5 – 7 | Línea recta de 3 casillas desde la casilla elegida | 1 – 2, en línea recta | No | No | 2 por turno | Empuja 2 casillas en área | Empuja 2 casillas (alejándose) a todos los objetivos de la línea; primero los más lejanos. |
+| ✅ | Liberación | Activo | Físico, Fuego | 3 PA | 3 – 6 | Círculo de 2 a tu alrededor | 0 | No | No | 1 por turno | – | Empuja 2 casillas a todos los objetivos de la zona. |
+| ✅ | Pies ligeros | Buff | Ninguno | 2 PA | – | – | 0 | No | No | 1 por turno, 2 turnos de recarga | – | Ganas 2 PM al momento (se ve «+2 PM»). |
+| ✅ | Punzón | Activo | Físico | 2 PA | 3 – 4 | Un objetivo | 1 – 4 | Sí | Sí | 2 por turno | Te curas el 25 % del daño hecho (daño real) | Te curas el 25 % del daño hecho. |
+| ⏳ | Balestra | Activo | Físico, Rayo | 3 PA | 2 – 9 | Línea recta, un objetivo | 1 – 6 | No | Sí | 1 por turno, 1 turno de recarga | Teletransporta al usuario detrás del objetivo | Desplaza al usuario hacia el objetivo y lo daña, luego lo teletransporta detrás de él. Si es un aliado no lo daña. |
+| ⏳ | Salto valiente | Activo | Físico, Fuego | 4 PA | 5 – 8 | Círculo de 3 casillas | 2 – 4 | No | No | 1 por turno, 3 turnos de recarga | Cura el 10 % del daño causado | Teletransporta al usuario a una casilla libre y daña a todos los enemigos del área. |
+| ⏳ | Lanza cargada | Activo, Buff | Físico, Rayo | 3 PA | 1 – 9 | Línea recta y diagonales | 1 – 7 | No | Sí | 2 por turno | 15 % de crítico base | 15 % de crítico base; +1 de daño base de este skill durante 2 turnos (acumulable 3 veces). |
+| ⏳ | Carga heroica | Activo | Físico, Rayo | 3 PA | 2 – 8 | Línea recta | 1 – 5 | No | Sí | 1 por turno | – | Desplaza al usuario hacia el objetivo y lo daña; luego empuja al objetivo tantas casillas como las recorridas + 1. |
+| ✅ inicial | Lanza del lago | Activo | Físico, Rayo | 3 PA | 2 – 7 | Tridente: `X.X.X / .XXX. / ..X..` (base en la casilla elegida, se abre alejándose) | 1 – 5, en línea recta | Sí | Sí | 1 por turno, 1 turno de recarga | Atrae 1 casilla hacia el lanzador | Atrae a los enemigos golpeados 1 casilla. |
+| ✅ inicial | En guardia! | Activo, Buff | Físico | 3 PA | 2 – 2 | Círculo de 2 a tu alrededor | 0 | No | No | 1 por turno, 2 turnos de recarga | – | Escudo = 10 % de la vida máxima + nivel, hasta tu próximo turno. **Pasa el turno.** Al terminar tu turno se crea la zona (dura hasta tu próximo turno): el enemigo que entra recibe el daño y es empujado 2 casillas, una vez por enemigo. No hace daño al lanzarse. |
+| ⏳ | Eclipse | Activo | Ninguno | 2 PA + 2 PM | – | Todo el mapa | 64 | No | No | 5 turnos de recarga | – | Quita 6 de alcance a todos los enemigos del mapa durante 1 turno. |
+| ⏳ | Barrido | Activo | Físico, Hielo | 3 PA | 4 – 5 | Línea recta, área 3×1 | 1 – 5 | No | Sí | 1 por turno | 30 % de quitar PM durante 1 turno | Se lanza sin objetivo. |
+| ⏳ | Abrir las aguas | Activo | Físico, Hielo | 4 PA | 3 – 6 | Línea recta, T invertida de tamaño 3 | 0 – 5 | No | Sí | 1 por turno, 2 turnos de recarga | Empuja 1 casilla | Daña y empuja a los enemigos desde donde se lanzó el skill. |
+| ⏳ | Lanza abisal | Activo | Físico, Hielo | 3 PA | 6 – 9 | Un objetivo | 1 – 3 | No | No | 1 por turno | +35 % de daño cuerpo a cuerpo | Daño extra si el enemigo está adyacente al usuario. |
+
+## Reglas generales acordadas
+- Daño por choque al empujar (todas las clases): 2 × casillas que faltaban + nivel del lanzador / 2, sin elemento; solo si choca.
+- Recarga: «N turnos de recarga» = no se puede usar en los N turnos siguientes.
+- «Físico, X»: el skill es del elemento X.
+- Nivel 2–3 de cada skill: por ahora solo sube el daño.

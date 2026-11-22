@@ -1283,7 +1283,7 @@ function openFloor(s,rng,elite=false,boss=null) {
   }
   s.act=actOf(s.floor);
   s.biome=actBiomes[s.act-1];
-  s.glyphs=[];
+  s.glyphs=[];s.guardZones=[];
   const w=s.width;
   const mid=Math.floor(s.height/2);
   layout||=makeLayout(s,mapRng);
@@ -1515,11 +1515,15 @@ function move(s,unit,path,voluntary=true,blink=false) {
     applyGlyphs(s,unit,previous);
     const trap=s.traps?.find(t=>t.pos===pos);
     if(trap&&alive(unit))triggerTrap(s,trap,unit);
+    if(s.guardZones?.length&&guardZoneCheck(s,unit,previous))break;
   }
 }
 function beginTurn(s) {
   const u=s.units[s.turn];
   s.enemyPlan=null;
+  // En guardia!: el escudo y la zona duran hasta el próximo turno del lanzador.
+  if(s.guardZones?.length)s.guardZones=s.guardZones.filter(z=>z.owner!==u.id);
+  if(u.effects.barrier?.untilOwnTurn)delete u.effects.barrier;
   const bonus=u.enemy?{}:s.mods||{};
   s.casts={};
   s.ap=Math.max(1,(u.enemy?4:BASE_AP)+(u.stats?.action||0)+(bonus.ap||0)-(u.effects.weak?.value||0));
@@ -1584,7 +1588,13 @@ function finish(s,rng) {
   return true;
 }
 function advance(s,rng) {
-  endEffects(s.units[s.turn]);
+  const ending=s.units[s.turn];
+  if(ending?.guardPending&&alive(ending)){
+    (s.guardZones||=[]).push({owner:ending.id,...ending.guardPending,hit:[]});
+    delete ending.guardPending;
+    note(s,ending.name+' queda en guardia hasta su próximo turno.');
+  }
+  endEffects(ending);
   while(!finish(s,rng)){
     do {
       s.turn=(s.turn+1)%s.units.length;
@@ -2462,13 +2472,34 @@ function shove(s,actor,target,cells,toward){
     note(s,target.name+' choca: +'+amount+' de daño por empuje.');
   }
 }
-/** En guardia!: escudo del 10 % de la vida máxima + el nivel (provisional: dura 2 turnos). */
+/**
+ * En guardia!: escudo del 10 % de la vida máxima + el nivel hasta el próximo turno del lanzador.
+ * Al terminar su turno se crea una zona (círculo de 3 a su alrededor) que dura hasta su próximo turno:
+ * cada enemigo que entre recibe el daño de la habilidad y es empujado 2 casillas (una vez por enemigo).
+ */
 function guard(s,unit,skill){
   const amount=Math.round(unit.max*.1)+(unit.level||0);
-  effect(unit,'barrier',amount,2);
-  unit.effects.barrier.value=amount;
+  unit.effects.barrier={value:amount,turns:99,untilOwnTurn:true};
+  unit.guardPending={skill:skill[0],size:skillOptions(skill).size||3,push:2};
   emit(s,{kind:'heal',unit:unit.id,from:unit.pos,pos:unit.pos,amount:0});
-  note(s,unit.name+' se pone en guardia: escudo de '+amount+'.');
+  note(s,unit.name+' se pone en guardia: escudo de '+amount+'. Al terminar su turno, quien se acerque será rechazado.');
+}
+/** Zona de En guardia!: se activa cuando un enemigo entra en ella (una vez por enemigo). */
+function guardZoneCheck(s,unit,previous){
+  for(const zone of s.guardZones||[]){
+    const owner=s.units.find(u=>u.id===zone.owner);
+    if(!owner||!alive(owner)||!alive(unit)||!!owner.enemy===!!unit.enemy||zone.hit.includes(unit.id))continue;
+    const inside=p=>p>=0&&distance(s,owner.pos,p)<=zone.size;
+    if(!inside(unit.pos)||inside(previous))continue;
+    zone.hit.push(unit.id);
+    const index=classes[owner.classId]?.skills.findIndex(k=>k[0]===zone.skill);
+    const skill=index>=0?skillFor(owner,index,true):null;
+    note(s,unit.name+' entra en la guardia de '+owner.name+'.');
+    if(skill&&skill[4]>0)hit(s,owner,unit,scaledDamage(owner,skill,roll(skill[3],skill[4],Math.random)),'damage',false,armorType(owner,skill),false);
+    if(alive(unit))shove(s,owner,unit,zone.push,false);
+    return true;
+  }
+  return false;
 }
 /** Aplica una habilidad a una unidad concreta (daño, efectos, empuje...). */
 /** ¿Es una habilidad de daño en área? */
@@ -2734,7 +2765,7 @@ export function act(s,id,a,rng=Math.random) {
     const hits=s.units.filter(u=>alive(u)&&area.includes(u.pos)&&(support?!u.enemy:u.enemy))
       .sort((a,b)=>kind==='push'?distance(s,unit.pos,b.pos)-distance(s,unit.pos,a.pos):kind==='pull'?distance(s,unit.pos,a.pos)-distance(s,unit.pos,b.pos):0);
     if(kind==='guard')guard(s,unit,skill);
-    for(const other of hits)applySkill(s,unit,other,skill,rng,areaFalloff(s,a.pos,other.pos,skill));
+    else for(const other of hits)applySkill(s,unit,other,skill,rng,areaFalloff(s,a.pos,other.pos,skill));
     finish(s,rng);
     if(s.phase==='combat'&&!alive(unit))advance(s,rng);
     return;
@@ -2747,3 +2778,5 @@ export function act(s,id,a,rng=Math.random) {
   if(s.phase==='combat'&&!alive(unit))advance(s,rng);
 }
 
+/** Solo para los tests: mover unidades y empezar turnos a mano. */
+export const _test={move:(...a)=>move(...a),beginTurn:(...a)=>beginTurn(...a)};

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost,setAway,castsLeft,scaledDamage,hit,setCustomMaps,cleanMap,mapWarnings,testCustomMap,actStart,midBossFloor,labCombat,labEnemyOptions} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost,setAway,castsLeft,scaledDamage,hit,_test,setCustomMaps,cleanMap,mapWarnings,testCustomMap,actStart,midBossFloor,labCombat,labEnemyOptions} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -778,15 +778,32 @@ test('Valkyria: Estocada empuja la línea, Liberación aparta alrededor, choques
     assert.equal(v.effects.fury.turns,2);
     assert.equal(scaledDamage(v,est,100),Math.floor(before*1.12)||scaledDamage(v,est,100));
     assert.ok(Math.abs(scaledDamage(v,est,100)/before-1.12)<.02);}
-  // En guardia!: escudo del 10 % de la vida + nivel que absorbe daño.
-  {const {s,v,foes}=setup();
+  // En guardia!: escudo del 10 % de la vida + nivel hasta su próximo turno; al terminar el turno, zona que
+  // daña y empuja 2 a cada enemigo que entre (una vez por enemigo).
+  {const {s,v,foes,w}=setup();
     v.level=5;
     act(s,v.id,{type:'skill',skill:idx('En guardia!'),pos:v.pos},rng);
     const shield=Math.round(v.max*.1)+5;
     assert.equal(v.effects.barrier.value,shield);
+    assert.ok(!s.guardZones?.length,'la zona aún no existe');
     const hp=v.hp;
-    hit(s,foes[0],v,shield+4,'damage',false,'neutral');
-    assert.equal(v.hp,hp-4,'el escudo absorbe primero');}
+    hit(s,foes[0],v,4,'damage',false,'neutral');
+    assert.equal(v.hp,hp,'el escudo absorbe primero');
+    act(s,v.id,{type:'end'},rng);
+    assert.equal(s.guardZones.length,1,'la zona aparece al terminar el turno');
+    const foe=foes[0];foe.pos=v.pos-5;
+    const before=foe.hp;
+    // El enemigo camina hacia ella: al entrar (distancia 3) recibe daño y sale despedido 2.
+    _test.move(s,foe,[v.pos-4,v.pos-3,v.pos-2],false);
+    assert.ok(foe.hp<before,'recibe daño');
+    assert.equal(foe.pos,v.pos-5,'empujado 2 desde donde entró');
+    // Una sola vez por enemigo.
+    const hp2=foe.hp;
+    _test.move(s,foe,[v.pos-4,v.pos-3,v.pos-2],false);
+    assert.equal(foe.hp,hp2);assert.equal(foe.pos,v.pos-2);
+    // En su próximo turno desaparecen escudo y zona.
+    s.turn=s.units.indexOf(v);_test.beginTurn(s);
+    assert.ok(!v.effects.barrier&&!s.guardZones.length);}
   // Lanza del lago: tridente y atrae 1 hacia ti.
   {const {s,v,foes,w}=setup();
     const lance=skillFor(v,idx('Lanza del lago'));

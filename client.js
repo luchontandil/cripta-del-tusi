@@ -1,10 +1,10 @@
-import {setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
+import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=117';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=117';
-import {setupSfx} from './music.js?v=117';
-import {icon} from './icons.js?v=117';
-import {openMapEditor} from './mapeditor.js?v=117';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=118';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=118';
+import {setupSfx} from './music.js?v=118';
+import {icon} from './icons.js?v=118';
+import {openMapEditor} from './mapeditor.js?v=118';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=117').then(({createIso})=>{
+import('./isometric.js?v=118').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -915,7 +915,7 @@ function skillEffectText(skill){
     haste:'+'+(o.value||2)+' PM en el próximo turno del aliado',
     sprint:'Ganas +'+(o.value||2)+' PM este turno',
     fury:'+'+(o.value||10)+' % de daño final durante 2 turnos (contando este); se multiplica por tu % de daño de fuego',
-    guard:'Escudo del 10 % de tu vida máxima + tu nivel durante 2 turnos (absorbe daño) y daña a los enemigos del área',
+    guard:'Escudo del 10 % de tu vida máxima + tu nivel hasta tu próximo turno. Al terminar tu turno, el primer paso de cada enemigo dentro del área le hace este daño y lo empuja 2 casillas (una vez por enemigo)',
     swap:'Intercambia tu posición con la del objetivo',
     dash:o.teleport?(o.los===false?'Teletransporte (sin necesitar línea de visión)':'Teletransporte a una casilla libre que veas, sin gastar PM'):'Desplazamiento por una ruta libre sin gastar PM'
   }[kind]||'';
@@ -2180,6 +2180,8 @@ function drawBoard(turn,walking,skill){
     const voidCell=!onBoard(state,pos);
     const wall=state.walls.includes(pos);
     const glyph=state.glyphs.find(g=>g.cells.includes(pos));
+    // Zona de En guardia! (círculo alrededor de quien la lanzó, hasta su próximo turno).
+    const guardZone=!voidCell&&!wall&&(state.guardZones||[]).some(z=>{const o=state.units.find(u=>u.id===z.owner&&u.hp>0);return o&&distance(state,o.pos,pos)<=z.size;});
     const water=state.water?.includes(pos);
     const trap=state.traps?.find(t=>t.pos===pos);
     const castRange=skill&&inRange(state,turn,pos,skill);
@@ -2194,7 +2196,7 @@ function drawBoard(turn,walking,skill){
     });
     const shadesIndex=((Math.imul(pos+1,2654435761)^state.mapSeed)>>>6)%shades.length;
     cell.style.setProperty('--tile',shades[shadesIndex]);
-    cell.className=['cell',voidCell&&'void',wall&&'wall',water&&'water',trap&&'trap trap-'+trap.kind,path&&'walk',blocked&&'no-sight',castRange&&'cast-range',aim&&'aim',glyph&&'glyph-'+glyph.kind,glyph?.warn&&'warn'].filter(Boolean).join(' ');
+    cell.className=['cell',voidCell&&'void',wall&&'wall',water&&'water',trap&&'trap trap-'+trap.kind,path&&'walk',blocked&&'no-sight',castRange&&'cast-range',aim&&'aim',glyph&&'glyph-'+glyph.kind,glyph?.warn&&'warn',guardZone&&'guard-zone'].filter(Boolean).join(' ');
     if(voidCell){cell.disabled=true;cell.setAttribute('aria-hidden','true');}
     cell.setAttribute('aria-label',(unit?.name||(wall?'Muro':water?'Agua':trap?trapInfo[trap.kind].name:'Casilla'))+' '+(pos%state.width+1)+', '+(Math.floor(pos/state.width)+1));
     if(path){

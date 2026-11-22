@@ -1530,3 +1530,5 @@ body:not(.in-expedition) .live-version.update{color:#1b1206;background:#ffd76a}
 .editor-return button{padding:5px 12px;border-radius:99px;background:var(--gold);color:#1b140a;border:0;font-weight:800;cursor:pointer}
 .lab-hero-head b{white-space:nowrap}
 .impact.block-loss{color:#b9cde0}
+/* Zona de En guardia! en el tablero 2D */
+.cell.guard-zone{box-shadow:inset 0 0 0 2px #d8c27a88}

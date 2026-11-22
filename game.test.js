@@ -1569,9 +1569,9 @@ test('Valkyria tanda 2: Balestra, Salto valiente, Carga heroica, Abrir las aguas
     assert.equal(v.pos,f.pos+5,'');assert.ok(f.hp<300);}
   // Salto valiente: aterriza y daña en círculo de 3.
   {const {s,v,foes}=setup();foes[0].pos=v.pos-3-3*s.width>=0?v.pos-3:v.pos-3;
-    const land=v.pos-3+1;foes[0].pos=land-3;
+    const land=v.pos-3+1;foes[0].pos=land-2;
     act(s,v.id,{type:'skill',skill:idx('Salto valiente'),pos:land},rng);
-    assert.equal(v.pos,land);assert.ok(foes[0].hp<300,'daña a 3 casillas');}
+    assert.equal(v.pos,land);assert.ok(foes[0].hp<300,'daña a 2 casillas');}
   // Abrir las aguas: T invertida, empuja 1 desde el centro.
   {const {s,v,foes,w}=setup();
     const center=v.pos-2*w;           // dos casillas arriba

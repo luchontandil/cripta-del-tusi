@@ -15,7 +15,7 @@ export const classes = {
     ['Liberación',3,0,3,6,'push','✹',0,{element:'fire',burnChance:0,area:'circle',size:2,push:2,los:false,casts:1,modifiable:false}],
     ['Pies ligeros',2,0,0,0,'sprint','➝',0,{value:2,los:false,casts:1,cooldown:2,modifiable:false}],
     ['Balestra',3,6,2,9,'lunge','⇥',1,{element:'lightning',inLine:true,clearPath:true,anyTarget:true,casts:1,cooldown:1,modifiable:false}],
-    ['Salto valiente',4,4,5,8,'leap','⤒',2,{element:'fire',burnChance:0,area:'circle',size:3,lifesteal:10,los:false,casts:1,cooldown:3,modifiable:false}],
+    ['Salto valiente',4,4,5,8,'leap','⤒',2,{element:'fire',burnChance:0,area:'circle',size:2,lifesteal:10,los:false,casts:1,cooldown:3,modifiable:false}],
     ['Carga heroica',3,5,2,8,'charge','⇶',1,{element:'lightning',inLine:true,clearPath:true,anyTarget:true,casts:1,modifiable:false}],
     ['Abrir las aguas',4,5,3,6,'push','⊥',0,{element:'ice',area:'tee',size:2,push:1,pushFrom:'center',inLine:true,casts:1,cooldown:2,modifiable:false}],
     ['Furia',2,0,0,0,'fury','✹',0,{element:'fire',burnChance:0,value:10,turns:2,los:false,casts:1,cooldown:4,modifiable:false}]

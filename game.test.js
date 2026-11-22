@@ -778,7 +778,7 @@ test('Valkyria: Estocada empuja la línea, Liberación aparta alrededor, choques
     assert.equal(v.effects.fury.turns,2);
     assert.equal(scaledDamage(v,est,100),Math.floor(before*1.12)||scaledDamage(v,est,100));
     assert.ok(Math.abs(scaledDamage(v,est,100)/before-1.12)<.02);}
-  // En guardia!: escudo del 10 % de la vida + nivel hasta su próximo turno; al terminar el turno, zona que
+  // En guardia!: escudo del 10 % de la vida + nivel hasta su próximo turno; al terminar el turno, zona (radio 2) que
   // daña y empuja 2 a cada enemigo que entre (una vez por enemigo).
   {const {s,v,foes,w}=setup();
     v.level=5;
@@ -791,16 +791,16 @@ test('Valkyria: Estocada empuja la línea, Liberación aparta alrededor, choques
     assert.equal(v.hp,hp,'el escudo absorbe primero');
     act(s,v.id,{type:'end'},rng);
     assert.equal(s.guardZones.length,1,'la zona aparece al terminar el turno');
-    const foe=foes[0];foe.pos=v.pos-5;
+    const foe=foes[0];foe.pos=v.pos-4;
     const before=foe.hp;
-    // El enemigo camina hacia ella: al entrar (distancia 3) recibe daño y sale despedido 2.
-    _test.move(s,foe,[v.pos-4,v.pos-3,v.pos-2],false);
+    // El enemigo camina hacia ella: al entrar (distancia 2) recibe daño y sale despedido 2.
+    _test.move(s,foe,[v.pos-3,v.pos-2,v.pos-1],false);
     assert.ok(foe.hp<before,'recibe daño');
-    assert.equal(foe.pos,v.pos-5,'empujado 2 desde donde entró');
+    assert.equal(foe.pos,v.pos-4,'empujado 2 desde donde entró');
     // Una sola vez por enemigo.
     const hp2=foe.hp;
-    _test.move(s,foe,[v.pos-4,v.pos-3,v.pos-2],false);
-    assert.equal(foe.hp,hp2);assert.equal(foe.pos,v.pos-2);
+    _test.move(s,foe,[v.pos-3,v.pos-2,v.pos-1],false);
+    assert.equal(foe.hp,hp2);assert.equal(foe.pos,v.pos-1);
     // En su próximo turno desaparecen escudo y zona.
     s.turn=s.units.indexOf(v);_test.beginTurn(s);
     assert.ok(!v.effects.barrier&&!s.guardZones.length);}

@@ -10,7 +10,7 @@ export const classes = {
   guardia: {name:'Valkyria', hp:58, initiative:10, skills:[
     ['Estocada',3,1,5,7,'push','➶',1,{element:'fire',burnChance:0,area:'line',size:2,push:2,los:false,casts:2,modifiable:false}],
     ['Lanza del lago',3,5,2,7,'pull','↢',1,{element:'lightning',area:'trident',pull:1,casts:1,cooldown:1,modifiable:true}],
-    ['En guardia!',3,0,2,2,'guard','⛨',0,{area:'circle',size:3,los:false,casts:1,cooldown:2,modifiable:false,perRank:0}],
+    ['En guardia!',3,0,2,2,'guard','⛨',0,{area:'circle',size:2,los:false,casts:1,cooldown:2,modifiable:false,perRank:0}],
     ['Punzón',2,4,3,4,'damage','✧',1,{element:'physical',casts:2,lifesteal:25,modifiable:true}],
     ['Liberación',3,0,3,6,'push','✹',0,{element:'fire',burnChance:0,area:'circle',size:2,push:2,los:false,casts:1,modifiable:false}],
     ['Pies ligeros',2,0,0,0,'sprint','➝',0,{value:2,los:false,casts:1,cooldown:2,modifiable:false}],

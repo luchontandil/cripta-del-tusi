@@ -808,7 +808,7 @@ test('Valkyria: Estocada empuja la línea, Liberación aparta alrededor, choques
   {const {s,v,foes,w}=setup();
     const lance=skillFor(v,idx('Lanza del lago'));
     const area=new Set(spellArea(s,v.pos-2,lance,v));
-    assert.deepEqual(area,new Set([v.pos-2,v.pos-3,v.pos-4-w,v.pos-4+w,v.pos-5-2*w,v.pos-5,v.pos-5+2*w]));
+    assert.deepEqual(area,new Set([v.pos-2,v.pos-3-w,v.pos-3,v.pos-3+w,v.pos-4-2*w,v.pos-4,v.pos-4+2*w]));
     foes[0].pos=v.pos-3;
     act(s,v.id,{type:'skill',skill:idx('Lanza del lago'),pos:v.pos-2},rng);
     assert.equal(foes[0].pos,v.pos-2);}

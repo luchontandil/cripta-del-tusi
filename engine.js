@@ -2420,12 +2420,16 @@ export function spellArea(s,pos,skill,caster=null) {
       center=step(s,center,dx,dy);
     }
   }else if(area==='trident'&&caster){
-    // Tridente: el mango empieza en la casilla elegida y se aleja del lanzador; las puntas se abren hacia fuera.
-    //   X . X . X     (3 casillas más allá)
-    //   . X . X .     (2 más allá)
-    //   . . X . .     (1 más allá)
+    // Tridente: la casilla elegida es la base y se abre alejándose del lanzador.
+    //   X . X . X     (2 casillas más allá)
+    //   . X X X .     (1 más allá)
     //   . . X . .     (casilla elegida)
-    for(const [f,l] of [[1,0],[2,-1],[2,1],[3,-2],[3,0],[3,2]]){const c=at(f,l);if(c>=0)cells.add(c);}
+    const {dx,dy}=direction(s,caster.pos,pos);
+    const at=(forward,side)=>{
+      const x=pos%s.width+dx*forward+dy*side,y=Math.floor(pos/s.width)+dy*forward+dx*side;
+      return x<0||y<0||x>=s.width||y>=s.height?-1:y*s.width+x;
+    };
+    for(const [f,l] of [[1,-1],[1,0],[1,1],[2,-2],[2,0],[2,2]]){const c=at(f,l);if(c>=0)cells.add(c);}
   }else if((area==='cone'||area==='line')&&caster){
     const {dx,dy}=direction(s,caster.pos,pos);
     let row=[pos];

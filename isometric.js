@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=126';
-import {playerColors} from './engine.js?v=126';
+import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=127';
+import {playerColors} from './engine.js?v=127';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -668,7 +668,8 @@ export function createIso(mount,onCell){
     if(['heal','cleanse'].includes(effect))return 'support';
     if(effect==='push'||effect==='pull')return effect;
     if(unit?.boss&&effect!=='slash')return 'cast';                   // poderes de jefe: invocar, aullar, nova
-    if(effect==='dash'||effect==='swap')return 'dash';
+    if(effect==='dash'||effect==='swap'||effect==='leap')return 'dash';
+    if(effect==='lunge'||effect==='charge')return 'melee';
     if(effect==='arrow')return 'shoot';
     if(effect==='slash')return 'melee';
     if(unit?.classId==='tirador')return 'shoot';

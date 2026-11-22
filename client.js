@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=126';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=126';
-import {setupSfx} from './music.js?v=126';
-import {icon} from './icons.js?v=126';
-import {openMapEditor} from './mapeditor.js?v=126';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=127';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=127';
+import {setupSfx} from './music.js?v=127';
+import {icon} from './icons.js?v=127';
+import {openMapEditor} from './mapeditor.js?v=127';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=126').then(({createIso})=>{
+import('./isometric.js?v=127').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -849,7 +849,7 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
   showTip(nodes,anchor,unit.enemy?'tip-foe':'tip-ally');
 }
 window.addEventListener('scroll',hideUnit,{passive:true});
-const areaNames={cross:'cruz',circle:'círculo',cone:'cono',line:'línea',wave:'rectángulo delante de ti',trident:'tridente'};
+const areaNames={cross:'cruz',circle:'círculo',cone:'cono',line:'línea',wave:'rectángulo delante de ti',trident:'tridente',tee:'T invertida'};
 /** Texto del efecto de una habilidad, con sus valores reales (rango y bonificaciones incluidos). */
 /** Qué hace cada habilidad, en una frase (los números exactos van en la ficha). */
 const skillLore={
@@ -860,6 +860,10 @@ const skillLore={
   'Punzón':'Un pinchazo preciso que te devuelve parte de las fuerzas que le roba al enemigo.',
   'Liberación':'Liberas de golpe la fuerza contenida y todo lo que te rodea sale despedido.',
   'Pies ligeros':'Por un momento el peso de la armadura desaparece y tus pasos se alargan.',
+  'Balestra':'Un salto adelante, la punta por delante, y cuando el enemigo se gira ya estás a su espalda.',
+  'Salto valiente':'Te lanzas por los aires y caes como un rayo en medio de la refriega.',
+  'Carga heroica':'Bajas la lanza y corres: cuanto más larga la carrera, más lejos sale despedido.',
+  'Abrir las aguas':'Clavas la lanza y el suelo se parte en tres: el frío aparta a todo lo que toca.',
   'Furia':'El fuego de la batalla te enciende por dentro: cada golpe pega más fuerte.',
   // Arquero
   'Flecha precisa':'Respiras, apuntas y sueltas. Una flecha limpia a cualquier enemigo a la vista.',
@@ -907,7 +911,7 @@ function skillEffectText(skill){
     slow:(o.slowChance!==undefined?o.slowChance+' % de probabilidad de ralentizar: ':'Ralentiza: ')+'−'+(o.value||2)+' PM en el próximo turno del objetivo',
     venom:'Veneno: '+(o.value||3)+' PV por turno durante 2 turnos',
     blast:'',
-    push:o.area?'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' a los enemigos alcanzados, alejándolos de ti. Si chocan: 2 de daño por casilla que falte + la mitad de tu nivel':'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' en línea. Si choca: 2 de daño por casilla que falte + la mitad de tu nivel',
+    push:o.area?'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' a los enemigos alcanzados, alejándolos '+(o.pushFrom==='center'?'del centro del área':'de ti')+'. Si chocan: 2 de daño por casilla que falte + la mitad de tu nivel':'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' en línea. Si choca: 2 de daño por casilla que falte + la mitad de tu nivel',
     pull:o.area?'Atrae '+(o.pull||1)+(o.pull>1?' casillas':' casilla')+' hacia ti a los enemigos alcanzados':o.pull==='melee'?'Atrae al objetivo (aliado o enemigo) hasta el cuerpo a cuerpo; a los aliados no les hace daño':'Atrae '+(o.pull||1)+(o.pull>1?' casillas':' casilla')+' hacia ti',
     cleanse:'Elimina todos los efectos negativos del aliado',
     heal:'Cura a un aliado o a ti mismo',
@@ -917,6 +921,9 @@ function skillEffectText(skill){
     fury:'+'+(o.value||10)+' % de daño final durante 2 turnos (contando este); se multiplica por tu % de daño de fuego',
     guard:'Escudo del 10 % de tu vida máxima + tu nivel hasta tu próximo turno. Al terminar tu turno, el primer paso de cada enemigo dentro del área le hace este daño y lo empuja 2 casillas (una vez por enemigo). Pasa el turno',
     swap:'Intercambia tu posición con la del objetivo',
+    lunge:'Corres en línea recta hasta el objetivo, lo golpeas y apareces detrás de él (si esa casilla está ocupada, te quedas pegado). A un aliado no le hace daño. Sin nada en medio de la recta',
+    charge:'Corres en línea recta hasta el objetivo, lo golpeas y lo empujas tantas casillas como recorriste + 1. Si choca: 2 de daño por casilla que falte + la mitad de tu nivel. A un aliado lo empuja sin daño. Sin nada en medio de la recta',
+    leap:'Saltas a una casilla libre y golpeas a todos los enemigos a tu alrededor (−20 % por casilla de distancia)',
     dash:o.teleport?(o.los===false?'Teletransporte (sin necesitar línea de visión)':'Teletransporte a una casilla libre que veas, sin gastar PM'):'Desplazamiento por una ruta libre sin gastar PM'
   }[kind]||'';
   const steal=o.lifesteal?' · Te curas el '+o.lifesteal+' % del daño hecho':'';
@@ -1011,7 +1018,7 @@ function skillRows(unit,skill){
   }
   const sketch=areaSketch(skill);
   if(o.area||sketch){
-    const label=o.area==='wave'?(o.width||3)+'×'+(o.size||1)+' al frente':o.area==='line'?'línea de '+((o.size||1)+1)+' casillas':o.area==='trident'?'tridente':o.area==='circle'&&!skill[2]?'círculo de '+(o.size||1)+' a tu alrededor':o.area?areaNames[o.area]+(o.size>1?' · tamaño '+o.size:''):'cruz';
+    const label=o.area==='wave'?(o.width||3)+'×'+(o.size||1)+' al frente':o.area==='line'?'línea de '+((o.size||1)+1)+' casillas':o.area==='trident'?'tridente':o.area==='tee'?'T invertida':o.area==='circle'&&!skill[2]?'círculo de '+(o.size||1)+' a tu alrededor':o.area?areaNames[o.area]+(o.size>1?' · tamaño '+o.size:''):'cruz';
     const row=statRow('blast','Área',label);
     if(sketch)row.querySelector('.tip-value').append(sketch);
     rows.push(row);

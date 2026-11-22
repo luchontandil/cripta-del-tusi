@@ -6,7 +6,7 @@
  */
 export const classes = {
   // Valkyria (antes Guardián/Lancero). Las tres primeras son las de inicio. Física: escala con daño físico + su elemento.
-  // Pendientes de la hoja: Balestra, Salto valiente, Lanza cargada, Carga heroica, Eclipse, Barrido, Abrir las aguas, Lanza abisal.
+  // Pendientes de la hoja (docs/skills-valkyria.md): Lanza cargada, Eclipse, Barrido, Lanza abisal.
   guardia: {name:'Valkyria', hp:58, initiative:10, skills:[
     ['Estocada',3,2,5,7,'push','➶',1,{element:'fire',inLine:true,burnChance:0,area:'line',size:2,push:2,los:false,casts:2,modifiable:false}],
     ['Lanza del lago',3,5,2,7,'pull','↢',1,{element:'lightning',area:'trident',inLine:true,pull:1,casts:1,cooldown:1,modifiable:true}],
@@ -14,6 +14,10 @@ export const classes = {
     ['Punzón',2,4,3,4,'damage','✧',1,{element:'physical',casts:2,lifesteal:25,modifiable:true}],
     ['Liberación',3,0,3,6,'push','✹',0,{element:'fire',burnChance:0,area:'circle',size:2,push:2,los:false,casts:1,modifiable:false}],
     ['Pies ligeros',2,0,0,0,'sprint','➝',0,{value:2,los:false,casts:1,cooldown:2,modifiable:false}],
+    ['Balestra',3,6,2,9,'lunge','⇥',1,{element:'lightning',inLine:true,clearPath:true,anyTarget:true,casts:1,cooldown:1,modifiable:false}],
+    ['Salto valiente',4,4,5,8,'leap','⤒',2,{element:'fire',burnChance:0,area:'circle',size:3,lifesteal:10,los:false,casts:1,cooldown:3,modifiable:false}],
+    ['Carga heroica',3,5,2,8,'charge','⇶',1,{element:'lightning',inLine:true,clearPath:true,anyTarget:true,casts:1,modifiable:false}],
+    ['Abrir las aguas',4,5,3,6,'push','⊥',0,{element:'ice',area:'tee',size:2,push:1,pushFrom:'center',inLine:true,casts:1,cooldown:2,modifiable:false}],
     ['Furia',2,0,0,0,'fury','✹',0,{element:'fire',burnChance:0,value:10,turns:2,los:false,casts:1,cooldown:4,modifiable:false}]
   ]},
   tirador: {name:'Arquero', hp:31, initiative:14, skills:[
@@ -2359,6 +2363,8 @@ export function hasRange(s,unit,pos,skill) {
   const d=distance(s,unit.pos,pos);
   // Hechizos en línea recta: solo en la misma fila o columna que el lanzador.
   if(skillOptions(skill).inLine&&pos%s.width!==unit.pos%s.width&&Math.floor(pos/s.width)!==Math.floor(unit.pos/s.width))return false;
+  // Cargas (Balestra, Carga heroica): nada en medio de la recta (las trampas no cuentan).
+  if(skillOptions(skill).clearPath&&!clearLine(s,unit.pos,pos))return false;
   return d>=min&&d<=range+(modifiableRange(skill)?(unit.stats?.reach||0):0);
 }
 /** Lanzamientos que le quedan este turno a una habilidad con límite (Infinity si no tiene). */
@@ -2383,6 +2389,12 @@ function countCast(s,unit,skill){
 export function inRange(s,unit,pos,skill) {
   return hasRange(s,unit,pos,skill)&&(skillOptions(skill).los===false||lineOfSight(s,unit.pos,pos));
 }
+/** ¿Están libres (sin muros, agua, vacío ni unidades) todas las casillas entre dos de la misma recta? */
+function clearLine(s,from,to){
+  const {dx,dy}=direction(s,from,to);
+  for(let p=step(s,from,dx,dy);p>=0&&p!==to;p=step(s,p,dx,dy))if(!free(s,p))return false;
+  return true;
+}
 const free=(s,pos)=>onBoard(s,pos)&&!s.walls.includes(pos)&&!s.water?.includes(pos)&&!s.units.some(u=>alive(u)&&u.pos===pos);
 export function castableCell(s,unit,pos,skill){
   if(!inRange(s,unit,pos,skill))return false;
@@ -2390,6 +2402,7 @@ export function castableCell(s,unit,pos,skill){
     if(!free(s,pos))return false;
     return skillOptions(skill).teleport||paths(s,unit,skill[2]).has(pos);
   }
+  if(skill[5]==='leap'&&!free(s,pos))return false;
   return castsOnCell(skill);
 }
 /** Dirección (una de las 4) desde el lanzador hacia la casilla objetivo. */
@@ -2430,6 +2443,17 @@ export function spellArea(s,pos,skill,caster=null) {
       return x<0||y<0||x>=s.width||y>=s.height?-1:y*s.width+x;
     };
     for(const [f,l] of [[1,-1],[1,0],[1,1],[2,-2],[2,0],[2,2]]){const c=at(f,l);if(c>=0)cells.add(c);}
+  }else if(area==='tee'&&caster){
+    // T invertida: la casilla elegida es el centro de la barra y el palo se aleja del lanzador.
+    //   . . X . .     (2 más allá)
+    //   . . X . .     (1 más allá)
+    //   X X X X X     (casilla elegida en el centro)
+    const {dx,dy}=direction(s,caster.pos,pos);
+    const at=(forward,side)=>{
+      const x=pos%s.width+dx*forward+dy*side,y=Math.floor(pos/s.width)+dy*forward+dx*side;
+      return x<0||y<0||x>=s.width||y>=s.height?-1:y*s.width+x;
+    };
+    for(const [f,l] of [[0,-2],[0,-1],[0,1],[0,2],[1,0],[2,0]]){const c=at(f,l);if(c>=0)cells.add(c);}
   }else if((area==='cone'||area==='line')&&caster){
     const {dx,dy}=direction(s,caster.pos,pos);
     let row=[pos];
@@ -2453,8 +2477,9 @@ export function targetable(s,unit,target,skill) {
   return !!target.enemy!==supportKinds.includes(skill[5]);
 }
 /** Empuja (o atrae) a una unidad casilla a casilla; si choca, recibe daño por cada casilla que faltaba. */
-function shove(s,actor,target,cells,toward){
-  const {dx,dy}=direction(s,actor.pos,target.pos);
+function shove(s,actor,target,cells,toward,origin=actor.pos,crash=true){
+  // Desde un punto (el centro de un área): quien está justo encima sale en la dirección del lanzamiento.
+  const {dx,dy}=origin===target.pos?direction(s,actor.pos,origin):direction(s,origin,target.pos);
   const sx=toward?-dx:dx,sy=toward?-dy:dy;
   const path=[];
   let pos=target.pos;
@@ -2465,7 +2490,7 @@ function shove(s,actor,target,cells,toward){
   }
   if(path.length)move(s,target,path,false);
   const missing=cells-path.length;
-  if(!toward&&missing>0&&alive(target)){
+  if(!toward&&crash&&missing>0&&alive(target)){
     // Choque: daño sin elemento ni escalado = 2 × casillas que faltaban + mitad del nivel del que empuja.
     const amount=2*missing+Math.floor((actor.level||s.floor||0)/2);
     hit(s,actor,target,amount,'damage',false,'neutral');
@@ -2512,7 +2537,7 @@ export function areaFalloff(s,center,pos,skill){
   if(!isAreaDamage(skill)||center==null||pos==null)return 1;
   return Math.max(.6,1-.2*distance(s,center,pos));
 }
-function applySkill(s,unit,target,skill,rng,scale=1){
+function applySkill(s,unit,target,skill,rng,scale=1,origin){
   const [name,,,min,max,kind]=skill;
   const opts=skillOptions(skill);
   const value=opts.value;
@@ -2536,6 +2561,16 @@ function applySkill(s,unit,target,skill,rng,scale=1){
     note(s,unit.name+' intercambia su posición con '+target.name+'.');
     return;
   }
+  // Cargas (Balestra, Carga heroica): primero corre en línea recta hasta quedar pegado al objetivo.
+  let dir=null,traveled=0;
+  if(kind==='lunge'||kind==='charge'){
+    dir=direction(s,unit.pos,target.pos);
+    const start=unit.pos,route=[];
+    for(let p=step(s,unit.pos,dir.dx,dir.dy);p>=0&&p!==target.pos;p=step(s,p,dir.dx,dir.dy))route.push(p);
+    if(route.length)move(s,unit,route,false);
+    traveled=distance(s,start,unit.pos);
+    if(!alive(unit))return;
+  }
   // Los hechizos que pueden apuntar a aliados (como el Gancho) no les hacen daño.
   if(max>0&&!!target.enemy!==!!unit.enemy){
     const element=skillElement(unit,skill);
@@ -2551,14 +2586,21 @@ function applySkill(s,unit,target,skill,rng,scale=1){
       if(heal>0){unit.hp+=heal;emit(s,{kind:'heal',unit:unit.id,from:target.pos,pos:unit.pos,amount:heal});note(s,unit.name+' se cura '+heal+' PV.');}
     }
   }
+  // Balestra: se teletransporta detrás del objetivo (si esa casilla está ocupada, se queda pegado).
+  if(kind==='lunge'&&alive(unit)){
+    const behind=step(s,target.pos,dir.dx,dir.dy);
+    if(behind>=0&&free(s,behind))move(s,unit,[behind],false,true);
+  }
   if(!alive(target))return;
+  // Carga heroica: empuja tantas casillas como recorrió + 1 (a un aliado sin daño por choque).
+  if(kind==='charge')shove(s,unit,target,traveled+1,false,unit.pos,!!target.enemy!==!!unit.enemy);
   if(kind==='expose'){effect(target,'expose',value||3,2);note(s,target.name+' queda vulnerable: todos los atacantes infligen +'+(value||3)+'.');}
   if(kind==='slow'&&(opts.slowChance===undefined||rng()*100<opts.slowChance)){
     drainMp(s,target,value||2,1);
     if(opts.slowChance!==undefined)note(s,target.name+' queda ralentizado: −'+(value||2)+' PM.');
   }
   if(kind==='venom'){effect(target,'poison',value||3,2);note(s,target.name+' queda envenenado.');}
-  if(kind==='push')shove(s,unit,target,opts.push||1,false);
+  if(kind==='push')shove(s,unit,target,opts.push||1,false,origin??unit.pos);
   if(kind==='pull')shove(s,unit,target,opts.pull==='melee'?Math.max(0,distance(s,unit.pos,target.pos)-1):opts.pull||1,true);
 }
 function gearAction(s,p,a,rng) {
@@ -2760,12 +2802,15 @@ export function act(s,id,a,rng=Math.random) {
     s.ap-=cost;countCast(s,unit,skill);
     const area=spellArea(s,a.pos,skill,unit);
     spellCue(s,unit,a.pos,kind,area,skill);
+    // Salto valiente: se teletransporta a la casilla y golpea alrededor.
+    if(kind==='leap')move(s,unit,[a.pos],false,true);
     const support=supportKinds.includes(kind);
     // Empujes en área: primero los más lejanos, para que no se bloqueen entre ellos.
+    const origin=skillOptions(skill).pushFrom==='center'?a.pos:unit.pos;
     const hits=s.units.filter(u=>alive(u)&&area.includes(u.pos)&&(support?!u.enemy:u.enemy))
-      .sort((a,b)=>kind==='push'?distance(s,unit.pos,b.pos)-distance(s,unit.pos,a.pos):kind==='pull'?distance(s,unit.pos,a.pos)-distance(s,unit.pos,b.pos):0);
+      .sort((a,b)=>kind==='push'?distance(s,origin,b.pos)-distance(s,origin,a.pos):kind==='pull'?distance(s,unit.pos,a.pos)-distance(s,unit.pos,b.pos):0);
     if(kind==='guard')guard(s,unit,skill);
-    else for(const other of hits)applySkill(s,unit,other,skill,rng,areaFalloff(s,a.pos,other.pos,skill));
+    else if(alive(unit))for(const other of hits)applySkill(s,unit,other,skill,rng,areaFalloff(s,a.pos,other.pos,skill),origin);
     finish(s,rng);
     // Habilidades que pasan el turno al lanzarse (En guardia!).
     if(s.phase==='combat'&&(!alive(unit)||skillOptions(skill).endsTurn))advance(s,rng);

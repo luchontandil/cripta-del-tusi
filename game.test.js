@@ -1536,3 +1536,48 @@ test('laboratorio: héroes, habilidades y enemigos a elegir, muñeco que no atac
   act(s,'lab0',{type:'end'},rng);
   assert.equal(s.phase,'won');
 });
+
+test('Valkyria tanda 2: Balestra, Salto valiente, Carga heroica, Abrir las aguas',()=>{
+  const rng=()=>.5;
+  const names=classes.guardia.skills.map(k=>k[0]);
+  const idx=n=>names.indexOf(n);
+  const setup=()=>{
+    const s=battle('guardia');
+    s.walls=[];s.water=[];s.traps=[];s.voids=[];
+    const v=s.units.find(u=>!u.enemy);
+    v.skillRanks=names.map(()=>1);
+    const foes=s.units.filter(u=>u.enemy);
+    for(const f of foes){f.pos=-99;f.hp=f.max=300;f.stats.ward=0;f.resist={};}
+    s.turn=s.units.indexOf(v);s.ap=20;s.mp=3;s.casts={};s.phase='combat';
+    v.pos=5*s.width+8;
+    return {s,v,foes,w:s.width};
+  };
+  // Balestra: corre hasta el objetivo, lo daña y aparece detrás.
+  {const {s,v,foes,w}=setup();const f=foes[0];f.pos=v.pos-4;
+    act(s,v.id,{type:'skill',skill:idx('Balestra'),pos:f.pos},rng);
+    assert.ok(f.hp<300,'daña');assert.equal(v.pos,f.pos-1,'queda detrás');
+    // Con la casilla de detrás ocupada, se queda pegado.
+    const {s:s2,v:v2,foes:g}=setup();g[0].pos=v2.pos-4;s2.walls=[v2.pos-5];
+    act(s2,v2.id,{type:'skill',skill:idx('Balestra'),pos:g[0].pos},rng);
+    assert.equal(v2.pos,g[0].pos+1,'pegado delante');
+    // Con algo en medio de la recta no se puede.
+    const {s:s3,v:v3,foes:h}=setup();h[0].pos=v3.pos-4;s3.walls=[v3.pos-2];
+    assert.throws(()=>act(s3,v3.id,{type:'skill',skill:idx('Balestra'),pos:h[0].pos},rng));}
+  // Carga heroica: recorre 3 y empuja 4.
+  {const {s,v,foes}=setup();const f=foes[0];f.pos=v.pos-4;
+    act(s,v.id,{type:'skill',skill:idx('Carga heroica'),pos:f.pos},rng);
+    assert.equal(v.pos,f.pos+5,'');assert.ok(f.hp<300);}
+  // Salto valiente: aterriza y daña en círculo de 3.
+  {const {s,v,foes}=setup();foes[0].pos=v.pos-3-3*s.width>=0?v.pos-3:v.pos-3;
+    const land=v.pos-3+1;foes[0].pos=land-3;
+    act(s,v.id,{type:'skill',skill:idx('Salto valiente'),pos:land},rng);
+    assert.equal(v.pos,land);assert.ok(foes[0].hp<300,'daña a 3 casillas');}
+  // Abrir las aguas: T invertida, empuja 1 desde el centro.
+  {const {s,v,foes,w}=setup();
+    const center=v.pos-2*w;           // dos casillas arriba
+    foes[0].pos=center-1;              // en la barra, a la izquierda del centro
+    foes[1]&&(foes[1].pos=center-2*w); // en el palo, 2 más allá
+    act(s,v.id,{type:'skill',skill:idx('Abrir las aguas'),pos:center},rng);
+    assert.equal(foes[0].pos,center-2,'empujado a un lado');
+    if(foes[1])assert.equal(foes[1].pos,center-3*w,'empujado lejos');}
+});

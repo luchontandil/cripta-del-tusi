@@ -1511,11 +1511,11 @@ function applyGlyphs(s,unit,oldPos) {
     triggerGlyph(s,g,unit);
   }
 }
-function move(s,unit,path,voluntary=true,blink=false) {
+function move(s,unit,path,voluntary=true,blink=false,style=null) {
   const from=unit.pos;
   const traveled=[];
   if(!path.length||!alive(unit)||(voluntary&&s.mp===0))return;
-  emit(s,{kind:'move',unit:unit.id,look:unit.look||unit.classId,from,path:traveled,...(blink?{blink:true}:{})});
+  emit(s,{kind:'move',unit:unit.id,look:unit.look||unit.classId,from,path:traveled,...(blink?{blink:true}:{}),...(!voluntary&&!blink?{rush:true}:{}),...(style?{style}:{})});
   for(const pos of path) {
     if(!alive(unit)||(voluntary&&s.mp===0))break;
     if(voluntary)s.mp--;
@@ -2366,7 +2366,7 @@ function spellCue(s,unit,pos,kind,area,skill){
   const effect=kind==='damage'?(unit.classId==='tirador'?'arrow':unit.classId==='mago'||unit.classId==='mistico'?'arcane':'slash'):kind;
   // Elemento de la habilidad (para el sonido de impacto): solo en las que no son de apoyo.
   const element=skill&&!supportKinds.includes(kind)&&kind!=='dash'?skillElement(unit,skill):null;
-  emit(s,{kind:'spell',effect,actor:unit.id,from:unit.pos,pos,area,...(element&&element!=='physical'?{element}:{})});
+  emit(s,{kind:'spell',effect,actor:unit.id,from:unit.pos,pos,area,...(skill?{name:skill[0]}:{}),...(element&&element!=='physical'?{element}:{})});
 }
 export function hasRange(s,unit,pos,skill) {
   const [,cost,range,,,,,min=0]=skill;
@@ -2597,7 +2597,7 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
     dir=direction(s,unit.pos,target.pos);
     const start=unit.pos,route=[];
     for(let p=step(s,unit.pos,dir.dx,dir.dy);p>=0&&p!==target.pos;p=step(s,p,dir.dx,dir.dy))route.push(p);
-    if(route.length)move(s,unit,route,false);
+    if(route.length)move(s,unit,route,false,false,'charge');
     traveled=distance(s,start,unit.pos);
     if(!alive(unit))return;
   }
@@ -2621,7 +2621,7 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
   // Balestra: se teletransporta detrás del objetivo (si esa casilla está ocupada, se queda pegado).
   if(kind==='lunge'&&alive(unit)){
     const behind=step(s,target.pos,dir.dx,dir.dy);
-    if(behind>=0&&free(s,behind))move(s,unit,[behind],false,true);
+    if(behind>=0&&free(s,behind))move(s,unit,[behind],false,true,'bolt');
   }
   if(!alive(target))return;
   // Carga heroica: empuja tantas casillas como recorrió + 1 (a un aliado sin daño por choque).
@@ -2835,7 +2835,7 @@ export function act(s,id,a,rng=Math.random) {
     const area=spellArea(s,a.pos,skill,unit);
     spellCue(s,unit,a.pos,kind,area,skill);
     // Salto valiente: se teletransporta a la casilla y golpea alrededor.
-    if(kind==='leap')move(s,unit,[a.pos],false,true);
+    if(kind==='leap')move(s,unit,[a.pos],false,false,'leap');
     const support=supportKinds.includes(kind);
     // Empujes en área: primero los más lejanos, para que no se bloqueen entre ellos.
     const origin=skillOptions(skill).pushFrom==='center'?a.pos:unit.pos;

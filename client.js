@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=139';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=139';
-import {setupSfx} from './music.js?v=139';
-import {icon} from './icons.js?v=139';
-import {openMapEditor} from './mapeditor.js?v=139';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=140';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=140';
+import {setupSfx} from './music.js?v=140';
+import {icon} from './icons.js?v=140';
+import {openMapEditor} from './mapeditor.js?v=140';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=139').then(({createIso})=>{
+import('./isometric.js?v=140').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -1042,7 +1042,7 @@ function skillRows(unit,skill){
   if(o.push||o.pull)rows.push(statRow('mp',o.push?'Empuje':'Atrae',o.pull==='melee'?'Hasta el contacto':(o.push||o.pull)+((o.push||o.pull)>1?' casillas':' casilla')));
   if(o.inLine)rows.push(statRow('move','Lanzar',o.inLine==='diagonal'?'En línea recta o diagonal':'En línea recta'));
   if(o.stack&&unit.stacks?.[skill[0]]?.length)rows.push(statRow('attack','Cargas',unit.stacks[skill[0]].length+' de '+(o.stack.max||3)+' · +'+unit.stacks[skill[0]].length*o.stack.value+' de daño'));
-  if(o.casts)rows.push(statRow('clock','Usos por turno',state?.phase==='combat'&&unit.id===state.units[state.turn]?.id?Math.max(0,castsLeft(state,unit,skill))+' de '+o.casts:String(o.casts)));
+  if(o.casts)rows.push(statRow('clock','Usos por turno',String(o.casts)));
   if(o.cooldown){
     const left=cooldownLeft(unit,skill);
     rows.push(statRow('clock','Recarga',left?'faltan '+left+(left>1?' turnos':' turno'):o.cooldown+(o.cooldown>1?' turnos':' turno')));

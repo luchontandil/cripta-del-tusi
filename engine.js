@@ -8,7 +8,7 @@ export const classes = {
   // Valkyria (antes Guardián/Lancero). Las tres primeras son las de inicio. Física: escala con daño físico + su elemento.
   // Pendientes de la hoja: Balestra, Salto valiente, Lanza cargada, Carga heroica, Eclipse, Barrido, Abrir las aguas, Lanza abisal.
   guardia: {name:'Valkyria', hp:58, initiative:10, skills:[
-    ['Estocada',3,1,5,7,'push','➶',1,{element:'fire',burnChance:0,area:'line',size:2,push:2,los:false,casts:2,modifiable:false}],
+    ['Estocada',3,2,5,7,'push','➶',1,{element:'fire',inLine:true,burnChance:0,area:'line',size:2,push:2,los:false,casts:2,modifiable:false}],
     ['Lanza del lago',3,5,2,7,'pull','↢',1,{element:'lightning',area:'trident',inLine:true,pull:1,casts:1,cooldown:1,modifiable:true}],
     ['En guardia!',3,0,2,2,'guard','⛨',0,{area:'circle',size:2,los:false,casts:1,cooldown:2,modifiable:false,perRank:0,endsTurn:true}],
     ['Punzón',2,4,3,4,'damage','✧',1,{element:'physical',casts:2,lifesteal:25,modifiable:true}],

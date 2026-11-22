@@ -132,7 +132,7 @@ export function skillElement(unit,skill){
 }
 /**
  * Escuela de una habilidad: «physical» (flechas, dagas, espadas, mazas…) o «magic» (hechizos).
- * Las de mago y clérigo son mágicas; el resto, físicas (aunque tengan un elemento, como Flecha ígnea).
+ * Las de mago y clérigo son mágicas; el resto, físicas (aunque tengan un elemento, como Detonadora).
  */
 export function skillSchool(unit,skill){
   const opts=skillOptions(skill);

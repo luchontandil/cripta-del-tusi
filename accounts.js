@@ -47,7 +47,7 @@ export function loadoutsOf(user){
 }
 /** Datos públicos de la cuenta (sin contraseña). */
 export function publicUser(user){
-  return {admin:isAdmin(user.nick),nick:user.nick,shards:user.shards||0,cards:user.cards||[],slots:user.slots||{},passiveSlots:user.passiveSlots||{},loadouts:loadoutsOf(user),
+  return {admin:isAdmin(user.nick),nick:user.nick,shards:user.shards||0,cards:(user.cards||[]).filter(id=>cards[id]),slots:user.slots||{},passiveSlots:user.passiveSlots||{},loadouts:loadoutsOf(user),
     friends:user.friends,invites:(user.invites||[]).filter(i=>Date.now()-i.at<600000),runs:user.runs||0,best:user.best||0};
 }
 async function newSession(nick){

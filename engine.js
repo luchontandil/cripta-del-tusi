@@ -34,9 +34,12 @@ export const classes = {
     ['Dardo pestilente',2,8,2,4,'corrode','✣',1,{element:'chaos',value:25,poison:2,perTarget:1,casts:2,modifiable:true}],
     ['Congelación prematura',4,8,4,6,'damage','✳',1,{element:'ice',area:'cross',size:1,freeze:true,casts:1,cooldown:1,modifiable:false}],
     ['Ramo helado',3,8,3,5,'damage','❆',1,{element:'ice',area:'cone',size:2,inLine:true,casts:1,modifiable:false}],
-    ['Tramposa',4,8,5,8,'snare','⌗',1,{element:'ice',area:'cross',size:1,blast:3,freeze:true,casts:1,cooldown:4,modifiable:false}],
-    ['Expansión de dominio',2,0,0,0,'domain','◎',0,{value:1,turns:2,los:false,casts:1,cooldown:3,modifiable:false}]
-    // Pendientes (docs/skills-arquero.md): Contagio, Trampita, Flecha Explosiva, Flecha Rastreadora.
+    ['Tramposa',4,8,5,8,'snare','⌗',1,{element:'ice',area:'cross',size:1,trigger:1,blast:3,freeze:true,casts:1,cooldown:4,modifiable:false}],
+    ['Expansión de dominio',2,0,0,0,'domain','◎',0,{value:1,turns:2,los:false,casts:1,cooldown:3,modifiable:false}],
+    ['Contagio',5,8,5,7,'contagion','☣',1,{element:'chaos',value:2,feeble:25,poison:2,poisonTurns:2,spread:2,casts:1,cooldown:3,modifiable:true}],
+    ['Trampita',2,4,3,5,'snare','▣',1,{element:'chaos',trigger:0,anyone:true,visible:true,poison:2,poisonTurns:2,slowChance:30,value:1,maxTraps:3,los:false,casts:1,modifiable:false}],
+    ['Flecha Explosiva',3,7,5,7,'damage','✹',1,{element:'fire',burnChance:0,area:'circle',size:3,blastSight:true,casts:1,modifiable:true}],
+    ['Flecha Rastreadora',4,8,6,8,'track','⌖',1,{element:'fire',burnChance:0,turns:2,casts:1,cooldown:3,modifiable:true}]
   ]},
   mistico: {name:'Clérigo', hp:36, initiative:12, skills:[
     ['Luz ardiente',2,4,5,8,'damage','✦',0,{element:'magic',max:{range:1}}],
@@ -183,7 +186,7 @@ export const poisonValue=(unit,base=2)=>Math.max(1,Math.round(base*(1+(unit.stat
 /** Alcance extra para hechizos de alcance modificable: equipo + Ojo de águila. */
 export const reachBonus=unit=>(unit.stats?.reach||0)+(unit.effects?.reach?.value||0);
 /** ¿Se apunta a una casilla (área, teletransporte) en lugar de a una unidad? */
-export const castsOnCell=skill=>!!skillOptions(skill).area||skill[5]==='dash'||skill[5]==='blast';
+export const castsOnCell=skill=>!!skillOptions(skill).area||['dash','blast','snare'].includes(skill[5]);
 /** Tipos de objeto de equipo (el talismán ya no existe). */
 export const slots = {weapon:'Arma',helmet:'Casco',armor:'Peto',gloves:'Guantes',belt:'Cinturón',boots:'Botas',ring:'Anillo',amulet:'Amuleto'};
 /** Ranuras del personaje: como el tipo de objeto, pero con dos anillos. */
@@ -1415,6 +1418,8 @@ export function damagePreview(unit,target,skill,scale=1){
   return {normal:range(false),critical:range(true),chance:Math.min(1,critChance(unit)+(skillOptions(skill).crit||0)/100),element};
 }
 export function hit(s,actor,target,raw,kind='damage',critical=false,element='physical',burns=true) {
+  // Contagio: quien lo sufre hace un N % menos de daño.
+  if(kind==='damage'&&actor?.effects?.feeble)raw=Math.max(1,Math.round(raw*(1-actor.effects.feeble.value/100)));
   const extra=kind==='damage'?(target.effects.expose?.value||0):0;
   let incoming=netDamage(target,raw,element,critical,extra);
   // Escudo (En guardia!): absorbe daño antes de la vida.
@@ -1586,13 +1591,24 @@ function frozenAfter(s,target){
 function snareCheck(s,unit){
   for(const snare of s.snares||[]){
     const owner=s.units.find(u=>u.id===snare.owner);
-    if(!owner||!alive(unit)||!!owner.enemy===!!unit.enemy)continue;
-    if(distance(s,unit.pos,snare.pos)>1)continue;
-    s.snares=s.snares.filter(t=>t!==snare);
+    if(!owner||!alive(unit))continue;
     const index=classes[owner.classId]?.skills.findIndex(k=>k[0]===snare.skill);
     const skill=index>=0?skillFor(owner,index,true):null;
+    const o=skill?skillOptions(skill):{};
+    if(!o.anyone&&!!owner.enemy===!!unit.enemy)continue;
+    if(distance(s,unit.pos,snare.pos)>(snare.trigger??1))continue;
+    s.snares=s.snares.filter(t=>t!==snare);
     if(!skill)return true;
-    const o=skillOptions(skill),radius=o.blast||3;
+    // Trampita: solo a quien la pisa (aliado o enemigo): daño, veneno y a veces −1 PM.
+    if(!o.blast){
+      emit(s,{kind:'spell',effect:'poison',actor:owner.id,from:snare.pos,pos:snare.pos,area:[snare.pos],name:snare.skill,element:o.element});
+      note(s,unit.name+' pisa la '+snare.skill+' de '+owner.name+'.');
+      hit(s,owner,unit,scaledDamage(owner,skill,roll(skill[3],skill[4],Math.random)),'damage',false,armorType(owner,skill),false);
+      if(alive(unit)&&o.poison)effect(unit,'poison',poisonValue(owner,o.poison),o.poisonTurns||2);
+      if(alive(unit)&&o.slowChance&&Math.random()*100<o.slowChance)drainMp(s,unit,o.value||1,1);
+      return true;
+    }
+    const radius=o.blast||3;
     const victims=s.units.filter(u=>alive(u)&&!!u.enemy!==!!owner.enemy&&distance(s,u.pos,snare.pos)<=radius);
     emit(s,{kind:'spell',effect:'blast',actor:owner.id,from:snare.pos,pos:snare.pos,area:victims.map(u=>u.pos).concat(snare.pos),name:'Tramposa',element:'ice'});
     note(s,unit.name+' pisa la Tramposa de '+owner.name+'.');
@@ -2484,7 +2500,9 @@ function countCast(s,unit,skill,target=null){
   s.casts[key]=(s.casts[key]||0)+1;
 }
 export function inRange(s,unit,pos,skill) {
-  return hasRange(s,unit,pos,skill)&&(skillOptions(skill).los===false||lineOfSight(s,unit.pos,pos));
+  // Flecha Rastreadora: contra un objetivo rastreado, el arquero no necesita línea de visión.
+  const tracked=s.units.find(u=>u.pos===pos&&alive(u)&&u.effects?.tracked?.by===unit.id);
+  return hasRange(s,unit,pos,skill)&&(skillOptions(skill).los===false||!!tracked||lineOfSight(s,unit.pos,pos));
 }
 /** ¿Están libres (sin muros, agua, vacío ni unidades) todas las casillas entre dos de la misma recta? */
 function clearLine(s,from,to){
@@ -2728,6 +2746,17 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
     note(s,target.name+' queda detonado: estallará al acabar su turno.');
   }
   if(opts.freeze&&kind!=='snare'&&!!target.enemy!==!!unit.enemy)freeze(s,unit,target);
+  if(kind==='contagion'&&!!target.enemy!==!!unit.enemy){
+    // Contagio: al objetivo y a sus aliados a ≤N casillas: −PA y −25 % de daño 1 turno (+1 con Expansión) y veneno.
+    const turns=1+(unit.effects?.domain?1:0);
+    const sick=s.units.filter(u=>alive(u)&&!!u.enemy===!!target.enemy&&distance(s,u.pos,target.pos)<=(opts.spread||2));
+    for(const u of sick){
+      effect(u,'weak',value||2,turns);effect(u,'feeble',opts.feeble||25,turns);
+      if(opts.poison)effect(u,'poison',poisonValue(unit,opts.poison),opts.poisonTurns||2);
+    }
+    note(s,'El contagio se extiende a '+sick.length+(sick.length===1?' enemigo.':' enemigos.'));
+  }
+  if(kind==='track'&&alive(target)){target.effects.tracked={value:1,turns:opts.turns||2,by:unit.id};note(s,target.name+' queda rastreado: '+unit.name+' no necesita verlo para disparar.');}
   if(kind==='curse'){effect(target,'weak',value||1,1);note(s,target.name+' pierde '+(value||1)+' PA en su próximo turno.');}
   if(kind==='corrode'){
     // Dura hasta el próximo turno del lanzador.
@@ -2943,13 +2972,18 @@ export function act(s,id,a,rng=Math.random) {
     // Empujes en área: primero los más lejanos, para que no se bloqueen entre ellos.
     const origin=skillOptions(skill).pushFrom==='center'?a.pos:unit.pos;
     // «friendly»: golpea a todo lo que haya en el área, aliados incluidos (Flecha Flamígera).
-    const hits=s.units.filter(u=>alive(u)&&area.includes(u.pos)&&(skillOptions(skill).friendly?u!==unit:support?!u.enemy:u.enemy))
+    const hits=s.units.filter(u=>alive(u)&&area.includes(u.pos)&&(skillOptions(skill).friendly?u!==unit:support?!u.enemy:u.enemy)
+      // Flecha Explosiva: solo lo que se ve desde la casilla del impacto (tras un muro, a salvo).
+      &&(!skillOptions(skill).blastSight||u.pos===a.pos||lineOfSight(s,a.pos,u.pos,u.id)))
       .sort((a,b)=>kind==='push'?distance(s,origin,b.pos)-distance(s,origin,a.pos):kind==='pull'?distance(s,unit.pos,a.pos)-distance(s,unit.pos,b.pos):0);
     if(kind==='snare'){
       // Una sola Tramposa por arquero: la nueva sustituye a la anterior. Dura hasta el final del combate.
-      s.snares=(s.snares||[]).filter(t=>!(t.owner===unit.id&&t.skill===skill[0]));
-      s.snares.push({owner:unit.id,pos:a.pos,skill:skill[0]});
-      note(s,unit.name+' coloca una trampa oculta.');
+      const o=skillOptions(skill),limit=o.maxTraps||1;
+      const mine=(s.snares||[]).filter(t=>t.owner===unit.id&&t.skill===skill[0]);
+      const drop=new Set(mine.slice(0,Math.max(0,mine.length-limit+1)));
+      s.snares=(s.snares||[]).filter(t=>!drop.has(t)&&t.pos!==a.pos);
+      s.snares.push({owner:unit.id,pos:a.pos,skill:skill[0],trigger:o.trigger??1,visible:!!o.visible});
+      note(s,unit.name+(o.visible?' coloca una trampa.':' coloca una trampa oculta.'));
     }
     else if(kind==='guard')guard(s,unit,skill);
     else if(alive(unit))for(const other of hits)applySkill(s,unit,other,skill,rng,areaFalloff(s,a.pos,other.pos,skill),origin);

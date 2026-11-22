@@ -1776,3 +1776,36 @@ test('Arquero tanda 2: Congelamiento, Ramo helado, Tramposa y Expansión de domi
     act(s,a.id,{type:'skill',skill:idx('Congelación prematura'),pos:f.pos},()=>.5);
     assert.equal(f.effects.frozen.skips,1);}
 });
+
+test('Arquero tanda 3: Contagio, Trampita, Flecha Explosiva y Flecha Rastreadora',()=>{
+  const names=classes.tirador.skills.map(k=>k[0]);
+  const idx=n=>names.indexOf(n);
+  const setup=()=>{
+    const s=battle('tirador');
+    s.walls=[];s.water=[];s.traps=[];s.voids=[];
+    const a=s.units.find(u=>!u.enemy);a.skillRanks=names.map(()=>1);
+    const foes=s.units.filter(u=>u.enemy);
+    for(const f of foes){f.pos=-99;f.hp=f.max=300;f.stats.ward=0;f.resist={};f.stats.movement=-9;}
+    const buddy={...structuredClone(foes[0]),id:'buddy',pos:-98};s.units.push(buddy);
+    s.turn=s.units.indexOf(a);s.ap=30;s.mp=3;s.casts={};s.castTargets={};s.phase='combat';
+    a.pos=5*s.width+8;
+    return {s,a,foes:[foes[0],buddy],w:s.width};
+  };
+  {const {s,a,foes,w}=setup();foes[0].pos=a.pos-4;foes[1].pos=foes[0].pos-w;
+    act(s,a.id,{type:'skill',skill:idx('Contagio'),pos:foes[0].pos},()=>.5);
+    for(const f of foes){assert.equal(f.effects.weak.value,2);assert.equal(f.effects.feeble.value,25);assert.equal(f.effects.poison.turns,2);}
+    a.stats.ward=0;a.resist={};const hp=a.hp;hit(s,foes[0],a,20);assert.equal(hp-a.hp,15,'−25 % de daño causado');}
+  {const {s,a,foes}=setup();
+    act(s,a.id,{type:'skill',skill:idx('Trampita'),pos:a.pos-2},()=>.5);
+    assert.equal(s.snares.length,1);
+    foes[0].pos=a.pos-3;_test.move(s,foes[0],[a.pos-2],true);
+    assert.ok(foes[0].hp<300);assert.ok(foes[0].effects.poison);assert.equal(s.snares.length,0);}
+  {const {s,a,foes,w}=setup();const c=a.pos-4;
+    foes[0].pos=c-2;foes[1].pos=c+2*w;s.walls=[c+w];
+    act(s,a.id,{type:'skill',skill:idx('Flecha Explosiva'),pos:c},()=>.5);
+    assert.ok(foes[0].hp<300,'a la vista');assert.equal(foes[1].hp,300,'tras el muro');}
+  {const {s,a,foes}=setup();foes[0].pos=a.pos-3;
+    act(s,a.id,{type:'skill',skill:idx('Flecha Rastreadora'),pos:foes[0].pos},()=>.5);
+    s.walls=[a.pos-1];
+    assert.ok(inRange(s,a,foes[0].pos,skillFor(a,idx('Flecha helada'))),'sin línea de visión contra el rastreado');}
+});

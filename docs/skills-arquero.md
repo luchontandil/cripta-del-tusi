@@ -1,6 +1,6 @@
 # Skills del Arquero (id de clase: `tirador`) — propuesta nueva
 
-Hoja hecha por un amigo del usuario, tal cual llegó (22-11-2026). Pendiente: revisar daños, aclarar mecánicas e implementar.
+Hoja hecha por un amigo del usuario, tal cual llegó (22-11-2026). Daños ajustados (abajo). Iniciales: Flecha helada, Flecha Flamigera y Detonadora. La fila vacía «Sangrado» se quitó (no había habilidad).
 
 | Estado | Nombre del skill | Tipo (Activo/Buff/Pasivo) | Elementos | Coste | Daño Base | Lanzamiento/ Area | Alcance | modificable? | Requiere linea de vision? | Usos / Cooldown | Efecto secundario | Descripcion |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -20,3 +20,8 @@ Hoja hecha por un amigo del usuario, tal cual llegó (22-11-2026). Pendiente: re
 | ⏳ | Flecha Flamigera | Activo | Fisico, Fuego | 3 | 9 - 10 | Linea recta, Area de 1x4 casillas | 1 - 9 | No | Si | 1 vez por turno | Empuja al lanzador una casilla hacia atras, en caso de que no haya una casilla disponible no lo empuja | Lanza una flecha en linea recta que afecta a todas las entidades a 3 casillas en linea recta desde su area de efecto, ocasionando daños de fuego |
 | ⏳ | Detonadora | Activo | Fisico, Fuego | 2 | 2 - 4 | Single target | 1 - 8 | Si | Si | 2 veces por turno y por objetivo | Le aplica el estado "Detonado xD" | Lanza una flecha que ocasiona daños de fuego al enemigo. Luego le aplica el estado "Detonado". Detonado: cuando finalice el turno del objetivo afectado, ocasiona daños de fuego a los enemigos a 2 casillas o menos (No al objetivo que tiene el estado "detonado") |
 | ⏳ | Flecha Rastreadora | Activo | Fisico, Fuego | 4 | 10 - 12 | Single target | 1 - 8 | Si | Si | 3 turnos de CD | Aplica el estado Rastreadisimo | Lanza una flecha que ocasiona daños de fuego. Aplica el estado Rastreadisimo: Pierdes la necesidad de la linea de vision con el enemigo objetivo "Rastreado" durante 2 turnos. |
+
+## Daños acordados (22-11-2026)
+Flecha Explosiva 13–16 → 5–7 · Flecha Repelente 7–10 → 3–5 · Flecha Flamigera 9–10 → 5–7 · Flecha Rastreadora 10–12 → 6–8 ·
+Contagio 9–10 → 5–7 · Tramposa 8–12 → 5–8 · Congelacion prematura 6–8 → 4–6 · Ramo helado 5–6 → 3–5 · Trampita 4–6 → 3–5.
+El resto, igual.

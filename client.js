@@ -1,10 +1,10 @@
-import {setCustomMaps,testCustomMap,labCombat,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
+import {setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=115';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=115';
-import {setupSfx} from './music.js?v=115';
-import {icon} from './icons.js?v=115';
-import {openMapEditor} from './mapeditor.js?v=115';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=117';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=117';
+import {setupSfx} from './music.js?v=117';
+import {icon} from './icons.js?v=117';
+import {openMapEditor} from './mapeditor.js?v=117';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -27,8 +27,8 @@ el('server').value=localStorage.getItem('amber-server')||(onPages?'https://cript
 const error=message=>{el('error').textContent=message;};
 const iconName={expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',burn:'Quemadura',weak:'Maldito',haste:'Prisa',shield:'Escudo'};
 const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo'};
-const specs={guardia:'Primera línea con su lanza · debilita al enemigo',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
-const roles={guardia:'Lancero',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
+const specs={guardia:'Lanza, empujes y escudo · controla el frente',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
+const roles={guardia:'Valkyria',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
 // Editor de SFX desactivado por ahora; poner true para volver a mostrarlo al admin.
 const SFX_EDITOR=false;
 const sfx=setupSfx(el('field-sfx'));
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=115').then(({createIso})=>{
+import('./isometric.js?v=117').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -849,19 +849,18 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
   showTip(nodes,anchor,unit.enemy?'tip-foe':'tip-ally');
 }
 window.addEventListener('scroll',hideUnit,{passive:true});
-const areaNames={cross:'cruz',circle:'círculo',cone:'cono',line:'línea',wave:'rectángulo delante de ti'};
+const areaNames={cross:'cruz',circle:'círculo',cone:'cono',line:'línea',wave:'rectángulo delante de ti',trident:'tridente'};
 /** Texto del efecto de una habilidad, con sus valores reales (rango y bonificaciones incluidos). */
 /** Qué hace cada habilidad, en una frase (los números exactos van en la ficha). */
 const skillLore={
-  // Lancero (habilidades heredadas del Guardián)
-  'Tajo':'Un corte seco y sin adornos contra quien tengas delante.',
-  'Quebrar armadura':'Golpeas donde la armadura cede: el enemigo queda expuesto y todo el grupo le pega más fuerte.',
-  'Segundo aliento':'Aprietas los dientes, tomas aire y vuelves a ponerte en pie con fuerzas renovadas.',
-  'Empujón de escudo':'Embistes con el escudo por delante. Si el enemigo choca contra una pared o contra otro, lo nota el doble.',
-  'Barrido':'Un arco amplio con el arma que castiga a todo lo que se amontone frente a ti.',
-  'Gancho':'Lanzas la cadena y tiras: el enemigo acaba a tus pies, o el aliado en apuros, a salvo a tu lado.',
-  'Muralla':'Plantas el escudo delante de un compañero (o de ti) y su armadura aguanta lo que venga.',
-  'Golpe de brasas':'El filo, al rojo vivo, abre la herida y la deja ardiendo.',
+  // Valkyria
+  'Estocada':'Una embestida con la lanza por delante que barre la línea y aparta a todo el que esté en ella.',
+  'Lanza del lago':'La lanza se abre en tres puntas al llegar y arrastra hacia ti a quien alcanza.',
+  'En guardia!':'Plantas los pies y alzas la guardia: un escudo te cubre y nadie se acerca sin pagarlo.',
+  'Punzón':'Un pinchazo preciso que te devuelve parte de las fuerzas que le roba al enemigo.',
+  'Liberación':'Liberas de golpe la fuerza contenida y todo lo que te rodea sale despedido.',
+  'Pies ligeros':'Por un momento el peso de la armadura desaparece y tus pasos se alargan.',
+  'Furia':'El fuego de la batalla te enciende por dentro: cada golpe pega más fuerte.',
   // Arquero
   'Flecha precisa':'Respiras, apuntas y sueltas. Una flecha limpia a cualquier enemigo a la vista.',
   'Flecha de lastre':'Una punta helada que entumece las piernas: el enemigo apenas podrá moverse en su próximo turno.',
@@ -908,17 +907,21 @@ function skillEffectText(skill){
     slow:(o.slowChance!==undefined?o.slowChance+' % de probabilidad de ralentizar: ':'Ralentiza: ')+'−'+(o.value||2)+' PM en el próximo turno del objetivo',
     venom:'Veneno: '+(o.value||3)+' PV por turno durante 2 turnos',
     blast:'',
-    push:'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' en línea (si choca, recibe daño extra)',
-    pull:o.pull==='melee'?'Atrae al objetivo (aliado o enemigo) hasta el cuerpo a cuerpo; a los aliados no les hace daño':'Atrae '+(o.pull||1)+(o.pull>1?' casillas':' casilla')+' hacia ti',
+    push:o.area?'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' a los enemigos alcanzados, alejándolos de ti. Si chocan: 2 de daño por casilla que falte + la mitad de tu nivel':'Empuja '+(o.push||1)+(o.push>1?' casillas':' casilla')+' en línea. Si choca: 2 de daño por casilla que falte + la mitad de tu nivel',
+    pull:o.area?'Atrae '+(o.pull||1)+(o.pull>1?' casillas':' casilla')+' hacia ti a los enemigos alcanzados':o.pull==='melee'?'Atrae al objetivo (aliado o enemigo) hasta el cuerpo a cuerpo; a los aliados no les hace daño':'Atrae '+(o.pull||1)+(o.pull>1?' casillas':' casilla')+' hacia ti',
     cleanse:'Elimina todos los efectos negativos del aliado',
     heal:'Cura a un aliado o a ti mismo',
     shield:'+'+(o.value||3)+' de armadura durante 2 turnos',
     haste:'+'+(o.value||2)+' PM en el próximo turno del aliado',
+    sprint:'Ganas +'+(o.value||2)+' PM este turno',
+    fury:'+'+(o.value||10)+' % de daño final durante 2 turnos (contando este); se multiplica por tu % de daño de fuego',
+    guard:'Escudo del 10 % de tu vida máxima + tu nivel durante 2 turnos (absorbe daño) y daña a los enemigos del área',
     swap:'Intercambia tu posición con la del objetivo',
     dash:o.teleport?(o.los===false?'Teletransporte (sin necesitar línea de visión)':'Teletransporte a una casilla libre que veas, sin gastar PM'):'Desplazamiento por una ruta libre sin gastar PM'
   }[kind]||'';
-  const burn=o.element==='fire'?' · '+(o.burnChance!==undefined?o.burnChance+' % de probabilidad de quemar: ':'Quemadura: ')+'arde 2 turnos y pierde ¼ del daño al empezar cada uno':'';
-  return (text+area+burn).replace(/^ · /,'');
+  const steal=o.lifesteal?' · Te curas el '+o.lifesteal+' % del daño hecho':'';
+  const burn=o.element==='fire'&&o.burnChance!==0?' · '+(o.burnChance!==undefined?o.burnChance+' % de probabilidad de quemar: ':'Quemadura: ')+'arde 2 turnos y pierde ¼ del daño al empezar cada uno':'';
+  return (text+area+steal+burn).replace(/^ · /,'');
 }
 /** Con qué escala el daño de una habilidad: (Magia, Hielo), (Físico), (Magia, Físico)... */
 const tagNames={physical:'Físico',magic:'Magia',fire:'Fuego',ice:'Hielo',lightning:'Rayo',chaos:'Caótico'};
@@ -1008,13 +1011,18 @@ function skillRows(unit,skill){
   }
   const sketch=areaSketch(skill);
   if(o.area||sketch){
-    const row=statRow('blast','Área',o.area==='wave'?(o.width||3)+'×'+(o.size||1)+' al frente':o.area?areaNames[o.area]+(o.size>1?' · tamaño '+o.size:''):'cruz');
+    const label=o.area==='wave'?(o.width||3)+'×'+(o.size||1)+' al frente':o.area==='line'?'línea de '+((o.size||1)+1)+' casillas':o.area==='trident'?'tridente':o.area==='circle'&&!skill[2]?'círculo de '+(o.size||1)+' a tu alrededor':o.area?areaNames[o.area]+(o.size>1?' · tamaño '+o.size:''):'cruz';
+    const row=statRow('blast','Área',label);
     if(sketch)row.querySelector('.tip-value').append(sketch);
     rows.push(row);
   }
   if(o.push||o.pull)rows.push(statRow('mp',o.push?'Empuje':'Atrae',o.pull==='melee'?'Hasta el contacto':(o.push||o.pull)+((o.push||o.pull)>1?' casillas':' casilla')));
   if(o.inLine)rows.push(statRow('move','Lanzar','En línea recta'));
   if(o.casts)rows.push(statRow('clock','Usos por turno',state?.phase==='combat'&&unit.id===state.units[state.turn]?.id?Math.max(0,castsLeft(state,unit,skill))+' de '+o.casts:String(o.casts)));
+  if(o.cooldown){
+    const left=cooldownLeft(unit,skill);
+    rows.push(statRow('clock','Recarga',left?'faltan '+left+(left>1?' turnos':' turno'):o.cooldown+(o.cooldown>1?' turnos':' turno')));
+  }
   if(o.anyTarget)rows.push(statRow('users','Objetivo','Aliado o enemigo'));
   // Alcance y si es modificable en la misma fila.
   const range=statRow('range','Alcance',(f.minRange&&f.minRange!==f.maxRange?f.minRange+'–':'')+f.maxRange+(f.reach?' (+'+f.reach+' equipo)':''));
@@ -1974,6 +1982,16 @@ function impact(event){
     }
     return;
   }
+  // Daño absorbido por un escudo: «⛨ N» en gris azulado.
+  if(event.kind==='block'){
+    const tag=h('span','impact mp-loss block-loss','⛨ '+event.amount);
+    tag.title='Escudo: absorbe '+event.amount+' de daño';
+    Object.assign(tag.style,boardPoint(event.pos,1.48));
+    tag.style.setProperty('--float-offset','-30px');
+    el('animations').append(tag);
+    setTimeout(()=>tag.remove(),hitDuration);
+    return;
+  }
   // PM quitados: «−N PM» justo debajo del número de daño.
   if(event.kind==='mp'){
     const tag=h('span','impact mp-loss','−'+event.amount+' PM');
@@ -2301,9 +2319,10 @@ function render(){
       b.onpointerleave=b.onblur=hideUnit;
       // Sin lanzamientos este turno: la carta se apaga en gris (y lo dice).
       const spent=castsLeft(state,turn,current)<=0;
+      const recharge=cooldownLeft(turn,current);
       b.disabled=cost>state.ap||spent;
       b.classList.toggle('spent',spent);
-      if(spent)b.append(h('span','ability-spent','Usado'));
+      if(spent)b.append(h('span','ability-spent',recharge?'Recarga '+recharge:'Usado'));
       controls.append(b);
     });
     const hint=h('small','hint-line');

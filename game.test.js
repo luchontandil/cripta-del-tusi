@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {server} from './server.js';
-import {actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost,setAway,setCustomMaps,cleanMap,mapWarnings,testCustomMap,actStart,midBossFloor,labCombat,labEnemyOptions} from './engine.js';
+import {actBiomes,maxBonusText,runPoints,playerColors,cards,defaultLoadout,cleanLoadout,enemyScaling,rollItem,makeRoute,create,join,act,tick,encounter,paths,lineOfSight,hasRange,inRange,spellArea,classes,planEnemy,onBoard,slots,damagePreview,skillFor,trainingChoices,trainingOffer,glyphCells,glyphPower,distance,damageBonus,damagePercent,skillSchool,monsterTraits,monsterVariants,monsterExtraSkills,forgeCost,forgeModes,socketsOf,runesOf,BASE_AP,BASE_MP,READY_TIME,shopRerollCost,setAway,castsLeft,scaledDamage,hit,setCustomMaps,cleanMap,mapWarnings,testCustomMap,actStart,midBossFloor,labCombat,labEnemyOptions} from './engine.js';
 
 const rng=()=>.3;
 function battle(...classes) {
@@ -166,17 +166,17 @@ test('genera botín con afijos y permite equipar y engarzar runas permanentes',(
   assert.ok(skillFor(raised,offer[0].index));
 });
 test('la vista previa aplica el crítico ×1,5 y la armadura frena las habilidades físicas',()=>{
-  const s=battle('guardia');
+  const s=battle('tirador');
   const hero=s.units[0], foe=s.units[1];
   // +20 % de daño físico contra un 30 % de armadura: (base × 1,2) × 0,7.
   hero.stats.physical=20;
   foe.stats.ward=30;foe.resist={};
-  const [,,,lo,hi]=classes.guardia.skills[0];
+  const [,,,lo,hi]=classes.tirador.skills[0];
   const net=(b,crit=1)=>Math.round(Math.floor(b*1.2)*crit*.7);
-  assert.deepEqual(damagePreview(hero,foe,classes.guardia.skills[0]),{element:'physical',normal:[net(lo),net(hi)],critical:[net(lo,1.5),net(hi,1.5)],chance:.12});
-  // Golpe de brasas es físico de fuego: suma físico + fuego, y la armadura lo frena.
+  assert.deepEqual(damagePreview(hero,foe,classes.tirador.skills[0]),{element:'physical',normal:[net(lo),net(hi)],critical:[net(lo,1.5),net(hi,1.5)],chance:.12});
+  // Flecha ígnea es física de fuego: suma físico + fuego, y la armadura la frena.
   hero.stats.fire=50;
-  const embers=classes.guardia.skills.at(-1);
+  const embers=classes.tirador.skills.at(-1);
   const hot=b=>Math.round(Math.floor(b*1.7)*.7);
   assert.deepEqual(damagePreview(hero,foe,embers).normal,[hot(embers[3]),hot(embers[4])]);
 });
@@ -302,15 +302,16 @@ test('el botín se puede equipar al elegirlo y devuelve la pieza anterior a la m
   assert.deepEqual(s.picks,['p0']);
 });
 test('la victoria conserva el daño crítico del último golpe y amplía el tiempo para elegir botín',()=>{
-  const s=battle('guardia');
+  const s=battle('sombra');
   const hero=s.units.find(u=>!u.enemy);
   const enemy=s.units.find(u=>u.enemy);
+  for(const other of s.units.filter(u=>u.enemy&&u!==enemy))other.hp=0;
   enemy.pos=hero.pos-1;
-  enemy.hp=9;
+  enemy.hp=4;enemy.stats.ward=0;enemy.resist={};
   act(s,'p0',{type:'skill',skill:0,pos:enemy.pos},()=>.01);
   assert.equal(s.phase,'reward');
   assert.equal(s.events.at(-1).kind,'damage');
-  assert.equal(s.events.at(-1).amount,9);
+  assert.equal(s.events.at(-1).amount,4);
   assert.equal(s.events.at(-1).critical,true);
   assert.equal(s.deadline-s.turnStarted,62500);
 });
@@ -529,7 +530,7 @@ test('los objetos siguen las reglas de rareza, afijos/sufijos y tiers por nivel'
 });
 
 test('los enemigos se adaptan al poder real del grupo',()=>{
-  const hero=(extra={})=>({classId:'guardia',level:3,skillRanks:[2,1,1,0],max:classes.guardia.hp+8+(extra.vitality||0),
+  const hero=(extra={})=>({classId:'guardia',level:3,skillRanks:[3,1,1,1],max:classes.guardia.hp+8+(extra.vitality||0),
     stats:{physical:1,fire:1,ice:1,magic:1,lightning:1,chaos:1,ward:0,critical:0,action:0,...extra}});
   const weak=enemyScaling(3,[hero()]);
   const strong=enemyScaling(3,[hero({physical:8,critical:25,ward:3,vitality:25})]);
@@ -655,19 +656,19 @@ test('cuentas: registro, cartas, mazos, amigos, invitaciones y Esquirlas al term
   assert.equal(solo.points,90+80+100);
   assert.equal((await call('/api/account/award',{floor:9},ana.token)).status,400);
   // Comprar una carta y equiparla
-  const bought=await call('/api/account/buy-card',{card:'guardia.empujon-de-escudo'},ana.token);
+  const bought=await call('/api/account/buy-card',{card:'guardia.punzon'},ana.token);
   assert.equal(bought.status,200);
   assert.equal(bought.user.shards,270-250);
-  assert.ok(bought.user.cards.includes('guardia.empujon-de-escudo'));
-  assert.equal((await call('/api/account/buy-card',{card:'guardia.gancho'},ana.token)).status,400,'sin Esquirlas suficientes');
+  assert.ok(bought.user.cards.includes('guardia.punzon'));
+  assert.equal((await call('/api/account/buy-card',{card:'guardia.liberacion'},ana.token)).status,400,'sin Esquirlas suficientes');
   assert.equal((await call('/api/account/buy-slot',{classId:'guardia'},ana.token)).status,400,'el hueco extra cuesta 1000');
   assert.equal((await call('/api/account/loadout',{classId:'guardia',loadout:{actives:[]}},ana.token)).status,400,'al menos una activa');
-  const saved=await call('/api/account/loadout',{classId:'guardia',loadout:{actives:['guardia.tajo','guardia.empujon-de-escudo','guardia.gancho']}},ana.token);
-  assert.deepEqual(saved.user.loadouts.guardia.actives,['guardia.tajo','guardia.empujon-de-escudo'],'el Gancho no se tiene: se descarta');
+  const saved=await call('/api/account/loadout',{classId:'guardia',loadout:{actives:['guardia.estocada','guardia.punzon','guardia.liberacion']}},ana.token);
+  assert.deepEqual(saved.user.loadouts.guardia.actives,['guardia.estocada','guardia.punzon'],'Liberación no se tiene: se descarta');
   const room=await call('/api/rooms',{classId:'guardia'},ana.token);
   assert.equal(room.state.players[0].name,'Ana');
   const ranks=room.state.players[0].skillRanks;
-  assert.deepEqual(classes.guardia.skills.filter((_,i)=>ranks[i]>0).map(sk=>sk[0]),['Tajo','Empujón de escudo']);
+  assert.deepEqual(classes.guardia.skills.filter((_,i)=>ranks[i]>0).map(sk=>sk[0]),['Estocada','Punzón']);
   assert.equal((await call('/api/account/invite',{nick:'Bob',code:room.code},ana.token)).status,200);
   const bobMe=await call('/api/account/me',null,bob.token);
   assert.equal(bobMe.user.invites[0].code,room.code);
@@ -690,42 +691,21 @@ test('habilidades estilo Dofus: Ninja con shuriken, cono, línea, empuje con cho
   assert.equal(classes.sombra.skills[0][0],'Shuriken');
   assert.ok(classes.sombra.skills[0][2]>1);
   for(const [id,cls] of Object.entries(classes)){
-    assert.ok(cls.skills.length>=(id==='mago'?3:8),cls.name);
+    // El Mago y la Valkyria tienen kits nuevos (sin bonus fijo de rango máximo).
+    if(id==='mago'||id==='guardia')continue;
+    assert.ok(cls.skills.length>=8,cls.name);
     const elementsUsed=new Set(cls.skills.map(sk=>sk[8]?.element).filter(Boolean));
     assert.ok(elementsUsed.size>=2,cls.name);
     for(const sk of cls.skills)assert.ok(maxBonusText(sk),sk[0]);
   }
-  const s=battle('guardia','mago');
+  const s=battle('sombra','mago');
   s.walls=[];s.water=[];s.traps=[];
-  const g=s.units.find(u=>u.id==='p0'),m=s.units.find(u=>u.id==='p1');
-  const foe=s.units.find(u=>u.enemy);
-  for(const u of s.units.filter(u=>u.enemy&&u!==foe))u.hp=0;
+  const m=s.units.find(u=>u.id==='p1');
   const w=s.width;
-  // Cono de Barrido: 4 casillas hacia delante.
-  g.pos=3*w+5;
-  const cone=spellArea(s,3*w+4,skillFor({...g,skillRanks:[1,1,1,1,1,1,1,1]},4),g);
-  assert.deepEqual(new Set(cone),new Set([3*w+4,3*w+3,2*w+3,4*w+3]));
   // Escarcha del Mago: rectángulo de 3 de ancho por 4 de largo delante de él.
   m.pos=4*w+8;
   const wave=spellArea(s,4*w+7,skillFor({...m,skillRanks:[1,1,1]},2),m);
   assert.deepEqual(new Set(wave),new Set([4*w+7,3*w+7,5*w+7,4*w+6,3*w+6,5*w+6,4*w+5,3*w+5,5*w+5,4*w+4,3*w+4,5*w+4]));
-  // Empujón de escudo contra un muro: la unidad choca y recibe daño extra.
-  s.turn=s.units.indexOf(g);s.ap=6;
-  g.skillRanks=[1,1,1,1,0,1,1,0];
-  foe.pos=g.pos-1;foe.hp=foe.max=200;foe.stats.ward=0;
-  s.walls=[g.pos-3];
-  const before=foe.hp;
-  act(s,'p0',{type:'skill',skill:3,pos:foe.pos},()=>.5);
-  assert.equal(foe.pos,g.pos-2);
-  assert.ok(before-foe.hp>=4+6);
-  // Gancho: atrae al enemigo en línea recta hasta el cuerpo a cuerpo.
-  s.walls=[];foe.pos=g.pos-4;s.ap=6;
-  act(s,'p0',{type:'skill',skill:5,pos:foe.pos},()=>.5);
-  assert.equal(foe.pos,g.pos-1);
-  // Rango máximo: Tajo gana crítico, Golpe de brasas pasa a alcance modificable.
-  const top={classId:'guardia',skillRanks:[3,1,1,1,1,1,1,3]};
-  assert.equal(skillFor(top,0)[8].crit,15);
-  assert.equal(skillFor(top,7)[8].modifiable,true);
   assert.equal(skillFor({classId:'mistico',skillRanks:[1,1,1,1,1,1,1,3]},7)[1],2);
   // Sustitución del Ninja: intercambia posiciones.
   const n=battle('sombra');
@@ -737,30 +717,84 @@ test('habilidades estilo Dofus: Ninja con shuriken, cono, línea, empuje con cho
   assert.deepEqual([ninja.pos,enemy.pos],[b,a]);
 });
 
-test('el Guardián tiene más vida y su Gancho atrae en línea recta a aliados y enemigos hasta el cuerpo a cuerpo',()=>{
-  assert.ok(classes.guardia.hp>=56);
-  const s=battle('guardia','mago');
-  s.walls=[];s.water=[];s.traps=[];
-  const guard=s.units.find(u=>u.id==='p0'),mage=s.units.find(u=>u.id==='p1'),foe=s.units.find(u=>u.enemy);
-  const hook=classes.guardia.skills.findIndex(k=>k[0]==='Gancho');
-  guard.skillRanks[hook]=1;s.players[0].skillRanks[hook]=1;
-  s.turn=s.units.indexOf(guard);s.ap=6;
-  const w=s.width;
-  guard.pos=3*w+8;
-  for(const u of s.units)if(u!==guard)u.pos=-99;
-  foe.pos=guard.pos-4;foe.stats.ward=0;
-  mage.pos=guard.pos-2*w-2;
-  const skill=skillFor(guard,hook);
-  assert.equal(hasRange(s,guard,mage.pos,skill),false,'nada en diagonal');
-  const hp=foe.hp;
-  act(s,'p0',{type:'skill',skill:hook,pos:foe.pos},rng);
-  assert.equal(foe.pos,guard.pos-1);
-  assert.ok(foe.hp<hp);
-  mage.pos=guard.pos+3*w;
-  const mageHp=mage.hp;
-  act(s,'p0',{type:'skill',skill:hook,pos:mage.pos},rng);
-  assert.equal(mage.pos,guard.pos+w);
-  assert.equal(mage.hp,mageHp);
+test('Valkyria: Estocada empuja la línea, Liberación aparta alrededor, choques, Punzón roba vida, recargas, Furia y escudo',()=>{
+  assert.equal(classes.guardia.name,'Valkyria');
+  const names=classes.guardia.skills.map(k=>k[0]);
+  assert.deepEqual(names.slice(0,3),['Estocada','Lanza del lago','En guardia!'],'las tres de inicio');
+  const idx=name=>names.indexOf(name);
+  const setup=()=>{
+    const s=battle('guardia');
+    s.walls=[];s.water=[];s.traps=[];
+    const v=s.units.find(u=>!u.enemy);
+    v.skillRanks=names.map(()=>1);
+    const foes=s.units.filter(u=>u.enemy);
+    for(const f of foes){f.pos=-99;f.hp=f.max=300;f.stats.ward=0;f.resist={};}
+    s.turn=s.units.indexOf(v);s.ap=20;s.mp=3;s.casts={};
+    v.pos=3*s.width+8;
+    return {s,v,foes,w:s.width};
+  };
+  // Estocada: línea de 3 desde la casilla elegida; empuja 2 alejando; los de atrás primero.
+  {const {s,v,foes}=setup();
+    foes[0].pos=v.pos-1;foes[1]&&(foes[1].pos=v.pos-3);
+    act(s,v.id,{type:'skill',skill:idx('Estocada'),pos:v.pos-1},rng);
+    assert.equal(foes[0].pos,v.pos-3,'el primero retrocede 2');
+    if(foes[1])assert.equal(foes[1].pos,v.pos-5);
+    assert.ok(foes[0].hp<300);}
+  // Choque: empujado contra un muro → 2 × casillas que faltan + nivel/2, sin elemento.
+  {const {s,v,foes}=setup();
+    foes[0].pos=v.pos-1;s.walls=[v.pos-2];v.level=6;
+    const events=s.events.length;
+    act(s,v.id,{type:'skill',skill:idx('Estocada'),pos:v.pos-1},()=>.5);
+    assert.equal(foes[0].pos,v.pos-1,'no se mueve');
+    const crash=s.events.slice(events).find(e=>e.kind==='damage'&&e.element==='neutral');
+    assert.equal(crash.amount,2*2+3);}
+  // Liberación: círculo de 2 a tu alrededor; aparta a todos.
+  {const {s,v,foes,w}=setup();
+    foes[0].pos=v.pos+w;
+    act(s,v.id,{type:'skill',skill:idx('Liberación'),pos:v.pos},rng);
+    assert.equal(foes[0].pos,v.pos+3*w);}
+  // Punzón: se cura el 25 % del daño hecho.
+  {const {s,v,foes}=setup();
+    foes[0].pos=v.pos-2;v.hp=10;
+    act(s,v.id,{type:'skill',skill:idx('Punzón'),pos:foes[0].pos},()=>.5);
+    const dealt=300-foes[0].hp;
+    assert.equal(v.hp,10+Math.round(dealt*.25));}
+  // Pies ligeros: +2 PM al momento y 2 turnos de recarga (usada en el turno 1, lista en el 4).
+  {const {s,v}=setup();
+    const k=idx('Pies ligeros'),skill=skillFor(v,k);
+    act(s,v.id,{type:'skill',skill:k,pos:v.pos},rng);
+    assert.equal(s.mp,5);
+    const endTurn=()=>{act(s,v.id,{type:'end'},rng);s.turn=s.units.indexOf(v);s.casts={};s.ap=20;s.phase='combat';};
+    assert.equal(castsLeft(s,v,skill),0);
+    endTurn();assert.equal(castsLeft(s,v,skill),0,'turno 2: en recarga');
+    endTurn();assert.equal(castsLeft(s,v,skill),0,'turno 3: en recarga');
+    endTurn();assert.ok(castsLeft(s,v,skill)>0,'turno 4: lista');}
+  // Furia: +10 % de daño final × (1 + % de fuego).
+  {const {s,v}=setup();
+    v.stats.fire=20;
+    const est=skillFor(v,idx('Estocada'));
+    const before=scaledDamage(v,est,100);
+    act(s,v.id,{type:'skill',skill:idx('Furia'),pos:v.pos},rng);
+    assert.equal(v.effects.fury.turns,2);
+    assert.equal(scaledDamage(v,est,100),Math.floor(before*1.12)||scaledDamage(v,est,100));
+    assert.ok(Math.abs(scaledDamage(v,est,100)/before-1.12)<.02);}
+  // En guardia!: escudo del 10 % de la vida + nivel que absorbe daño.
+  {const {s,v,foes}=setup();
+    v.level=5;
+    act(s,v.id,{type:'skill',skill:idx('En guardia!'),pos:v.pos},rng);
+    const shield=Math.round(v.max*.1)+5;
+    assert.equal(v.effects.barrier.value,shield);
+    const hp=v.hp;
+    hit(s,foes[0],v,shield+4,'damage',false,'neutral');
+    assert.equal(v.hp,hp-4,'el escudo absorbe primero');}
+  // Lanza del lago: tridente y atrae 1 hacia ti.
+  {const {s,v,foes,w}=setup();
+    const lance=skillFor(v,idx('Lanza del lago'));
+    const area=new Set(spellArea(s,v.pos-2,lance,v));
+    assert.deepEqual(area,new Set([v.pos-2,v.pos-3,v.pos-3-2*w,v.pos-3+2*w,v.pos-4,v.pos-4-3*w,v.pos-4+3*w]));
+    foes[0].pos=v.pos-3;
+    act(s,v.id,{type:'skill',skill:idx('Lanza del lago'),pos:v.pos-2},rng);
+    assert.equal(foes[0].pos,v.pos-2);}
 });
 
 test('cada acto tiene su ambientación, su fauna y salas generadas al azar',()=>{

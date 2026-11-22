@@ -5,15 +5,16 @@
  * max: bonificación al llegar a rango 3 → {range:1}|{modifiable:true}|{crit:10}|{cost:-1}|{value:1}|{push:1}|{size:1}.
  */
 export const classes = {
-  guardia: {name:'Lancero', hp:58, initiative:10, skills:[
-    ['Tajo',2,1,7,10,'damage','⚔',0,{element:'physical',max:{crit:15}}],
-    ['Quebrar armadura',2,1,3,5,'expose','✷',0,{element:'physical',value:3,max:{value:2}}],
-    ['Segundo aliento',2,0,5,8,'heal','✚',0,{max:{range:2}}],
-    ['Empujón de escudo',2,1,4,6,'push','➶',0,{element:'physical',push:3,max:{push:1}}],
-    ['Barrido',3,1,5,8,'damage','⚔',0,{element:'physical',area:'cone',max:{cost:-1}}],
-    ['Gancho',2,4,2,4,'pull','↢',2,{element:'physical',pull:'melee',inLine:true,anyTarget:true,max:{range:1}}],
-    ['Muralla',2,3,0,0,'shield','⛨',0,{value:25,max:{value:10}}],
-    ['Golpe de brasas',2,2,7,10,'damage','✹',0,{element:'fire',max:{modifiable:true}}]
+  // Valkyria (antes Guardián/Lancero). Las tres primeras son las de inicio. Física: escala con daño físico + su elemento.
+  // Pendientes de la hoja: Balestra, Salto valiente, Lanza cargada, Carga heroica, Eclipse, Barrido, Abrir las aguas, Lanza abisal.
+  guardia: {name:'Valkyria', hp:58, initiative:10, skills:[
+    ['Estocada',3,1,5,7,'push','➶',1,{element:'fire',burnChance:0,area:'line',size:2,push:2,los:false,casts:2,modifiable:false}],
+    ['Lanza del lago',3,5,2,7,'pull','↢',1,{element:'lightning',area:'trident',pull:1,casts:1,cooldown:1,modifiable:true}],
+    ['En guardia!',3,0,2,2,'guard','⛨',0,{area:'circle',size:3,los:false,casts:1,cooldown:2,modifiable:false,perRank:0}],
+    ['Punzón',2,4,3,4,'damage','✧',1,{element:'physical',casts:2,lifesteal:25,modifiable:true}],
+    ['Liberación',3,0,3,6,'push','✹',0,{element:'fire',burnChance:0,area:'circle',size:2,push:2,los:false,casts:1,modifiable:false}],
+    ['Pies ligeros',2,0,0,0,'sprint','➝',0,{value:2,los:false,casts:1,cooldown:2,modifiable:false}],
+    ['Furia',2,0,0,0,'fury','✹',0,{element:'fire',burnChance:0,value:10,turns:2,los:false,casts:1,cooldown:4,modifiable:false}]
   ]},
   tirador: {name:'Arquero', hp:31, initiative:14, skills:[
     ['Flecha precisa',2,7,6,8,'damage','➶',2,{element:'physical',max:{crit:15}}],
@@ -148,8 +149,10 @@ export const flatDamage=unit=>unit.stats?.damage||0;
 export function scaledDamage(unit,skill,base,scale=1){
   const pe=passiveEffects(unit);
   const dealt=(pe.dealtAll||0)+(skillSchool(unit,skill)==='magic'?pe.dealtMagic||0:0);
-  return Math.max(1,Math.floor((base+flatDamage(unit))*(1+damagePercent(unit,skill)/100)*(1+dealt/100)*scale));
+  return Math.max(1,Math.floor((base+flatDamage(unit))*(1+damagePercent(unit,skill)/100)*(1+dealt/100)*furyBonus(unit)*scale));
 }
+/** Furia: +X % de daño final, multiplicado por (1 + % de fuego). Con +20 % de fuego, Furia 10 % da +12 %. */
+export const furyBonus=unit=>unit?.effects?.fury?1+unit.effects.fury.value/100*(1+(unit.stats?.fire||0)/100):1;
 /** Compatibilidad: cuánto añade el bonus a la media de la habilidad (para estimaciones). */
 export function damageBonus(unit,skill){
   const average=(skill[3]+skill[4])/2;
@@ -159,7 +162,7 @@ export function damageBonus(unit,skill){
 const armorType=(unit,skill)=>skillSchool(unit,skill)==='physical'?'physical':skillElement(unit,skill);
 export const modifiableRange=skill=>skillOptions(skill).modifiable??(skill[2]>1&&!['dash','swap'].includes(skill[5]));
 /** Tipos de habilidad que se lanzan sobre aliados. */
-export const supportKinds=['heal','cleanse','shield','haste'];
+export const supportKinds=['heal','cleanse','shield','haste','sprint','fury'];
 /** ¿Se apunta a una casilla (área, teletransporte) en lugar de a una unidad? */
 export const castsOnCell=skill=>!!skillOptions(skill).area||skill[5]==='dash'||skill[5]==='blast';
 /** Tipos de objeto de equipo (el talismán ya no existe). */
@@ -1391,9 +1394,19 @@ export function damagePreview(unit,target,skill,scale=1){
   const range=critical=>[skill[3],skill[4]].map(base=>netDamage(target,scaledDamage(unit,skill,base,scale),armor,critical,extra));
   return {normal:range(false),critical:range(true),chance:Math.min(1,critChance(unit)+(skillOptions(skill).crit||0)/100),element};
 }
-function hit(s,actor,target,raw,kind='damage',critical=false,element='physical',burns=true) {
+export function hit(s,actor,target,raw,kind='damage',critical=false,element='physical',burns=true) {
   const extra=kind==='damage'?(target.effects.expose?.value||0):0;
-  const damage=Math.min(target.hp,netDamage(target,raw,element,critical,extra));
+  let incoming=netDamage(target,raw,element,critical,extra);
+  // Escudo (En guardia!): absorbe daño antes de la vida.
+  const barrier=target.effects.barrier;
+  if(barrier&&incoming>0){
+    const absorbed=Math.min(barrier.value,incoming);
+    barrier.value-=absorbed;incoming-=absorbed;
+    if(barrier.value<=0)delete target.effects.barrier;
+    emit(s,{kind:'block',unit:target.id,pos:target.pos,amount:absorbed});
+    note(s,target.name+' absorbe '+absorbed+' de daño con su escudo.');
+  }
+  const damage=Math.min(target.hp,incoming);
   target.hp-=damage;
   // Laboratorio: «no morir» deja a los héroes con 1 PV.
   if(s.lab?.immortal&&!target.enemy&&target.hp<=0)target.hp=1;
@@ -1524,6 +1537,7 @@ function endEffects(unit) {
   for(const [key,status] of Object.entries(unit.effects)) {
     if(--status.turns<=0)delete unit.effects[key];
   }
+  for(const [name,left] of Object.entries(unit.cooldowns||{}))if(left<=1)delete unit.cooldowns[name];else unit.cooldowns[name]=left-1;
 }
 function finish(s,rng) {
   if(!s.units.some(u=>!u.enemy&&alive(u))){
@@ -2339,11 +2353,18 @@ export function hasRange(s,unit,pos,skill) {
 }
 /** Lanzamientos que le quedan este turno a una habilidad con límite (Infinity si no tiene). */
 export function castsLeft(s,unit,skill){
+  // Tiempo de recarga: tras usarla, no se puede volver a usar durante sus N turnos siguientes.
+  if(unit.cooldowns?.[skill[0]]>0)return 0;
   const limit=skillOptions(skill).casts;
   if(!limit)return Infinity;
   return limit-(s.casts?.[unit.id+':'+skill[0]]||0);
 }
+/** Turnos de recarga que le quedan a una habilidad (0 si está lista). */
+export const cooldownLeft=(unit,skill)=>Math.max(0,(unit.cooldowns?.[skill[0]]||0)-1);
 function countCast(s,unit,skill){
+  const cooldown=skillOptions(skill).cooldown;
+  // Se guarda N+1: baja 1 al terminar cada turno propio, y con 0 vuelve a estar lista (N turnos después).
+  if(cooldown)(unit.cooldowns||={})[skill[0]]=cooldown+1;
   if(!skillOptions(skill).casts)return;
   s.casts=s.casts||{};
   const key=unit.id+':'+skill[0];
@@ -2388,6 +2409,17 @@ export function spellArea(s,pos,skill,caster=null) {
       for(let k=-half;k<=half;k++){const c=k?step(s,center,dy*k,dx*k):center;if(c>=0&&onBoard(s,c))cells.add(c);}
       center=step(s,center,dx,dy);
     }
+  }else if(area==='trident'&&caster){
+    // Tridente: el mango empieza en la casilla elegida y se aleja del lanzador; las puntas se abren hacia fuera.
+    //   X . . X . . X     (2 casillas más allá)
+    //   . X . X . X .     (1 casilla más allá)
+    //   . . . X . . .     (casilla elegida)
+    const {dx,dy}=direction(s,caster.pos,pos);
+    const at=(forward,side)=>{
+      const x=pos%s.width+dx*forward+dy*side,y=Math.floor(pos/s.width)+dy*forward+dx*side;
+      return x<0||y<0||x>=s.width||y>=s.height?-1:y*s.width+x;
+    };
+    for(const [f,l] of [[1,0],[1,-2],[1,2],[2,0],[2,-3],[2,3]]){const c=at(f,l);if(c>=0)cells.add(c);}
   }else if((area==='cone'||area==='line')&&caster){
     const {dx,dy}=direction(s,caster.pos,pos);
     let row=[pos];
@@ -2424,9 +2456,19 @@ function shove(s,actor,target,cells,toward){
   if(path.length)move(s,target,path,false);
   const missing=cells-path.length;
   if(!toward&&missing>0&&alive(target)){
-    hit(s,actor,target,missing*3+Math.floor(s.floor/3),'damage',false,'physical');
-    note(s,target.name+' choca: +'+(missing*3)+' de daño por empuje.');
+    // Choque: daño sin elemento ni escalado = 2 × casillas que faltaban + mitad del nivel del que empuja.
+    const amount=2*missing+Math.floor((actor.level||s.floor||0)/2);
+    hit(s,actor,target,amount,'damage',false,'neutral');
+    note(s,target.name+' choca: +'+amount+' de daño por empuje.');
   }
+}
+/** En guardia!: escudo del 10 % de la vida máxima + el nivel (provisional: dura 2 turnos). */
+function guard(s,unit,skill){
+  const amount=Math.round(unit.max*.1)+(unit.level||0);
+  effect(unit,'barrier',amount,2);
+  unit.effects.barrier.value=amount;
+  emit(s,{kind:'heal',unit:unit.id,from:unit.pos,pos:unit.pos,amount:0});
+  note(s,unit.name+' se pone en guardia: escudo de '+amount+'.');
 }
 /** Aplica una habilidad a una unidad concreta (daño, efectos, empuje...). */
 /** ¿Es una habilidad de daño en área? */
@@ -2445,6 +2487,8 @@ function applySkill(s,unit,target,skill,rng,scale=1){
   const value=opts.value;
   if(supportKinds.includes(kind)){
     if(kind==='shield'){effect(target,'shield',value||25,2);note(s,name+' → '+target.name+': +'+(value||25)+' % de armadura 2 turnos.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
+    if(kind==='sprint'){s.mp+=value||2;note(s,name+': +'+(value||2)+' PM este turno.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
+    if(kind==='fury'){effect(target,'fury',value||10,opts.turns||2);note(s,name+': +'+(value||10)+' % de daño final (más con daño de fuego) durante 2 turnos.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
     if(kind==='haste'){effect(target,'haste',value||2,target===unit?2:1);note(s,name+' → '+target.name+': +'+(value||2)+' PM en su próximo turno.');emit(s,{kind:'heal',unit:target.id,from:unit.pos,pos:target.pos,amount:0});return;}
     const amount=Math.min(target.max-target.hp,Math.round((roll(min,max,rng)+Math.floor(unit.level/2))*(1+(passiveEffects(unit).healPct||0)/100)));
     target.hp+=amount;
@@ -2470,6 +2514,11 @@ function applySkill(s,unit,target,skill,rng,scale=1){
     const burns=opts.burnChance===undefined||rng()*100<opts.burnChance;
     hit(s,unit,target,scaledDamage(unit,skill,roll(min,max,rng),scale),'damage',critical,armorType(unit,skill),burns);
     if(burns)ignite(s,target,before-target.hp,element);
+    // Robo de vida de la habilidad (Punzón): un % del daño hecho de verdad.
+    if(opts.lifesteal&&alive(unit)){
+      const heal=Math.min(unit.max-unit.hp,Math.round((before-target.hp)*opts.lifesteal/100));
+      if(heal>0){unit.hp+=heal;emit(s,{kind:'heal',unit:unit.id,from:target.pos,pos:unit.pos,amount:heal});note(s,unit.name+' se cura '+heal+' PV.');}
+    }
   }
   if(!alive(target))return;
   if(kind==='expose'){effect(target,'expose',value||3,2);note(s,target.name+' queda vulnerable: todos los atacantes infligen +'+(value||3)+'.');}
@@ -2681,7 +2730,11 @@ export function act(s,id,a,rng=Math.random) {
     const area=spellArea(s,a.pos,skill,unit);
     spellCue(s,unit,a.pos,kind,area,skill);
     const support=supportKinds.includes(kind);
-    for(const other of s.units.filter(u=>alive(u)&&area.includes(u.pos)&&(support?!u.enemy:u.enemy)))applySkill(s,unit,other,skill,rng,areaFalloff(s,a.pos,other.pos,skill));
+    // Empujes en área: primero los más lejanos, para que no se bloqueen entre ellos.
+    const hits=s.units.filter(u=>alive(u)&&area.includes(u.pos)&&(support?!u.enemy:u.enemy))
+      .sort((a,b)=>kind==='push'?distance(s,unit.pos,b.pos)-distance(s,unit.pos,a.pos):kind==='pull'?distance(s,unit.pos,a.pos)-distance(s,unit.pos,b.pos):0);
+    if(kind==='guard')guard(s,unit,skill);
+    for(const other of hits)applySkill(s,unit,other,skill,rng,areaFalloff(s,a.pos,other.pos,skill));
     finish(s,rng);
     if(s.phase==='combat'&&!alive(unit))advance(s,rng);
     return;

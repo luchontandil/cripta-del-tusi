@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=144';
-import {playerColors} from './engine.js?v=144';
+import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=145';
+import {playerColors} from './engine.js?v=145';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -78,20 +78,20 @@ function makeWater(clockUniform,mode='crypt'){
 const clock={value:0};
 const overlayCache=new Map();
 /** Material de resaltado: relleno translúcido, borde luminoso y pulso suave. */
-function overlayMaterial(color,strength=1){
-  const key=color+strength;
+function overlayMaterial(color,strength=1,fill=1){
+  const key=color+strength+'/'+fill;
   if(overlayCache.has(key))return overlayCache.get(key);
   const material=new T.ShaderMaterial({
-    uniforms:{tint:{value:new T.Color(color)},time:clock,strength:{value:strength}},
+    uniforms:{tint:{value:new T.Color(color)},time:clock,strength:{value:strength},fill:{value:fill}},
     vertexShader:`varying vec2 vUv; varying vec3 vWorld;
       void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.);vWorld=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,
-    fragmentShader:`uniform vec3 tint; uniform float time; uniform float strength; varying vec2 vUv; varying vec3 vWorld;
+    fragmentShader:`uniform vec3 tint; uniform float time; uniform float strength; uniform float fill; varying vec2 vUv; varying vec3 vWorld;
       void main(){
         vec2 q=min(vUv,1.-vUv);
         float d=min(q.x,q.y);
         float edge=smoothstep(.045,.0,d);
         float pulse=.94+.06*sin(time*2.4+(vWorld.x+vWorld.z)*.55);
-        float alpha=(.20+edge*.32)*pulse*strength;
+        float alpha=(.20*fill+edge*.32)*pulse*strength;
         gl_FragColor=vec4(tint*(1.+edge*.25),alpha);
       }`,
     transparent:true,depthWrite:false,toneMapped:false
@@ -677,7 +677,8 @@ export function createIso(mount,onCell){
       const type=c.contains('area-preview')?'area':c.contains('route')?'route':c.contains('no-sight')?'blocked':glyph||(
         c.contains('aim')?'aim':c.contains('cast-range')?'cast':c.contains('walk')?'walk':c.contains('foe-reach')?'foe':c.contains('guard-zone')?'guard':c.contains('hero-trap')?'snare':null);
       o.visible=!!type;
-      if(type)o.material=overlayMaterial(overlayColors[type],type==='route'||type==='area'?1.25:glyph?1.1:1);
+      // Las casillas a las que puedes moverte: casi transparentes, solo el borde, para ver el suelo y los glifos.
+      if(type)o.material=type==='walk'?overlayMaterial(overlayColors.walk,.85,.22):overlayMaterial(overlayColors[type],type==='route'||type==='area'?1.25:glyph?1.1:1);
       // La casilla entera (los glifos un pelín menos, para que se distingan del suelo resaltado).
       const size=glyph?.96:1;
       o.scale.set(size,1,size);

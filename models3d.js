@@ -878,6 +878,28 @@ function hellObstacle(root){
 // Escala: 1 casilla = 1 unidad; altura ≈1,35; cabeza ≈0,3 → 4,5 cabezas.
 // Cada grupo móvil (torso+cabeza, brazos, piernas, arma, escudo) es UNA malla fusionada → 7–8 draw calls.
 const ps1Material=new T.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:.78,metalness:.08});
+/**
+ * Obstáculos con textura (modo HD): proyección triplanar en coordenadas del mundo, así no hacen falta UV.
+ * La textura es gris neutro y se multiplica por el color de cada pieza.
+ */
+let obstacleMaterial=ps1Material;
+export function useObstacleTexture(texture){
+  if(!texture){obstacleMaterial=ps1Material;return;}
+  texture.wrapS=texture.wrapT=T.RepeatWrapping;texture.magFilter=texture.minFilter=T.NearestFilter;texture.generateMipmaps=false;
+  const m=new T.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:.82,metalness:.04});
+  m.onBeforeCompile=sh=>{
+    sh.uniforms.tri={value:texture};
+    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vTriPos; varying vec3 vTriNorm;')
+      .replace('#include <begin_vertex>','#include <begin_vertex>\nvTriPos=(modelMatrix*vec4(transformed,1.)).xyz; vTriNorm=normalize(mat3(modelMatrix)*objectNormal);');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform sampler2D tri; varying vec3 vTriPos; varying vec3 vTriNorm;')
+      .replace('#include <color_fragment>',`#include <color_fragment>
+        { vec3 w=pow(abs(normalize(vTriNorm)),vec3(4.)); w/=w.x+w.y+w.z;
+          vec3 p=vTriPos*1.6;
+          vec3 t=texture2D(tri,p.zy).rgb*w.x+texture2D(tri,p.xz).rgb*w.y+texture2D(tri,p.xy).rgb*w.z;
+          t=(t-.53)*1.8+.53; diffuseColor.rgb*=t*1.9; }`);
+  };
+  obstacleMaterial=m;
+}
 /** Pieza low-poly: geometría + color + transformación, lista para fusionar. */
 function lp(list,geometry,color,[x,y,z],[rx,ry,rz]=[0,0,0],[sx,sy,sz]=[1,1,1]){
   const g=geometry.index?geometry.toNonIndexed():geometry.clone();
@@ -902,7 +924,7 @@ function fuse(list,name){
   geometry.setAttribute('position',new T.BufferAttribute(pos,3));
   geometry.setAttribute('color',new T.BufferAttribute(col,3));
   geometry.computeVertexNormals();
-  const mesh=new T.Mesh(geometry,ps1Material);
+  const mesh=new T.Mesh(geometry,name==='obstacle'?obstacleMaterial:ps1Material);
   mesh.name=name;mesh.castShadow=true;mesh.receiveShadow=true;
   return mesh;
 }

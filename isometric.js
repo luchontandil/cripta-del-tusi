@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=156';
-import {playerColors} from './engine.js?v=156';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=157';
+import {playerColors} from './engine.js?v=157';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -11,6 +11,30 @@ const tilesets={
   bones:['#4e4840','#5a5246','#474036','#625a4c','#514a3e'],
   hell:['#2a2624','#322c29','#262220','#3a3330','#2e2826']
 };
+// Tileset en archivo (prueba): tiles/<bioma>.png, cuadrícula de 4×4 casillas (32×32 o más):
+// filas 1-3 = 12 variantes de suelo ordenadas de más sana a más destruida, fila 4 = 4 variantes de pared.
+// Se activa con ?tiles en la URL o localStorage tiles=1; los biomas sin archivo siguen con colores planos.
+const query=(()=>{try{return new URLSearchParams(location.search);}catch{return new URLSearchParams();}})();
+// Gráficos mejorados por defecto (tileset + relieve + luces cálidas + sombras de antorchas + decorado + muros altos).
+// ?classic vuelve al aspecto anterior de colores planos.
+const deluxe=!query.has('classic');
+const useTiles=deluxe||query.has('tiles')||(()=>{try{return localStorage.getItem('tiles')==='1';}catch{return false;}})();
+const tileFiles={crypt:'tiles/crypt.png',hell:'tiles/hell.png'};
+const TILE_COLS=4,TILE_ROWS=4,FLOOR_TILES=12,WALL_ROW=3;
+const FLOOR_WEIGHTS=[10,9,8,7,6,5,4,3,2.5,2,1.5,1],FLOOR_WEIGHT_TOTAL=FLOOR_WEIGHTS.reduce((a,b)=>a+b,0);
+const tileSheets={},tileMats={};
+let propTexture=null;
+function tileMaterial(mode,col,row){
+  const file=tileFiles[mode];if(!useTiles||!file)return null;
+  const key=mode+col+'/'+row;
+  if(tileMats[key])return tileMats[key];
+  const sheet=tileSheets[mode]??=new T.TextureLoader().load(file);
+  const t=sheet.clone();
+  t.magFilter=t.minFilter=T.NearestFilter;t.colorSpace=T.SRGBColorSpace;t.generateMipmaps=false;
+  t.repeat.set(1/TILE_COLS,1/TILE_ROWS);t.offset.set(col/TILE_COLS,1-(row+1)/TILE_ROWS);
+  // En HD el propio dibujo hace de relieve: las juntas oscuras quedan hundidas y atrapan sombra.
+  return tileMats[key]=new T.MeshStandardMaterial({map:t,roughness:.86,metalness:0,...(deluxe?{bumpMap:t,bumpScale:row===WALL_ROW?3:2.2}:{})});
+}
 const biomeLight={crypt:'#ffa45a',jungle:'#e8ff8a',roots:'#c1f195',bones:'#9dffb8',hell:'#ff8a3a'};
 const biomeFog={crypt:'#07060d',jungle:'#0c1a0e',roots:'#0d1412',bones:'#12110e',hell:'#0e0b0a'};
 const overlayColors={walk:'#6aa3bb',cast:'#9484b8',aim:'#e9c48a',route:'#bfe6f2',area:'#e09a72',blocked:'#b06070',damage:'#ea6a50',poison:'#9abe56',slow:'#9a86ff',foe:'#c97a6e',guard:'#d8c27a',snare:'#8fe3ff',snareToxic:'#a6d64a'};
@@ -151,7 +175,8 @@ export function createIso(mount,onCell){
   const pixelMaterial=new T.ShaderMaterial({
     uniforms:{image:{value:pixels.texture},resolution:{value:new T.Vector2(1,1)},time:clock},
     vertexShader:`varying vec2 tex; void main(){tex=uv;gl_Position=vec4(position.xy,0.,1.);}`,
-    fragmentShader:`uniform sampler2D image; uniform vec2 resolution; uniform float time; varying vec2 tex;
+    fragmentShader:`#define DELUXE ${deluxe?'1.':'0.'}
+      uniform sampler2D image; uniform vec2 resolution; uniform float time; varying vec2 tex;
       void main(){
         vec2 p=tex*resolution;
         vec4 base=texture2D(image,tex);
@@ -163,7 +188,7 @@ export function createIso(mount,onCell){
           vec3 c=texture2D(image,tex+o).rgb;
           glow+=max(c-.62,0.);
         }
-        gl_FragColor=vec4(base.rgb+glow*.08,base.a);
+        gl_FragColor=vec4(base.rgb+glow*(DELUXE>0.?.16:.08),base.a);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
         // Gradación: sombras frías, luces cálidas, algo más de contraste.
@@ -175,7 +200,7 @@ export function createIso(mount,onCell){
         c=(c-.5)*1.05+.5;
         // Viñeta suave (sin tramado ni reducción de colores: cansaban la vista).
         vec2 v=tex-.5;
-        c*=1.-dot(v,v)*.3;
+        c*=1.-dot(v,v)*(DELUXE>0.?.9:.3);
         gl_FragColor.rgb=clamp(c,0.,1.);
       }`,
     transparent:true,depthTest:false
@@ -467,6 +492,42 @@ export function createIso(mount,onCell){
     for(const step of steps.values())step.resolve();
     steps.clear();
   }
+  /** HD: muros altos de ladrillo al fondo y decorado (huesos, calaveras, velas, cascotes, charcos). */
+  function dressStage(palette,mode,walls,holes,w,h){
+    const brick=tileMaterial(mode,0,WALL_ROW),brick2=tileMaterial(mode,2,WALL_ROW);
+    const tall=(x,z,alongX)=>{
+      for(let k=0;k<3;k++){
+        const c=piece(stage,'cube','#3a3d50',x,.3+k*.55,z,alongX?1:.3,.55,alongX?.3:1);
+        if(brick){c.material=k%2?brick2:brick;c.castShadow=true;}
+      }
+      const cap=piece(stage,'cube','#2a2c3a',x,1.95,z,alongX?1.04:.38,.12,alongX?.38:1.04);cap.castShadow=true;
+    };
+    for(let x=0;x<w;x++){if(!holes.has(x)){const c=logical(state,x);tall(c.x,c.z-.65,true);}}
+    for(let z=0;z<h;z++){if(!holes.has(z*w)){const c=logical(state,z*w);tall(c.x-.65,c.z,false);}}
+    let candles=0;
+    for(let pos=0;pos<w*h;pos++){
+      if(walls.has(pos)||holes.has(pos)||state.water?.includes(pos)||state.traps?.some(t=>t.pos===pos))continue;
+      const v=random(state.mapSeed,pos+5003),c=logical(state,pos),ox=(random(state.mapSeed,pos+71)-.5)*.5,oz=(random(state.mapSeed,pos+13)-.5)*.5;
+      if(v<.05){                                  // huesos y calavera
+        for(let i=0;i<3;i++){const b=piece(stage,'cube','#d9cfb8',c.x+ox+(i-1)*.1,.03,c.z+oz,.22,.04,.05);b.rotation.y=v*40+i;b.castShadow=true;}
+        if(v<.025){const sk=piece(stage,'orb','#e6dcc4',c.x+ox,.09,c.z+oz+.15,.16,.13,.16);sk.castShadow=true;piece(stage,'cube','#201a1a',c.x+ox-.03,.1,c.z+oz+.23,.03,.03,.01);piece(stage,'cube','#201a1a',c.x+ox+.03,.1,c.z+oz+.23,.03,.03,.01);}
+      }else if(v<.075&&candles<7){                 // velas con su propia luz
+        candles++;
+        for(const [dx,dz,hh] of [[0,0,.22],[.09,.05,.15],[-.07,.08,.11]]){
+          const cdl=piece(stage,'column','#e8dcc0',c.x+ox+dx,hh/2,c.z+oz+dz,.06,hh,.06);cdl.castShadow=true;
+          piece(stage,'gem','#ffcf6b',c.x+ox+dx,hh+.04,c.z+oz+dz,.05,.09,.05,true);
+        }
+        const l=new T.PointLight('#ffb15a',5,3.2,2);l.position.set(c.x+ox,.45,c.z+oz);stage.add(l);torchLights.push(l);
+        const halo=piece(stage,'orb','#ffb15a',c.x+ox,.28,c.z+oz,.45,.45,.45,true);
+        halo.material=new T.MeshBasicMaterial({color:'#ffb15a',transparent:true,opacity:.12,depthWrite:false,blending:T.AdditiveBlending});
+      }else if(v<.11){                             // cascotes
+        for(let i=0;i<4;i++){const r=piece(stage,'cube',palette[i%palette.length],c.x+ox+(random(state.mapSeed,pos+i)-.5)*.4,.04,c.z+oz+(random(state.mapSeed,pos+i+9)-.5)*.4,.09+.05*i%2,.07,.08);r.rotation.y=i*1.3;r.castShadow=true;}
+      }else if(v<.13&&mode==='crypt'){             // charco que refleja las luces
+        const p=piece(stage,'disc','#2a3448',c.x+ox*.5,.006,c.z+oz*.5,.42,.004,.3);
+        p.material=new T.MeshStandardMaterial({color:'#3a4660',roughness:.12,metalness:.35,transparent:true,opacity:.7});
+      }
+    }
+  }
   function rebuild(){
     if(dust){dust.geometry.dispose();dust.material.dispose();dust=null;}
     for(const id of models.keys())removeModel(id);
@@ -488,7 +549,11 @@ export function createIso(mount,onCell){
       hell:['#c8b8b0','#1a1210',1.5,'#ffc890',1.9,'#8a7ab8',.8]}[mode]||['#d9dcff','#2a1a33',2.3,'#ffd6a8',2.7,'#9fa6ff',1.35];
     sky.color.set(mood[0]);sky.groundColor.set(mood[1]);sky.intensity=mood[2];
     key.color.set(mood[3]);key.intensity=mood[4];fill.color.set(mood[5]);fill.intensity=mood[6];
+    // HD: ambiente oscuro y frío; la luz importante la ponen las antorchas y velas.
+    if(deluxe){sky.intensity*=.55;key.intensity*=.5;key.color.set('#c9d2f2');fill.intensity*=.55;fill.color.set('#8c86b8');scene.fog.color.set('#05040a');}
     const palette=tilesets[mode]||tilesets.crypt;
+    // HD: piedra con grano en sarcófagos, columnas y escombros (solo biomas de piedra).
+    useObstacleTexture(deluxe&&tileFiles[mode]?(propTexture??=new T.TextureLoader().load('tiles/props.png')):null);
     const walls=new Set(state.walls);
     const holes=new Set(state.voids||[]);
     const w=state.width,h=state.height;
@@ -499,16 +564,26 @@ export function createIso(mount,onCell){
       const coord=logical(state,pos);
       const v=random(state.mapSeed,pos);
       const color=palette[Math.floor(v*palette.length)];
-      if(!state.water?.includes(pos))piece(stage,'cube',color,coord.x,-.057,coord.z,.963,.114,.963);
+      if(!state.water?.includes(pos)){
+        const slab=piece(stage,'cube',color,coord.x,-.057,coord.z,.963,.114,.963);
+        // Con tileset: la losa lleva su dibujo (variante y giro según la semilla).
+        const r=random(state.mapSeed,pos+911);
+        // De más sana a más rota: las sanas salen mucho más a menudo.
+        let n=0,acc=r*FLOOR_WEIGHT_TOTAL;while(n<FLOOR_TILES-1&&(acc-=FLOOR_WEIGHTS[n])>0)n++;
+        const top=tileMaterial(mode,n%TILE_COLS,Math.floor(n/TILE_COLS));
+        if(top){slab.material=top;slab.rotation.y=Math.floor(random(state.mapSeed,pos+37)*4)*Math.PI/2;}
+      }
       const x=pos%w,z=Math.floor(pos/w);
       if(!ground(x-1,z)||!ground(x+1,z)||!ground(x,z-1)||!ground(x,z+1)){
         piece(stage,'cube',ink,coord.x,-.24,coord.z,1,.36,1);
         if(!ground(x,z-1)){
-          piece(stage,'cube',palette[(pos+2)%palette.length],coord.x,.21,coord.z-.51,.97,.40,.23);
+          const side=piece(stage,'cube',palette[(pos+2)%palette.length],coord.x,.21,coord.z-.51,.97,.40,.23);
+          const sm=tileMaterial(mode,pos%4,WALL_ROW);if(sm)side.material=sm;
           exposed.push([coord.x,coord.z-.55]);
         }
         if(!ground(x-1,z)&&pos%4!==2){
-          piece(stage,'cube',palette[pos%palette.length],coord.x-.52,.17,coord.z,.22,.34,.96);
+          const side=piece(stage,'cube',palette[pos%palette.length],coord.x-.52,.17,coord.z,.22,.34,.96);
+          const sm=tileMaterial(mode,(pos+1)%4,WALL_ROW);if(sm)side.material=sm;
           exposed.push([coord.x-.55,coord.z]);
         }
       }
@@ -559,6 +634,7 @@ export function createIso(mount,onCell){
         chip.rotation.y=v*12;
       }
     }
+    if(deluxe)dressStage(palette,mode,walls,holes,w,h);
     const placement=[.09,.49,.87].map(f=>exposed[Math.floor(exposed.length*f)]);
     placement.forEach(([x,z],index)=>{
       piece(stage,'column','#475264',x,.52,z,.34,1.13,.34);
@@ -566,8 +642,9 @@ export function createIso(mount,onCell){
       const color=biomeLight[mode]||'#ffb46b';
       const flame=piece(stage,'gem',color,x,1.34,z,.22,.37,.22,true);
       torches.push(flame);
-      const light=new T.PointLight(color,14,6,2);
+      const light=new T.PointLight(color,deluxe?34:14,deluxe?11:6,2);
       light.position.set(x,1.47,z);
+      if(deluxe){light.castShadow=true;light.shadow.mapSize.set(512,512);light.shadow.bias=-.004;light.shadow.radius=3;}
       stage.add(light);
       torchLights.push(light);
       const halo=piece(stage,'orb',color,x,1.36,z,.5,.5,.5,true);
@@ -671,6 +748,8 @@ export function createIso(mount,onCell){
         model.ring=ring;
         model.shadow=shadow;
         Object.assign(model,makeLabel(u),{unit:u,phase:random(next.mapSeed,u.pos)*Math.PI*2});
+        // HD: cada héroe lleva una luz suave encima para no perderse en la penumbra.
+        if(deluxe&&!u.enemy){const lamp=new T.PointLight('#ffe6c4',1.6,2.6,2);lamp.position.set(0,1.9,.25);model.root.add(lamp);}
         models.set(u.id,model);
       }
       const model=models.get(u.id);

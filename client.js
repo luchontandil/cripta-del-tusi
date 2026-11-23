@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=153';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=153';
-import {setupSfx} from './music.js?v=153';
-import {icon} from './icons.js?v=153';
-import {openMapEditor} from './mapeditor.js?v=153';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=154';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=154';
+import {setupSfx} from './music.js?v=154';
+import {icon} from './icons.js?v=154';
+import {openMapEditor} from './mapeditor.js?v=154';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=153').then(({createIso})=>{
+import('./isometric.js?v=154').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -893,21 +893,21 @@ const areaNames={cross:'cruz',circle:'círculo',cone:'cono',line:'línea',wave:'
 /** Qué hace cada habilidad, en una frase (los números exactos van en la ficha). */
 const skillLore={
   // Valkyria
-  'Estocada':'Una embestida con la lanza por delante que barre la línea y aparta a todo el que esté en ella.',
-  'Lanza del lago':'La lanza se abre en tres puntas al llegar y arrastra hacia ti a quien alcanza.',
-  'En guardia!':'Plantas los pies y alzas la guardia: un escudo te cubre y nadie se acerca sin pagarlo.',
-  'Punzón':'Un pinchazo preciso que te devuelve parte de las fuerzas que le roba al enemigo.',
-  'Liberación':'Liberas de golpe la fuerza contenida y todo lo que te rodea sale despedido.',
-  'Pies ligeros':'Por un momento el peso de la armadura desaparece y tus pasos se alargan.',
-  'Balestra':'Un salto adelante, la punta por delante, y cuando el enemigo se gira ya estás a su espalda.',
-  'Salto valiente':'Te lanzas por los aires y caes como un rayo en medio de la refriega.',
-  'Carga heroica':'Bajas la lanza y corres: cuanto más larga la carrera, más lejos sale despedido.',
-  'Lanza cargada':'Cada estocada carga la punta de electricidad: la siguiente pica más fuerte.',
-  'Barrido':'Un giro amplio con el asta helada que barre todo lo que tienes delante.',
-  'Lanza abisal':'Una punta forjada en el fondo del lago: hiela hasta el hueso, y más de cerca.',
-  'Eclipse':'Alzas la lanza al cielo y la luz se apaga: nadie ve más allá de su nariz.',
-  'Abrir las aguas':'Clavas la lanza y el suelo se parte en tres: el frío aparta a todo lo que toca.',
-  'Furia':'El fuego de la batalla te enciende por dentro: cada golpe pega más fuerte.',
+  'Estocada':'Clava la lanza hacia delante y empuja a todos los enemigos de la línea.',
+  'Lanza del lago':'Lanza una estocada en forma de tridente que atrae a los enemigos alcanzados hacia ti.',
+  'En guardia!':'Te proteges con un escudo y terminas el turno; los enemigos que entren a tu alrededor reciben daño y son empujados.',
+  'Punzón':'Pincha a un enemigo a distancia y te curas con parte del daño.',
+  'Liberación':'Golpea el suelo con la lanza y empuja a todos los enemigos a tu alrededor.',
+  'Pies ligeros':'Ganas movimiento extra este turno.',
+  'Balestra':'Corres hacia el objetivo, lo golpeas y apareces detrás de él.',
+  'Salto valiente':'Saltas a una casilla y golpeas a todos los enemigos a tu alrededor al caer.',
+  'Carga heroica':'Cargas contra el objetivo y lo empujas más lejos cuanto más hayas corrido.',
+  'Lanza cargada':'Lanza un golpe eléctrico en línea o diagonal; cada uso hace más fuertes los siguientes.',
+  'Barrido':'Barre con la lanza tres casillas de lado y puede ralentizar a los enemigos.',
+  'Lanza abisal':'Golpe de hielo que hace más daño si el enemigo está pegado a ti.',
+  'Eclipse':'Oscureces el campo de batalla: todos los enemigos pierden alcance durante su próximo turno.',
+  'Abrir las aguas':'Clava la lanza y abre una zona de hielo en forma de T que daña y aparta a los enemigos.',
+  'Furia':'Durante un tiempo, todos tus golpes hacen más daño.',
   // Clérigo
   'Luz ardiente':'Un destello sagrado que quema a los enemigos que se acercan demasiado.',
   'Restaurar':'Posas la mano y la luz cierra las heridas, tuyas o de un aliado.',

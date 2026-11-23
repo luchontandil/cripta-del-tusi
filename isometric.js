@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=149';
-import {playerColors} from './engine.js?v=149';
+import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=150';
+import {playerColors} from './engine.js?v=150';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -13,7 +13,7 @@ const tilesets={
 };
 const biomeLight={crypt:'#ffa45a',jungle:'#e8ff8a',roots:'#c1f195',bones:'#9dffb8',hell:'#ff8a3a'};
 const biomeFog={crypt:'#07060d',jungle:'#0c1a0e',roots:'#0d1412',bones:'#12110e',hell:'#0e0b0a'};
-const overlayColors={walk:'#6aa3bb',cast:'#9484b8',aim:'#e9c48a',route:'#bfe6f2',area:'#e09a72',blocked:'#b06070',damage:'#ea6a50',poison:'#9abe56',slow:'#719add',foe:'#c97a6e',guard:'#d8c27a',snare:'#8fe3ff'};
+const overlayColors={walk:'#6aa3bb',cast:'#9484b8',aim:'#e9c48a',route:'#bfe6f2',area:'#e09a72',blocked:'#b06070',damage:'#ea6a50',poison:'#9abe56',slow:'#9a86ff',foe:'#c97a6e',guard:'#d8c27a',snare:'#8fe3ff'};
 const ink='#121423';
 const flatTile=new T.PlaneGeometry(1,1).rotateX(-Math.PI/2);
 const waterGeometry=new T.PlaneGeometry(1,1,6,6).rotateX(-Math.PI/2);
@@ -686,11 +686,12 @@ export function createIso(mount,onCell){
       if(!o)continue;
       const c=cell.classList;
       const glyph=['damage','poison','slow'].find(kind=>c.contains('glyph-'+kind));
-      const type=c.contains('area-preview')?'area':c.contains('route')?'route':c.contains('no-sight')?'blocked':glyph||(
+      // Los glifos siempre se ven: por encima de la ruta, del movimiento y del alcance (solo el área del hechizo los tapa).
+      const type=c.contains('area-preview')?'area':glyph||(c.contains('route')?'route':c.contains('no-sight')?'blocked':null)||(
         c.contains('aim')?'aim':c.contains('cast-range')?'cast':c.contains('walk')?'walk':c.contains('foe-reach')?'foe':c.contains('guard-zone')?'guard':c.contains('hero-trap')?'snare':null);
       o.visible=!!type;
       // Las casillas a las que puedes moverte: casi transparentes, solo el borde, para ver el suelo y los glifos.
-      if(type)o.material=type==='walk'?overlayMaterial(overlayColors.walk,.85,.22):overlayMaterial(overlayColors[type],type==='route'||type==='area'?1.25:glyph?1.1:1);
+      if(type)o.material=type==='walk'?overlayMaterial(overlayColors.walk,.85,.22):overlayMaterial(overlayColors[type],type==='route'||type==='area'?1.25:glyph?1.6:1,glyph?1.6:1);
       // La casilla entera (los glifos un pelín menos, para que se distingan del suelo resaltado).
       const size=glyph?.96:1;
       o.scale.set(size,1,size);

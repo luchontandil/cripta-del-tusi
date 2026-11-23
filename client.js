@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=154';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=154';
-import {setupSfx} from './music.js?v=154';
-import {icon} from './icons.js?v=154';
-import {openMapEditor} from './mapeditor.js?v=154';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=155';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=155';
+import {setupSfx} from './music.js?v=155';
+import {icon} from './icons.js?v=155';
+import {openMapEditor} from './mapeditor.js?v=155';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=154').then(({createIso})=>{
+import('./isometric.js?v=155').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -972,10 +972,10 @@ function skillEffectText(skill){
     contagion:'Contagia al objetivo y a sus aliados a '+(o.spread||2)+' casillas o menos: −'+(o.value||2)+' PA y −'+(o.feeble||25)+' % de daño causado en su próximo turno, y veneno de '+(o.poison||2)+' PV (+ tu % de daño caótico) durante '+(o.poisonTurns||2)+' turnos',
     track:'Rastreado durante '+(o.turns||2)+' turnos: tus habilidades no necesitan línea de visión contra él',
     domain:'Durante '+(o.turns||2)+' turnos, los Congelamientos y Contagios que apliques duran 1 turno más',
-    detonate:'Detonado: al acabar su turno estalla y quema a sus aliados a 2 casillas o menos ('+(o.detonate||[3,5]).join('-')+' de fuego). Una vez por objetivo y turno',
+    detonate:'Detonado: al acabar su turno estalla y quema a sus aliados a 2 casillas o menos ('+(o.detonate||[3,5]).join('-')+' de fuego)',
     reach:'+'+(o.value||3)+' de alcance en tus hechizos de alcance modificable durante '+(o.turns||2)+' turnos',
     curse:'−'+(o.value||1)+' PA en el próximo turno del objetivo (no se acumula)',
-    corrode:'−'+(o.value||25)+' % a todas las resistencias del objetivo hasta tu próximo turno, y veneno de '+(o.poison||2)+' PV (+ tu % de daño caótico) en su próximo turno. Una vez por objetivo y turno',
+    corrode:'−'+(o.value||25)+' % a todas las resistencias del objetivo hasta tu próximo turno, y veneno de '+(o.poison||2)+' PV (+ tu % de daño caótico) en su próximo turno',
     eclipse:'Todos los enemigos del mapa pierden '+(o.value||6)+' de alcance en su próximo turno (mínimo 1)',
     fury:'+'+(o.value||10)+' % de daño final durante 2 turnos (contando este); se multiplica por tu % de daño de fuego',
     guard:'Escudo del 10 % de tu vida máxima + tu nivel hasta tu próximo turno. Al terminar tu turno, el primer paso de cada enemigo dentro del área le hace este daño y lo empuja 2 casillas (una vez por enemigo). Pasa el turno',
@@ -1088,6 +1088,7 @@ function skillRows(unit,skill){
   if(o.inLine)rows.push(statRow('move','Lanzar',o.inLine==='diagonal'?'En línea recta o diagonal':'En línea recta'));
   if(o.stack&&unit.stacks?.[skill[0]]?.length)rows.push(statRow('attack','Cargas',unit.stacks[skill[0]].length+' de '+(o.stack.max||3)+' · +'+unit.stacks[skill[0]].length*o.stack.value+' de daño'));
   if(o.casts)rows.push(statRow('clock','Usos por turno',String(o.casts)));
+  if(o.perTarget)rows.push(statRow('clock','Usos por objetivo',String(o.perTarget)));
   if(o.cooldown){
     const left=cooldownLeft(unit,skill);
     rows.push(statRow('clock','Recarga',left?'faltan '+left+(left>1?' turnos':' turno'):o.cooldown+(o.cooldown>1?' turnos':' turno')));

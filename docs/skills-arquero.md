@@ -50,3 +50,4 @@ El resto, igual.
 - La IA esquiva las Trampitas (visibles); la Tramposa sigue oculta.
 - Congelación prematura (23-11-2026): sin recarga (1 uso por turno) y daño 4–6 → 6–8.
 - Congelación prematura (23-11-2026, de nuevo): 1 turno de recarga y 4–6. Congelamiento dura 2 turnos del lanzador (3 con Expansión de dominio) y da +35 % (antes +50 %). Afecta también a Tramposa.
+- Flecha Repelente (23-11-2026): alcance no modificable, 2 por turno y 1 por objetivo, daño 3–5 → 2–4.

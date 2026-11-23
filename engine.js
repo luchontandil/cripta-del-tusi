@@ -28,7 +28,7 @@ export const classes = {
     ['Flecha helada',2,8,2,3,'slow','❄',2,{element:'ice',value:1,slowBonus:{chance:25,value:2},casts:2,modifiable:true}],
     ['Flecha Flamígera',3,9,5,7,'damage','➵',1,{element:'fire',burnChance:0,area:'line',size:3,inLine:true,friendly:true,recoil:1,casts:1,modifiable:false}],
     ['Detonadora',2,8,2,4,'detonate','✺',1,{element:'fire',burnChance:0,detonate:[2,3],perTarget:1,casts:2,modifiable:true}],
-    ['Flecha Repelente',3,8,3,5,'push','➶',1,{element:'physical',push:2,casts:2,modifiable:true}],
+    ['Flecha Repelente',3,8,2,4,'push','➶',1,{element:'physical',push:2,perTarget:1,casts:2,modifiable:false}],
     ['Ojo de águila',2,0,0,0,'reach','◉',0,{value:3,turns:2,los:false,casts:1,cooldown:3,modifiable:false}],
     ['Flecha venenosa',2,8,1,4,'curse','☠',1,{element:'chaos',value:1,casts:2,modifiable:true}],
     ['Dardo pestilente',2,8,2,4,'corrode','✣',1,{element:'chaos',value:25,poison:2,perTarget:1,casts:2,modifiable:true}],

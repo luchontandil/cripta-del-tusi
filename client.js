@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=146';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=146';
-import {setupSfx} from './music.js?v=146';
-import {icon} from './icons.js?v=146';
-import {openMapEditor} from './mapeditor.js?v=146';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=148';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=148';
+import {setupSfx} from './music.js?v=148';
+import {icon} from './icons.js?v=148';
+import {openMapEditor} from './mapeditor.js?v=148';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,12 +124,13 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=146').then(({createIso})=>{
+import('./isometric.js?v=148').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
     else cell?.dispatchEvent(new PointerEvent('pointer'+event));
   });
+  iso?.setStatusRenderer?.(statusBadge);
   syncViewport();
   if(iso?.active){
     iso.sync(state,hidePawn);
@@ -737,6 +738,44 @@ function hpBar(u){
   const bar=h('div','tip-hp'+(u.enemy?' foe':''),h('i'),h('span',null,u.hp+' / '+u.max+' PV'));
   bar.style.setProperty('--hp',pct+'%');
   return bar;
+}
+/** Icono y explicación de cada estado (encima del nombre de las criaturas). */
+const statusIcons={frozen:'ice',chill:'slow',feeble:'weak',tracked:'range',corrode:'expose',detonate:'fire',reach:'reach',domain:'clock',
+  fury:'fire',barrier:'ward',blind:'range',shield:'ward',haste:'movement'};
+const statusBuffs=new Set(['reach','domain','fury','barrier','shield','haste']);
+const statusLong={
+  poison:'Pierde vida al empezar cada uno de sus turnos.',burn:'Arde: pierde vida de fuego al empezar cada uno de sus turnos.',
+  slow:'Tendrá menos PM en su próximo turno.',chill:'Se le rompió el hielo: tendrá menos PM en su próximo turno.',
+  weak:'Tendrá menos PA en su próximo turno.',expose:'Recibe más daño de todos los ataques.',
+  feeble:'Contagiado: hace menos daño con sus ataques.',corrode:'Todas sus resistencias están rebajadas.',
+  frozen:'El próximo golpe de hielo que reciba le hará +50 % de daño y le quitará 1 PM; luego se rompe.',
+  detonate:'Al acabar su turno estallará y quemará a sus aliados a 2 casillas o menos (a él no).',
+  tracked:'El arquero que lo marcó no necesita línea de visión para dispararle.',
+  blind:'Eclipse: tiene menos alcance en su próximo turno (mínimo 1).',
+  reach:'Más alcance en los hechizos de alcance modificable.',domain:'Sus Congelamientos y Contagios duran 1 turno más.',
+  fury:'Hace más daño con todos sus ataques.',barrier:'Escudo de En guardia!: absorbe el daño hasta su próximo turno.',
+  shield:'Más armadura.',haste:'Tendrá más PM en su próximo turno.'};
+function statusDuration(status){
+  if(status.untilTurnOf){
+    const who=state?.units.find(u=>u.id===status.untilTurnOf)?.name||'quien lo aplicó';
+    return 'Hasta el próximo turno de '+who+(status.skips?' (+'+status.skips+' turno más)':'');
+  }
+  if(status.untilOwnTurn)return 'Hasta su próximo turno';
+  if(!status.turns||status.turns>=99)return null;
+  return status.turns===1?'1 turno restante':status.turns+' turnos restantes';
+}
+function statusBadge(key,status,unit){
+  const badge=h('span','status-badge '+(statusBuffs.has(key)?'buff':'debuff')+' status-'+key,icon(statusIcons[key]||key));
+  const value=status.value>1&&!['frozen','tracked','domain','detonate'].includes(key)?h('b',null,String(status.value)):null;
+  if(value)badge.append(value);
+  badge.tabIndex=0;
+  hoverTip(badge,()=>[
+    h('div','tip-head',h('strong',null,iconName[key]||key)),
+    effectHelp[key]?h('p','tip-effect',effectHelp[key](status.value)):null,
+    h('p','tip-lore',statusLong[key]||''),
+    statusDuration(status)?statRow('clock','Duración',statusDuration(status)):null
+  ].filter(Boolean),150);
+  return badge;
 }
 function effectChips(unit){
   const list=Object.entries(unit.effects||{});

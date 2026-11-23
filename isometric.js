@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=146';
-import {playerColors} from './engine.js?v=146';
+import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=148';
+import {playerColors} from './engine.js?v=148';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -114,9 +114,12 @@ export function createIso(mount,onCell){
   renderer.shadowMap.enabled=true;
   renderer.shadowMap.type=T.PCFSoftShadowMap;
   renderer.domElement.setAttribute('aria-hidden','true');
+  let statusRenderer=null;
   const labels=document.createElement('div');
   labels.className='iso-labels';
-  mount.append(renderer.domElement,labels);
+  const badges=document.createElement('div');
+  badges.className='iso-labels iso-badges';
+  mount.append(renderer.domElement,labels,badges);
 
   const scene=new T.Scene();
   scene.fog=new T.Fog('#100d1a',24,52);
@@ -259,7 +262,7 @@ export function createIso(mount,onCell){
   function removeModel(id){
     const model=models.get(id);
     if(!model)return;
-    model.label.remove();
+    model.label.remove();model.fx?.remove();
     model.ring.geometry.dispose();
     model.shadow.parent?.remove(model.shadow);
     figures.remove(model.root);
@@ -425,7 +428,7 @@ export function createIso(mount,onCell){
     }else if(hurt)model.hurt=null;
     // Muerte: cae hacia atrás, se hunde y se desvanece; después se retira.
     let fade=1;
-    if(model.deathAt&&!model.dying&&now>=model.deathAt){model.dying=now;model.label.style.opacity='0';model.ring.visible=false;}
+    if(model.deathAt&&!model.dying&&now>=model.deathAt){model.dying=now;model.label.style.opacity='0';model.fx.style.display='none';model.ring.visible=false;}
     if(model.dying){
       const dt=(now-model.dying)/950;
       if(dt>=1){removeModel(model.unit.id);return;}
@@ -609,9 +612,13 @@ export function createIso(mount,onCell){
     const name=document.createElement('span');
     name.textContent=u.name;
     const hp=document.createElement('i');
+    // Estados encima del nombre (iconos con ficha al pasar el ratón; los dibuja el cliente).
+    // Van en su propia capa, por encima de todos los nombres, para que ningún otro cartel los tape.
+    const fx=document.createElement('div');fx.className='iso-effects';
     label.append(name,hp);
     labels.append(label);
-    return {label,hp};
+    badges.append(fx);
+    return {label,hp,fx,fxSig:''};
   }
   function sync(next,shouldAnimate){
     state=next;
@@ -651,6 +658,11 @@ export function createIso(mount,onCell){
       model.label.classList.toggle('active',next.phase==='combat'&&next.units[next.turn]?.id===u.id);
       model.ring.visible=next.phase==='combat'&&next.units[next.turn]?.id===u.id;
       model.hp.style.setProperty('--hp',(u.hp/u.max*100)+'%');
+      const sig=JSON.stringify(u.effects||{});
+      if(sig!==model.fxSig){
+        model.fxSig=sig;
+        model.fx.replaceChildren(...Object.entries(u.effects||{}).map(([key,st])=>statusRenderer?.(key,st,u)).filter(Boolean));
+      }
       if(!moving)model.root.position.copy(coords);
     }
   }
@@ -1403,6 +1415,7 @@ export function createIso(mount,onCell){
       model.shadow.position.z=model.root.position.z;
       const pos=projected(model.root.position.x,model.head+.15+model.figure.position.y,model.root.position.z);
       model.label.style.transform='translate('+pos.x+'px,'+pos.y+'px) translate(-50%,-100%)';
+      if(model.fx.firstChild)model.fx.style.transform='translate('+pos.x+'px,'+(pos.y-model.label.offsetHeight-3)+'px) translate(-50%,-100%)';
     }
     for(let i=effects.length-1;i>=0;i--){
       const fx=effects[i];
@@ -1473,7 +1486,7 @@ export function createIso(mount,onCell){
     const after=groundAt(event);
     if(before&&after){pan.x+=before.x-after.x;pan.z+=before.z-after.z;fit();}
   }
-  return {show,sync,anchor,highlight,move,impact,zoom,resetHover(){hover=null;},get active(){return active;},
+  return {show,sync,anchor,highlight,move,impact,zoom,setStatusRenderer(fn){statusRenderer=fn;for(const m of models.values())m.fxSig='';},resetHover(){hover=null;},get active(){return active;},
     set aiming(value){groundOnly=!!value;}};
 }
 

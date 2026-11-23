@@ -48,3 +48,4 @@ El resto, igual.
 ## Ajustes de equilibrio (22-11-2026, tomando la Valkyria como referencia)
 - Flecha Explosiva: círculo de 3 → círculo de 2. Explosión de Detonadora: 3–5 → 2–3.
 - La IA esquiva las Trampitas (visibles); la Tramposa sigue oculta.
+- Congelación prematura (23-11-2026): sin recarga (1 uso por turno) y daño 4–6 → 6–8.

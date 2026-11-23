@@ -32,7 +32,7 @@ export const classes = {
     ['Ojo de águila',2,0,0,0,'reach','◉',0,{value:3,turns:2,los:false,casts:1,cooldown:3,modifiable:false}],
     ['Flecha venenosa',2,8,1,4,'curse','☠',1,{element:'chaos',value:1,casts:2,modifiable:true}],
     ['Dardo pestilente',2,8,2,4,'corrode','✣',1,{element:'chaos',value:25,poison:2,perTarget:1,casts:2,modifiable:true}],
-    ['Congelación prematura',4,8,4,6,'damage','✳',1,{element:'ice',area:'cross',size:1,freeze:true,casts:1,cooldown:1,modifiable:false}],
+    ['Congelación prematura',4,8,6,8,'damage','✳',1,{element:'ice',area:'cross',size:1,freeze:true,casts:1,modifiable:false}],
     ['Ramo helado',3,8,3,5,'damage','❆',1,{element:'ice',area:'cone',size:2,inLine:true,casts:1,modifiable:false}],
     ['Tramposa',4,8,5,8,'snare','⌗',1,{element:'ice',area:'cross',size:1,trigger:1,blast:3,freeze:true,casts:1,cooldown:4,modifiable:false}],
     ['Expansión de dominio',2,0,0,0,'domain','◎',0,{value:1,turns:2,los:false,casts:1,cooldown:3,modifiable:false}],

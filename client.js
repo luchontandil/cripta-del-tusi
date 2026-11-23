@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=148';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=148';
-import {setupSfx} from './music.js?v=148';
-import {icon} from './icons.js?v=148';
-import {openMapEditor} from './mapeditor.js?v=148';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=149';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=149';
+import {setupSfx} from './music.js?v=149';
+import {icon} from './icons.js?v=149';
+import {openMapEditor} from './mapeditor.js?v=149';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -26,7 +26,7 @@ const onPages=location.hostname.endsWith('.github.io');
 el('server').value=localStorage.getItem('amber-server')||(onPages?'https://cripta-del-tusi.onrender.com':location.origin);
 const error=message=>{el('error').textContent=message;};
 const iconName={feeble:'Contagio',tracked:'Rastreado',frozen:'Congelado',chill:'Hielo roto',domain:'Expansión de dominio',reach:'Ojo de águila',corrode:'Corroído',detonate:'Detonado',expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',burn:'Quemadura',weak:'Maldito',haste:'Prisa',shield:'Escudo',fury:'Furia',barrier:'Guardia',blind:'Eclipse'};
-const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',feeble:v=>'hace un '+v+' % menos de daño',tracked:()=>'el arquero no necesita verlo para dispararle',frozen:()=>'el próximo golpe de hielo hace +50 % y quita 1 PM',chill:v=>'−'+v+' PM',domain:()=>'tus Congelamientos y Contagios duran 1 turno más',reach:v=>'+'+v+' de alcance',corrode:v=>'−'+v+' % a todas las resistencias',detonate:v=>'estalla al acabar su turno ('+v+' de fuego a 2 casillas)',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo',fury:v=>'+'+v+' % de daño',barrier:v=>v+' de escudo',blind:v=>'−'+v+' de alcance'};
+const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',feeble:v=>'hace un '+v+' % menos de daño',tracked:()=>'el arquero no necesita verlo para dispararle',frozen:()=>'el próximo golpe de hielo hace +35 % y quita 1 PM',chill:v=>'−'+v+' PM',domain:()=>'tus Congelamientos y Contagios duran 1 turno más',reach:v=>'+'+v+' de alcance',corrode:v=>'−'+v+' % a todas las resistencias',detonate:v=>'estalla al acabar su turno ('+v+' de fuego a 2 casillas)',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo',fury:v=>'+'+v+' % de daño',barrier:v=>v+' de escudo',blind:v=>'−'+v+' de alcance'};
 const specs={guardia:'Lanza, empujes y escudo · controla el frente',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
 const roles={guardia:'Valkyria',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
 // Editor de SFX desactivado por ahora; poner true para volver a mostrarlo al admin.
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=148').then(({createIso})=>{
+import('./isometric.js?v=149').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -748,7 +748,7 @@ const statusLong={
   slow:'Tendrá menos PM en su próximo turno.',chill:'Se le rompió el hielo: tendrá menos PM en su próximo turno.',
   weak:'Tendrá menos PA en su próximo turno.',expose:'Recibe más daño de todos los ataques.',
   feeble:'Contagiado: hace menos daño con sus ataques.',corrode:'Todas sus resistencias están rebajadas.',
-  frozen:'El próximo golpe de hielo que reciba le hará +50 % de daño y le quitará 1 PM; luego se rompe.',
+  frozen:'El próximo golpe de hielo que reciba le hará +35 % de daño y le quitará 1 PM; luego se rompe.',
   detonate:'Al acabar su turno estallará y quemará a sus aliados a 2 casillas o menos (a él no).',
   tracked:'El arquero que lo marcó no necesita línea de visión para dispararle.',
   blind:'Eclipse: tiene menos alcance en su próximo turno (mínimo 1).',
@@ -985,7 +985,7 @@ function skillEffectText(skill){
     leap:'Saltas a una casilla libre y golpeas a todos los enemigos a tu alrededor (−20 % por casilla de distancia)',
     dash:o.teleport?(o.los===false?'Teletransporte (sin necesitar línea de visión)':'Teletransporte a una casilla libre que veas, sin gastar PM'):'Desplazamiento por una ruta libre sin gastar PM'
   }[kind]||'';
-  const extra=(o.stack?'+'+o.stack.value+' de daño base de esta habilidad por cada uso durante '+(o.stack.turns||2)+' turnos (acumulable '+(o.stack.max||3)+' veces, cada carga dura lo suyo)':'')+(o.meleeBonus?'+'+o.meleeBonus+' % de daño si el objetivo está adyacente':'')+(o.freeze&&skill[5]!=='snare'?'Congela a los enemigos alcanzados hasta tu próximo turno: el siguiente golpe de hielo que reciban hace +50 % y les quita 1 PM':'')+(o.blastSight?'Solo daña a los enemigos que se ven desde la casilla del impacto (tras un muro, a salvo)':'')+(o.friendly?'Daña también a los aliados del área':'')+(o.recoil?(o.friendly?' · ':'')+'Retrocedes '+o.recoil+' casilla al disparar (si chocas, te haces daño)':'');
+  const extra=(o.stack?'+'+o.stack.value+' de daño base de esta habilidad por cada uso durante '+(o.stack.turns||2)+' turnos (acumulable '+(o.stack.max||3)+' veces, cada carga dura lo suyo)':'')+(o.meleeBonus?'+'+o.meleeBonus+' % de daño si el objetivo está adyacente':'')+(o.freeze&&skill[5]!=='snare'?'Congela a los enemigos alcanzados durante 2 de tus turnos: el siguiente golpe de hielo que reciban hace +35 % y les quita 1 PM':'')+(o.blastSight?'Solo daña a los enemigos que se ven desde la casilla del impacto (tras un muro, a salvo)':'')+(o.friendly?'Daña también a los aliados del área':'')+(o.recoil?(o.friendly?' · ':'')+'Retrocedes '+o.recoil+' casilla al disparar (si chocas, te haces daño)':'');
   const steal=o.lifesteal?' · Te curas el '+o.lifesteal+' % del daño hecho':'';
   const burn=o.element==='fire'&&o.burnChance!==0?' · '+(o.burnChance!==undefined?o.burnChance+' % de probabilidad de quemar: ':'Quemadura: ')+'arde 2 turnos y pierde ¼ del daño al empezar cada uno':'';
   return ([text,extra].filter(Boolean).join(' · ')+area+steal+burn).replace(/^ · /,'');

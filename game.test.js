@@ -1774,7 +1774,7 @@ test('Arquero tanda 2: Congelamiento, Ramo helado, Tramposa y Expansión de domi
   {const {s,a,foes}=setup();const f=foes[0];f.pos=a.pos-4;
     act(s,a.id,{type:'skill',skill:idx('Expansión de dominio'),pos:a.pos},()=>.5);
     act(s,a.id,{type:'skill',skill:idx('Congelación prematura'),pos:f.pos},()=>.5);
-    assert.equal(f.effects.frozen.skips,1);}
+    assert.equal(f.effects.frozen.skips,2);}
 });
 
 test('Arquero tanda 3: Contagio, Trampita, Flecha Explosiva y Flecha Rastreadora',()=>{

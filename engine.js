@@ -32,7 +32,7 @@ export const classes = {
     ['Ojo de águila',2,0,0,0,'reach','◉',0,{value:3,turns:2,los:false,casts:1,cooldown:3,modifiable:false}],
     ['Flecha venenosa',2,8,1,4,'curse','☠',1,{element:'chaos',value:1,casts:2,modifiable:true}],
     ['Dardo pestilente',2,8,2,4,'corrode','✣',1,{element:'chaos',value:25,poison:2,perTarget:1,casts:2,modifiable:true}],
-    ['Congelación prematura',4,8,6,8,'damage','✳',1,{element:'ice',area:'cross',size:1,freeze:true,casts:1,modifiable:false}],
+    ['Congelación prematura',4,8,4,6,'damage','✳',1,{element:'ice',area:'cross',size:1,freeze:true,casts:1,cooldown:1,modifiable:false}],
     ['Ramo helado',3,8,3,5,'damage','❆',1,{element:'ice',area:'cone',size:2,inLine:true,casts:1,modifiable:false}],
     ['Tramposa',4,8,5,8,'snare','⌗',1,{element:'ice',area:'cross',size:1,trigger:1,blast:3,freeze:true,casts:1,cooldown:4,modifiable:false}],
     ['Expansión de dominio',2,0,0,0,'domain','◎',0,{value:1,turns:2,los:false,casts:1,cooldown:3,modifiable:false}],
@@ -1567,17 +1567,18 @@ function beginTurn(s) {
   if(u.effects.burn&&alive(u))hit(s,{name:'Quemadura',pos:u.pos},u,u.effects.burn.value,'burn',false,'fire');
   applyGlyphs(s,u,-1);
 }
-/** Congelamiento: hasta el próximo turno del lanzador (uno más con Expansión de dominio). */
+/** Congelamiento: dura 2 turnos del lanzador (uno más con Expansión de dominio). */
+export const FROZEN_BONUS=35;
 function freeze(s,caster,target){
   if(!alive(target))return;
-  target.effects.frozen={value:1,turns:99,untilTurnOf:caster.id,skips:caster.effects?.domain?1:0};
-  note(s,target.name+' queda congelado: el próximo golpe de hielo le hará +50 % y le quitará 1 PM.');
+  target.effects.frozen={value:1,turns:99,untilTurnOf:caster.id,skips:1+(caster.effects?.domain?1:0)};
+  note(s,target.name+' queda congelado: el próximo golpe de hielo le hará +'+FROZEN_BONUS+' % y le quitará 1 PM.');
 }
-/** Golpe de hielo sobre un congelado: +50 % de daño, consume el estado y quita 1 PM extra. */
+/** Golpe de hielo sobre un congelado: +35 % de daño, consume el estado y quita 1 PM extra. */
 function frozenHit(target,element){
   if(element!=='ice'||!target.effects?.frozen)return 1;
   delete target.effects.frozen;target.frozenPending=true;
-  return 1.5;
+  return 1+FROZEN_BONUS/100;
 }
 function frozenAfter(s,target){
   if(!target.frozenPending)return;

@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=150';
-import {playerColors} from './engine.js?v=150';
+import {miniature,ps1Obstacle,piece,solid} from './models3d.js?v=152';
+import {playerColors} from './engine.js?v=152';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -13,7 +13,7 @@ const tilesets={
 };
 const biomeLight={crypt:'#ffa45a',jungle:'#e8ff8a',roots:'#c1f195',bones:'#9dffb8',hell:'#ff8a3a'};
 const biomeFog={crypt:'#07060d',jungle:'#0c1a0e',roots:'#0d1412',bones:'#12110e',hell:'#0e0b0a'};
-const overlayColors={walk:'#6aa3bb',cast:'#9484b8',aim:'#e9c48a',route:'#bfe6f2',area:'#e09a72',blocked:'#b06070',damage:'#ea6a50',poison:'#9abe56',slow:'#9a86ff',foe:'#c97a6e',guard:'#d8c27a',snare:'#8fe3ff'};
+const overlayColors={walk:'#6aa3bb',cast:'#9484b8',aim:'#e9c48a',route:'#bfe6f2',area:'#e09a72',blocked:'#b06070',damage:'#ea6a50',poison:'#9abe56',slow:'#9a86ff',foe:'#c97a6e',guard:'#d8c27a',snare:'#8fe3ff',snareToxic:'#a6d64a'};
 const ink='#121423';
 const flatTile=new T.PlaneGeometry(1,1).rotateX(-Math.PI/2);
 const waterGeometry=new T.PlaneGeometry(1,1,6,6).rotateX(-Math.PI/2);
@@ -205,6 +205,10 @@ export function createIso(mount,onCell){
   const pan={x:0,z:0};
   const routeGroup=new T.Group();
   stage.add(routeGroup);
+  // Trampas de los héroes (Tramposa, Trampita): una marca en la casilla, que late.
+  const snareGroup=new T.Group();
+  stage.add(snareGroup);
+  let snareSignature='';
 
   function fit(){
     if(!state||!active)return;
@@ -471,6 +475,7 @@ export function createIso(mount,onCell){
     routeGroup.clear();
     stage.add(routeGroup);
     routeSignature='';
+    snareGroup.clear();stage.add(snareGroup);snareSignature='';
     overlays.length=0;
     torches.length=0;
     torchLights.length=0;
@@ -627,6 +632,21 @@ export function createIso(mount,onCell){
       stageKey=id;
       rebuild();
     }
+    const snareSig=JSON.stringify(state.snares||[]);
+    if(snareSig!==snareSignature){
+      snareSignature=snareSig;
+      snareGroup.clear();
+      for(const t of state.snares||[]){
+        const p=logical(state,t.pos),ice=t.skill==='Tramposa',col=ice?'#9fe8ff':'#9acb4a';
+        const mark=new T.Group();mark.position.set(p.x,0,p.z);mark.userData.snare=true;
+        piece(mark,'ring',col,0,.06,0,.42,.42,.1,true).rotation.x=-Math.PI/2;
+        piece(mark,'disc',ice?'#2a5a78':'#3a4a1a',0,.035,0,.3,.01,.3);
+        // Dientes del cepo / pinchos.
+        for(let i=0;i<(ice?8:6);i++){const a=i/(ice?8:6)*Math.PI*2,r=ice?.24:.14;piece(mark,'cone',ice?'#e6fbff':'#c8cdd5',Math.cos(a)*r,.08,Math.sin(a)*r,.05,.14,.05,ice);}
+        piece(mark,'gem',col,0,.16,0,.09,.09,.09,true);
+        snareGroup.add(mark);
+      }
+    }
     for(const u of next.units){
       const moving=shouldAnimate(u.id)||steps.has(u.id);
       if(u.hp<=0&&!moving){
@@ -688,10 +708,10 @@ export function createIso(mount,onCell){
       const glyph=['damage','poison','slow'].find(kind=>c.contains('glyph-'+kind));
       // Los glifos siempre se ven: por encima de la ruta, del movimiento y del alcance (solo el área del hechizo los tapa).
       const type=c.contains('area-preview')?'area':glyph||(c.contains('route')?'route':c.contains('no-sight')?'blocked':null)||(
-        c.contains('aim')?'aim':c.contains('cast-range')?'cast':c.contains('walk')?'walk':c.contains('foe-reach')?'foe':c.contains('guard-zone')?'guard':c.contains('hero-trap')?'snare':null);
+        c.contains('aim')?'aim':c.contains('hero-trap-poison')?'snareToxic':c.contains('hero-trap')?'snare':c.contains('cast-range')?'cast':c.contains('walk')?'walk':c.contains('foe-reach')?'foe':c.contains('guard-zone')?'guard':null);
       o.visible=!!type;
       // Las casillas a las que puedes moverte: casi transparentes, solo el borde, para ver el suelo y los glifos.
-      if(type)o.material=type==='walk'?overlayMaterial(overlayColors.walk,.85,.22):overlayMaterial(overlayColors[type],type==='route'||type==='area'?1.25:glyph?1.6:1,glyph?1.6:1);
+      if(type)o.material=type==='walk'?overlayMaterial(overlayColors.walk,.85,.22):overlayMaterial(overlayColors[type],type==='route'||type==='area'?1.25:glyph?1.6:type.startsWith('snare')?1.5:1,glyph?1.6:type.startsWith('snare')?1.3:1);
       // La casilla entera (los glifos un pelín menos, para que se distingan del suelo resaltado).
       const size=glyph?.96:1;
       o.scale.set(size,1,size);
@@ -1300,6 +1320,7 @@ export function createIso(mount,onCell){
     const delta=previousFrame?Math.min(45,Math.max(0,now-previousFrame)):0;
     previousFrame=now;
     clock.value=now/1000;
+    if(!reduced)for(const [i,mark] of snareGroup.children.entries()){mark.rotation.y=now*.0006+i;const k=1+.06*Math.sin(now*.004+i);mark.scale.set(k,1,k);}
     for(const [index,light] of torchLights.entries()){
       light.intensity=reduced?14:12.5+Math.sin(now*.011+index*2.1)*1.6+Math.sin(now*.027+index)*1.1;
     }

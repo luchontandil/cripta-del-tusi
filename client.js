@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=150';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=150';
-import {setupSfx} from './music.js?v=150';
-import {icon} from './icons.js?v=150';
-import {openMapEditor} from './mapeditor.js?v=150';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=152';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=152';
+import {setupSfx} from './music.js?v=152';
+import {icon} from './icons.js?v=152';
+import {openMapEditor} from './mapeditor.js?v=152';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=150').then(({createIso})=>{
+import('./isometric.js?v=152').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -2264,7 +2264,8 @@ function drawBoard(turn,walking,skill){
     const wall=state.walls.includes(pos);
     const glyph=state.glyphs.find(g=>g.cells.includes(pos));
     // Zona de En guardia! (círculo alrededor de quien la lanzó, hasta su próximo turno).
-    const snare=!voidCell&&!wall&&(state.snares||[]).some(t=>distance(state,t.pos,pos)<=(t.trigger??1));
+    const snareAt=!voidCell&&!wall&&(state.snares||[]).find(t=>distance(state,t.pos,pos)<=(t.trigger??1));
+    const snare=snareAt&&(snareAt.skill==='Trampita'?'hero-trap hero-trap-poison':'hero-trap');
     const guardZone=!voidCell&&!wall&&(state.guardZones||[]).some(z=>{const o=state.units.find(u=>u.id===z.owner&&u.hp>0);return o&&distance(state,o.pos,pos)<=z.size;});
     const water=state.water?.includes(pos);
     const trap=state.traps?.find(t=>t.pos===pos);
@@ -2280,7 +2281,7 @@ function drawBoard(turn,walking,skill){
     });
     const shadesIndex=((Math.imul(pos+1,2654435761)^state.mapSeed)>>>6)%shades.length;
     cell.style.setProperty('--tile',shades[shadesIndex]);
-    cell.className=['cell',voidCell&&'void',wall&&'wall',water&&'water',trap&&'trap trap-'+trap.kind,path&&'walk',blocked&&'no-sight',castRange&&'cast-range',aim&&'aim',glyph&&'glyph-'+glyph.kind,glyph?.warn&&'warn',guardZone&&'guard-zone',snare&&'hero-trap'].filter(Boolean).join(' ');
+    cell.className=['cell',voidCell&&'void',wall&&'wall',water&&'water',trap&&'trap trap-'+trap.kind,path&&'walk',blocked&&'no-sight',castRange&&'cast-range',aim&&'aim',glyph&&'glyph-'+glyph.kind,glyph?.warn&&'warn',guardZone&&'guard-zone',snare].filter(Boolean).join(' ');
     if(voidCell){cell.disabled=true;cell.setAttribute('aria-hidden','true');}
     cell.setAttribute('aria-label',(unit?.name||(wall?'Muro':water?'Agua':trap?trapInfo[trap.kind].name:'Casilla'))+' '+(pos%state.width+1)+', '+(Math.floor(pos/state.width)+1));
     if(path){

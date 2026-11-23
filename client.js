@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=152';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=152';
-import {setupSfx} from './music.js?v=152';
-import {icon} from './icons.js?v=152';
-import {openMapEditor} from './mapeditor.js?v=152';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=153';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=153';
+import {setupSfx} from './music.js?v=153';
+import {icon} from './icons.js?v=153';
+import {openMapEditor} from './mapeditor.js?v=153';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -124,7 +124,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=152').then(({createIso})=>{
+import('./isometric.js?v=153').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -928,21 +928,21 @@ const skillLore={
   'Teletransporte':'Te desvaneces y reapareces en otro punto, aunque no lo veas.',
   'Rayo umbrío':'Energía caótica que se retuerce camino del blanco.',
   // Arquero (hoja nueva)
-  'Flecha helada':'Una punta de escarcha que entumece las piernas del blanco.',
-  'Flecha Flamígera':'Una flecha que arde en línea recta; el retroceso del disparo te empuja hacia atrás.',
-  'Detonadora':'La flecha se queda clavada, chisporroteando… y revienta cuando menos se lo esperan.',
-  'Flecha Repelente':'El impacto es tan fuerte que aparta al enemigo de un empujón.',
-  'Ojo de águila':'Respiras hondo, fijas la vista y el campo de batalla se acerca.',
-  'Flecha venenosa':'El veneno agarrota los músculos: al enemigo le cuesta actuar.',
-  'Dardo pestilente':'Un dardo podrido que corroe cualquier defensa.',
-  'Congelación prematura':'Una flecha cae del cielo y escarcha el suelo: lo que toca queda listo para romperse.',
-  'Ramo helado':'La flecha revienta en un abanico de esquirlas de hielo.',
-  'Tramposa':'Una trampa escondida bajo la escarcha: quien la pise, lo lamentará.',
-  'Expansión de dominio':'Tu hielo y tus venenos tardan más en soltar a sus presas.',
-  'Contagio':'Una flecha infecta y la enfermedad salta de un enemigo a otro.',
-  'Trampita':'Pequeña, fea y venenosa. Mira bien dónde pisas.',
-  'Flecha Explosiva':'Revienta al tocar el suelo; solo un muro te salva de la onda.',
-  'Flecha Rastreadora':'Una vez marcada la presa, ya no hace falta verla.',
+  'Flecha helada':'Dispara una flecha de hielo que ralentiza al objetivo.',
+  'Flecha Flamígera':'Dispara una flecha de fuego que quema todo lo que hay en línea recta. El retroceso te echa hacia atrás.',
+  'Detonadora':'Clava una flecha explosiva en un enemigo; al acabar su turno, estalla y quema a los que tenga cerca.',
+  'Flecha Repelente':'Dispara una flecha potente que aparta al enemigo de un empujón.',
+  'Ojo de águila':'Te concentras y tus hechizos llegan más lejos durante un tiempo.',
+  'Flecha venenosa':'Dispara una flecha envenenada que le quita acciones al objetivo.',
+  'Dardo pestilente':'Lanza un dardo que envenena al objetivo y debilita sus resistencias.',
+  'Congelación prematura':'Dispara una flecha al cielo que cae y congela a los enemigos de la zona.',
+  'Ramo helado':'Dispara una flecha que, al impactar, se abre en un cono de hielo hacia atrás.',
+  'Tramposa':'Coloca una trampa de hielo oculta; cuando un enemigo la pisa, estalla y congela a los que estén cerca.',
+  'Expansión de dominio':'Durante un tiempo, tus congelamientos y contagios duran más.',
+  'Contagio':'Dispara una flecha infectada que debilita y envenena al objetivo y a los enemigos que tenga cerca.',
+  'Trampita':'Coloca una pequeña trampa venenosa a la vista; quien la pise queda envenenado.',
+  'Flecha Explosiva':'Dispara una flecha que explota en la zona de impacto; los muros protegen de la explosión.',
+  'Flecha Rastreadora':'Dispara una flecha de fuego que marca al objetivo: podrás dispararle aunque no lo veas.',
   // Ninja
   'Shuriken':'Una estrella de acero que vuela rápida y silenciosa hacia el blanco.',
   'Cuchilla envenenada':'Un corte pequeño, pero el veneno sigue trabajando turno tras turno.',

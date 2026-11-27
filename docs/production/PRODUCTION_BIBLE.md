@@ -1,3 +1,5 @@
+> ⚠️ Documento de una etapa anterior (estética chibi, Guardián, glifos de jefes…). La guía vigente es `CLAUDE.md` en la raíz del repo; si algo choca, manda ella.
+
 # Biblia de arte y producción — Cripta del Tusi
 
 ## Autoridad y decisiones actuales

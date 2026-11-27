@@ -1,3 +1,5 @@
+> ⚠️ Documento de una etapa anterior (estética chibi, Guardián, glifos de jefes…). La guía vigente es `CLAUDE.md` en la raíz del repo; si algo choca, manda ella.
+
 # Guía de agentes: Cripta del Tusi — Blender + Three.js
 
 Lee `docs/production/PRODUCTION_BIBLE.md`, `docs/art/STYLE_GUIDE.md`, la ficha de la familia, el roster, `docs/REFERENCE_POLICY.md`, `docs/VISUAL_QA.md` y `docs/QUALITY_GATE.md` antes de modelar. Las imágenes autorizadas del proyecto tienen que existir en `docs/production/references/`; si no están disponibles, decláralo. No uses la lámina realista anterior de peregrino/abadía ni inventes un canon.

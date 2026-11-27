@@ -1,3 +1,5 @@
+> ⚠️ Documento de una etapa anterior (estética chibi, Guardián, glifos de jefes…). La guía vigente es `CLAUDE.md` en la raíz del repo; si algo choca, manda ella.
+
 # Especificación visual de los cinco arquetipos
 
 Los cinco pertenecen a la misma escala y rig base, con proporción chibi estilizada de 2.5–3 cabezas. No los hagas bebés ni muñecos sin anatomía: silueta compacta, cara expresiva, manos/armas algo exageradas, volúmenes simples con bordes suaves y un rasgo distintivo legible desde cenital. Las fichas no reemplazan las imágenes de referencia; si no se copian al repo, registrar que faltan.

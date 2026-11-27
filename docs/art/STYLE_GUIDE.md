@@ -1,3 +1,5 @@
+> ⚠️ Documento de una etapa anterior (estética chibi, Guardián, glifos de jefes…). La guía vigente es `CLAUDE.md` en la raíz del repo; si algo choca, manda ella.
+
 # Dirección artística — Cripta del Tusi
 
 ## Canon visual aprobado

@@ -1,5 +1,7 @@
 # Cripta del tusi
 
+> Para desarrollar (personas o IA): lee primero `CLAUDE.md`, la guía vigente del proyecto. Partes de este README describen versiones antiguas (6 pisos, Guardián, glifos de jefes).
+
 Dungeon crawler táctico para navegador. Juega en solitario o en una sala de hasta cuatro personas. Elige Guardián, Arquero, Clérigo, Mago o Acechante y supera seis pisos. Los tableros combinan cinco diseños, reflejos, obstáculos adicionales y posiciones enemigas variables. Crecen con el grupo. A partir del segundo piso, la planta puede tener forma de L, T, C o cruz y cambia de dimensiones respecto al anterior.
 
 El tablero isométrico usa Three.js r180, incluido con su licencia MIT. Sin hechizo seleccionado, pulsa una casilla azul para moverte; con las teclas 1 a 4 eliges hechizo y con Esc o clic derecho lo sueltas. Desde la barra superior puedes alternar con la vista cenital. Si el navegador no dispone de WebGL, el juego usa la vista cenital automáticamente.

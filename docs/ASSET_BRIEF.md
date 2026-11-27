@@ -1,3 +1,5 @@
+> ⚠️ Documento de una etapa anterior (estética chibi, Guardián, glifos de jefes…). La guía vigente es `CLAUDE.md` en la raíz del repo; si algo choca, manda ella.
+
 # Brief de asset — Cripta del Tusi
 
 Duplica para `docs/briefs/<id>.md`. Usa el roster del proyecto y pega literalmente la descripción/correcciones del usuario. Hereda la guía de estilo chibi, perfil balanced y las dos cámaras top-down/isométrica. No heredes dimensiones humanas o métricas que aún no se hayan medido en el código.

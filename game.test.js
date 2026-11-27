@@ -82,7 +82,7 @@ test('la vulnerabilidad se aplica a otro atacante y el clérigo cura a un aliado
   act(s,'p1',{type:'skill',skill:1,pos:30},rng);
   assert.equal(archer.hp,23);
 });
-test('el jefe anuncia un glifo amplio y, al activarla en su turno, las cadenas dañan y restan PM',()=>{
+test('los jefes no usan glifos',()=>{
   const s=battle('tirador');
   s.route=makeRoute(rng,1);
   s.floor=7;
@@ -90,27 +90,10 @@ test('el jefe anuncia un glifo amplio y, al activarla en su turno, las cadenas d
   s.picks=['p0'];
   act(s,'p0',{type:'next'},rng);
   enterCombat(s);
-  assert.equal(s.units.find(u=>u.boss).look,'umbralking');
-  const boss=s.units[s.turn];
-  assert.equal(boss.boss,true);
-  timeout(s);
-  assert.equal(s.glyphs.length,1);
-  const glyph=s.glyphs[0];
-  assert.equal(glyph.kind,'slow');
-  assert.ok(glyph.warn);
-  const center=glyph.cells[0];
-  // Rombo de radio 2 recortado por muros y líquidos.
-  assert.ok(glyph.cells.length>5);
-  assert.ok(glyph.cells.every(pos=>distance(s,center,pos)<=2&&!s.walls.includes(pos)));
-  const hero=s.units.find(u=>u.id==='p0');
-  hero.pos=center;
-  const before=hero.hp;
-  for(let i=0;i<16&&s.glyphs.some(g=>g.warn);i++)timeout(s);
-  assert.ok(hero.hp<before);
-  while(s.units[s.turn]===boss&&s.enemyPlan)timeout(s);
-  assert.equal(s.glyphs.every(g=>!g.warn),true);
-  assert.equal(s.units[s.turn],hero);
-  assert.equal(s.mp,1);
+  const boss=s.units.find(u=>u.boss);
+  assert.equal(boss.look,'umbralking');
+  for(let i=0;i<20&&s.units[s.turn].enemy;i++)timeout(s);
+  assert.equal(s.glyphs.length,0);
 });
 test('genera botín con afijos y permite equipar y engarzar runas permanentes',()=>{
   const s=battle('tirador');

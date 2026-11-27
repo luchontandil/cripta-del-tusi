@@ -673,12 +673,12 @@ const fauna=[
 /** Jefes: dos por acto (a mitad y al final), con sus poderes. */
 export const bosses={
   cerberus:{name:'Cancerbero',act:2,range:1,initiative:18,hp:1.05,powers:'Embestida sobre el héroe más lejano y aullido que resta PM a todo el grupo.'},
-  oracle:{name:'Oráculo de Ceniza',act:3,range:4,initiative:16,hp:1,glyphs:['damage','poison'],element:'fire',powers:'Glifos de brasas y veneno, y mirada ardiente a distancia.'},
+  oracle:{name:'Oráculo de Ceniza',act:3,range:4,initiative:16,hp:1,element:'fire',powers:'Mirada ardiente a distancia.'},
   skeletonking:{name:'Rey Osario',act:1,range:1,initiative:12,hp:1.1,powers:'Invoca esqueletos y se protege con un escudo de huesos mientras viven.'},
-  umbralking:{name:'Rey del Umbral',act:1,range:4,initiative:16,hp:1,glyphs:['slow','poison'],element:'magic',powers:'Glifos de cadenas y veneno; cadena que arrastra a un héroe hacia él.'},
-  sporemother:{name:'Madre Espora',act:2,range:3,initiative:14,hp:1.1,glyphs:['poison','slow'],powers:'Glifos de esporas y lianas; hace brotar plantas escupidoras a su alrededor.'},
-  firedemon:{name:'Demonio de Fuego',act:3,range:2,initiative:15,hp:1.1,glyphs:['damage'],element:'fire',powers:'Nova de fuego a su alrededor y suelo en llamas.'},
-  vampqueen:{name:'Reina Vampira',act:3,range:3,initiative:17,hp:1.05,glyphs:['poison','damage'],element:'chaos',powers:'Roba vida con cada golpe e invoca murciélagos.'}
+  umbralking:{name:'Rey del Umbral',act:1,range:4,initiative:16,hp:1,element:'magic',powers:'Cadena que arrastra a un héroe hacia él.'},
+  sporemother:{name:'Madre Espora',act:2,range:3,initiative:14,hp:1.1,powers:'Hace brotar plantas escupidoras a su alrededor.'},
+  firedemon:{name:'Demonio de Fuego',act:3,range:2,initiative:15,hp:1.1,element:'fire',powers:'Nova de fuego a su alrededor.'},
+  vampqueen:{name:'Reina Vampira',act:3,range:3,initiative:17,hp:1.05,element:'chaos',powers:'Roba vida con cada golpe e invoca murciélagos.'}
 };
 /** Jefes de cada acto: [opciones a mitad, opciones al final]. */
 const actBosses=[[['skeletonking'],['umbralking']],[['cerberus'],['sporemother']],[['oracle','vampqueen'],['firedemon']]];
@@ -2175,7 +2175,7 @@ export function tick(s,rng=Math.random) {
     const heroes=s.units.filter(u=>!u.enemy&&alive(u));
     if(!s.enemyPlan){
       if(unit.boss){
-        if(bosses[unit.look]?.glyphs)castGlyph(s,unit,heroes);
+        // Los jefes ya no usan glifos (castGlyph queda sin uso por si se recupera).
         const consumed=bossPower(s,unit,heroes,rng);
         unit.cycle=(unit.cycle||0)+1;
         if(consumed||!heroes.some(alive)){advance(s,rng);return true;}

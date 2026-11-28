@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=163';
-import {playerColors} from './engine.js?v=163';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=164';
+import {playerColors} from './engine.js?v=164';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -276,7 +276,7 @@ export function createIso(mount,onCell){
       pixelMaterial.uniforms.resolution.value.set(pixels.width,pixels.height);
     }
     // Con poco zoom la cámara vuelve al centro; con más zoom puede desplazarse hasta los bordes del tablero.
-    const room=Math.max(0,(magnification-.95)/(1.45-.95));
+    const room=clamp((magnification-.95)/.5,0,1);
     pan.x=clamp(pan.x,-state.width/2*room,state.width/2*room);
     pan.z=clamp(pan.z,-state.height/2*room,state.height/2*room);
     camera.position.set(17+pan.x,17.5,18+pan.z);
@@ -1676,7 +1676,10 @@ export function createIso(mount,onCell){
   function zoom(delta,event=null){
     if(!state)return;
     const before=groundAt(event);
-    magnification=clamp(magnification+delta,.85,1.45);
+    // Paso proporcional (cada rueda acerca un % del zoom actual). El tope de acercamiento crece con el tamaño
+    // del mapa: en un mapa grande se puede llegar a ver unas 5 casillas de ancho.
+    const most=Math.max(2.6,Math.max(state.width,state.height)/5);
+    magnification=clamp(magnification*(1+delta*1.4),.6,most);
     fit();
     const after=groundAt(event);
     if(before&&after){pan.x+=before.x-after.x;pan.z+=before.z-after.z;fit();}

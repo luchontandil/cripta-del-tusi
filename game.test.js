@@ -152,17 +152,17 @@ test('genera botín con afijos y permite equipar y engarzar runas permanentes',(
 test('la vista previa aplica el crítico ×1,5 y la armadura frena las habilidades físicas',()=>{
   const s=battle('tirador');
   const hero=s.units[0], foe=s.units[1];
-  // +20 % de daño físico contra un 30 % de armadura: (base × 1,2) × 0,7.
+  // +20 % de daño físico contra 4 de armadura: base × 1,2 − 2 (mínimo 1).
   hero.stats.physical=20;
-  foe.stats.ward=30;foe.resist={};
+  foe.stats.ward=4;foe.resist={};
   const plain=classes.tirador.skills.find(k=>k[0]==='Flecha Repelente');
   const [,,,lo,hi]=plain;
-  const net=(b,crit=1)=>Math.round(Math.floor(b*1.2)*crit*.7);
+  const net=(b,crit=1)=>Math.max(1,Math.round(Math.floor(b*1.2)*crit)-2);
   assert.deepEqual(damagePreview(hero,foe,plain),{element:'physical',normal:[net(lo),net(hi)],critical:[net(lo,1.5),net(hi,1.5)],chance:.12});
   // Detonadora es física de fuego: suma físico + fuego, y la armadura la frena.
   hero.stats.fire=50;
   const embers=classes.tirador.skills.find(k=>k[0]==='Detonadora');
-  const hot=b=>Math.round(Math.floor(b*1.7)*.7);
+  const hot=b=>Math.max(1,Math.round(Math.floor(b*1.7))-2);
   assert.deepEqual(damagePreview(hero,foe,embers).normal,[hot(embers[3]),hot(embers[4])]);
 });
 test('la IA avanza hacia el rival aunque un aliado cierre el único paso',()=>{
@@ -514,6 +514,23 @@ test('los objetos siguen las reglas de rareza, afijos/sufijos y tiers por nivel'
   assert.ok(late.filter(i=>i.grade>=2).length>early.filter(i=>i.grade>=2).length);
 });
 
+test('armadura en puntos (pares), tope de resistencias y sin gemas al principio',()=>{
+  const s=battle('mago');
+  const hero=s.units.find(u=>!u.enemy),foe=s.units.find(u=>u.enemy);
+  const fireball=classes.mago.skills.find(k=>k[0]==='Bola de fuego');
+  foe.stats.ward=0;foe.resist={fire:0};
+  const base=damagePreview(hero,foe,fireball).normal;
+  foe.resist={fire:90};
+  assert.deepEqual(damagePreview(hero,foe,fireball).normal,base.map(v=>Math.max(1,Math.round(v*.5))),'resistencia con tope del 50 %');
+  foe.resist={fire:0};foe.stats.ward=10;
+  assert.deepEqual(damagePreview(hero,foe,fireball).normal,base,'la armadura no frena el fuego');
+  for(let i=0;i<300;i++){
+    const item=rollItem(s,Math.random,{gear:true,ilvl:20});
+    for(const m of item.affixes)if(m.stat==='ward')assert.equal(m.value%2,0,'armadura par');
+  }
+  s.floor=1;
+  for(let i=0;i<200;i++)assert.notEqual(rollItem(s,Math.random).kind,'rune','sin gemas en el piso 1');
+});
 test('los enemigos se adaptan al poder real del grupo',()=>{
   const hero=(extra={})=>({classId:'guardia',level:3,skillRanks:[3,1,1,1],max:classes.guardia.hp+8+(extra.vitality||0),
     stats:{physical:1,fire:1,ice:1,magic:1,lightning:1,chaos:1,ward:0,critical:0,action:0,...extra}});
@@ -928,11 +945,11 @@ test('daño: físicas suman físico + su elemento; hechizos suman mágico + su e
   assert.equal(damagePercent(mage,skill('mago','Escarcha')),5+11);
   assert.equal(damagePercent(mage,skill('mago','Misil mágico')),5+3,'el Misil escala con mágico y físico');
   assert.equal(skillSchool(archer,skill('tirador','Detonadora')),'physical');
-  // La armadura (en %) solo frena lo físico.
-  const target={stats:{ward:40},effects:{}};
+  // La armadura (en puntos: −1 por cada 2) solo frena lo físico.
+  const target={stats:{ward:4},effects:{}};
   const phys=damagePreview(archer,target,skill('tirador','Detonadora')).normal[0];
   const magic=damagePreview(mage,target,skill('mago','Bola de fuego')).normal[0];
-  assert.equal(phys,Math.round(Math.floor(skill('tirador','Detonadora')[3]*1.10)*.6));
+  assert.equal(phys,Math.max(1,Math.floor(skill('tirador','Detonadora')[3]*1.10)-2));
   assert.equal(magic,Math.floor(skill('mago','Bola de fuego')[3]*1.12));
 });
 

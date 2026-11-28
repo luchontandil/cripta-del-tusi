@@ -46,7 +46,7 @@ export const classes = {
     ['Restaurar',2,5,6,10,'heal','✚',0,{max:{range:1}}],
     ['Sello de fragilidad',1,4,1,3,'expose','✷',0,{element:'magic',value:3,max:{value:2}}],
     ['Purificar',2,3,3,6,'cleanse','❖',0,{max:{range:2}}],
-    ['Escudo sagrado',2,4,0,0,'shield','⛨',0,{value:25,max:{value:10}}],
+    ['Escudo sagrado',2,4,0,0,'shield','⛨',0,{value:4,max:{value:2}}],
     ['Celeridad divina',2,4,0,0,'haste','➝',0,{value:2,max:{range:2}}],
     ['Juicio',3,5,5,8,'blast','✹',2,{element:'fire',area:'cross',max:{crit:15}}],
     ['Alba radiante',3,4,8,12,'heal','✚',0,{area:'cross',max:{cost:-1}}]
@@ -202,8 +202,8 @@ export function equipTarget(p,item,wanted){
 export const statNames = {...Object.fromEntries(Object.entries(elements).map(([key,name])=>[key,'Daño '+name.toLowerCase()])),
   vitality:'Vida',reach:'Alcance (habilidades modificables)',ward:'Armadura',critical:'Crítico',movement:'PM',action:'PA',
   leech:'Vampirismo',damage:'Daño (todos los tipos)'};
-/** Estadísticas que se expresan en %: el daño por tipo, la armadura, el crítico y el vampirismo. */
-export const percentStats=new Set([...Object.keys(elements),'ward','critical','leech']);
+/** Estadísticas que se expresan en %: el daño por tipo, el crítico y el vampirismo (la armadura va en puntos). */
+export const percentStats=new Set([...Object.keys(elements),'critical','leech']);
 export const rarities = ['Normal','Poco común','Raro','Legendario'];
 const bases = {
   weapon:['Arco de tejo','Sable de cobre','Cetro de ónice','Lanza de vigía'],
@@ -229,13 +229,14 @@ export const affixes={
     magic:[[1,4,6,'Brillante'],[2,6,9,'Estelar'],[3,9,13,'Astral'],[5,13,17,'Celestial'],[7,17,22,'Sideral'],[11,22,28,'Cósmico'],[16,28,35,'Divino'],[21,35,44,'Infinito']],
     lightning:[[1,4,6,'Chispeante'],[2,6,9,'Eléctrico'],[3,9,13,'Crepitante'],[5,13,17,'Tormentoso'],[7,17,22,'Fulminante'],[11,22,28,'Tronante'],[16,28,35,'Huracanado'],[21,35,44,'del Trueno Eterno']],
     chaos:[[1,4,6,'Lúgubre'],[2,6,9,'Sepulcral'],[3,9,13,'Umbral'],[5,13,17,'Abisal'],[7,17,22,'Espectral'],[11,22,28,'Abismal'],[16,28,35,'Insondable'],[21,35,44,'Primigenio']],
-    ward:[[1,3,5,'Firme'],[3,5,8,'Resistente'],[5,8,11,'Inquebrantable'],[7,11,14,'Impenetrable'],[13,14,18,'Colosal'],[19,18,23,'Inmortal']],
+    // Armadura en puntos (siempre pares): cada 2 puntos, −1 de daño físico por golpe.
+    ward:[[1,2,2,'Firme'],[3,2,4,'Resistente'],[5,4,4,'Inquebrantable'],[7,4,6,'Impenetrable'],[13,6,6,'Colosal'],[19,6,8,'Inmortal']],
     // Daño plano pequeño (se suma a la base de cualquier habilidad). Raro: solo anillos y amuletos.
     damage:[[1,1,1,'Afilado'],[9,2,2,'Templado'],[17,3,3,'Magistral']]
   },
   suffix:{
     vitality:[[1,3,5,'del Zorro'],[2,5,8,'del Oso'],[3,8,12,'de la Ballena'],[5,12,16,'del Coloso'],[7,16,22,'del Titán'],[11,22,30,'del Leviatán'],[16,30,40,'del Behemot'],[21,40,52,'de los Dioses']],
-    critical:[[1,3,5,'del Halcón'],[2,5,8,'del Cazador'],[4,8,11,'del Asesino'],[6,11,15,'del Verdugo'],[11,15,19,'de la Carnicería'],[17,19,24,'del Apocalipsis']],
+    critical:[[1,1,2,'del Halcón'],[2,2,3,'del Cazador'],[4,3,4,'del Asesino'],[6,4,5,'del Verdugo'],[11,5,6,'de la Carnicería'],[17,6,8,'del Apocalipsis']],
     reach:[[3,1,1,'del Vigía'],[9,2,2,'del Horizonte']],
     movement:[[1,1,1,'de la Liebre'],[7,2,2,'del Viento']],
     action:[[3,1,1,'del Erudito']],
@@ -281,8 +282,8 @@ export const gems={
   amethyst:{name:'Amatista',female:true,stat:'magic',values:[4,8,12,16,22],colors:['#8a4fd8','#dcb8ff','#43206e']},
   emerald:{name:'Esmeralda',female:true,stat:'chaos',values:[4,8,12,16,22],colors:['#1f9d55','#8ff0b4','#0c4d28']},
   onyx:{name:'Ónice',female:false,stat:'physical',values:[4,8,12,16,22],colors:['#4a4a55','#b7b7c4','#16161c']},
-  diamond:{name:'Diamante',female:false,stat:'ward',values:[3,6,9,12,16],colors:['#cfe6ef','#ffffff','#7b98a6']},
-  tigereye:{name:'Ojo de tigre',female:false,stat:'critical',values:[2,4,6,8,10],colors:['#b9782a','#ffd28a','#5a3510']}
+  diamond:{name:'Diamante',female:false,stat:'ward',values:[2,4,6,8,10],colors:['#cfe6ef','#ffffff','#7b98a6']},
+  tigereye:{name:'Ojo de tigre',female:false,stat:'critical',values:[1,2,3,4,5],colors:['#b9782a','#ffd28a','#5a3510']}
 };
 /** Calidad de gema (0–4) para un nivel de objeto. */
 export const gemQuality=ilvl=>gemQualities.reduce((q,info,i)=>ilvl>=info.ilvl?i:q,0);
@@ -293,6 +294,8 @@ export function makeGem(id,type,quality){
 }
 const pick = (values,rng) => values[Math.floor(rng()*values.length)];
 const roll = (low,high,rng) => low+Math.floor(rng()*(high-low+1));
+/** Valor de un modificador: la armadura sale siempre par. */
+const rollStat=(stat,low,high,rng)=>stat==='ward'?low+2*Math.floor(rng()*(Math.floor((high-low)/2)+1)):roll(low,high,rng);
 const randomSeed = rng => (rng()*4294967296)>>>0;
 /** Generador del mapa (mulberry32): semillas cercanas dan salas muy distintas. */
 function floorRandom(seed) {
@@ -369,7 +372,7 @@ function rollMod(type,slot,base,level,taken,rng,grade=0){
   const reach=tierLevel(grade,level,rng);
   const tierIndex=rollTier(affixes[type][stat],reach,rng);
   const [,low,high,label]=affixes[type][stat][tierIndex];
-  return {type,stat,tier:tierIndex+1,tiers:affixes[type][stat].length,value:roll(low,high,rng),label,...(affixes[type][stat][tierIndex][0]>level?{ascended:true}:{})};
+  return {type,stat,tier:tierIndex+1,tiers:affixes[type][stat].length,value:rollStat(stat,low,high,rng),label,...(affixes[type][stat][tierIndex][0]>level?{ascended:true}:{})};
 }
 /** Recalcula stats, nombre y precio de un objeto a partir de sus modificadores. */
 function refreshItem(item,rng,wasGrade=item.grade){
@@ -388,7 +391,8 @@ function refreshItem(item,rng,wasGrade=item.grade){
 export function rollItem(s,rng,{bonus=0,gear=false,ilvl,minGrade=0}={}) {
   const itemId = ++s.itemId;
   const level=ilvl??itemLevel(s);
-  if (!gear&&!minGrade&&rng()<.22) {
+  // Gemas: no en los 2 primeros pisos (aún no hay equipo con engarces donde ponerlas).
+  if (!gear&&!minGrade&&(s.floor||1)>2&&rng()<.22) {
     // A veces sale una calidad por debajo de la que toca por nivel.
     const quality=Math.max(0,gemQuality(level)-(rng()<.3?1:0));
     return makeGem(itemId,pick(Object.keys(gems),rng),quality);
@@ -407,7 +411,7 @@ export function rollItem(s,rng,{bonus=0,gear=false,ilvl,minGrade=0}={}) {
       pool[type].splice(pool[type].indexOf(stat),1);
       const tierIndex=rollTier(affixes[type][stat],tierLevel(grade,level,rng),rng);
       const [,low,high,label]=affixes[type][stat][tierIndex];
-      mods.push({type,stat,tier:tierIndex+1,tiers:affixes[type][stat].length,value:roll(low,high,rng),label,...(affixes[type][stat][tierIndex][0]>level?{ascended:true}:{})});
+      mods.push({type,stat,tier:tierIndex+1,tiers:affixes[type][stat].length,value:rollStat(stat,low,high,rng),label,...(affixes[type][stat][tierIndex][0]>level?{ascended:true}:{})});
     }
   }
   const stats={};
@@ -474,7 +478,7 @@ function forgeItem(item,mode,rng){
     const mod=pick(polishable(item),rng);
     const tiers=affixes[mod.type][mod.stat];
     const [need,low,high,label]=tiers[mod.tier];
-    mod.tier++;mod.value=roll(low,high,rng);mod.label=label;
+    mod.tier++;mod.value=rollStat(mod.stat,low,high,rng);mod.label=label;
     if(need>level)mod.ascended=true;
   }
   else if(mode==='reroll'){reroll('prefix');reroll('suffix');}
@@ -518,7 +522,7 @@ export function heroStats(p,level=p.level||1){
   // Bendiciones (o maldiciones) permanentes de los eventos.
   const b=p.boons||{};
   for(const key of damageKeys)stats[key]+=5*(b.power||0);   // cada punto de «poder»: +5 % de daño
-  stats.vitality+=b.vitality||0;stats.critical+=b.critical||0;stats.ward+=4*(b.ward||0);
+  stats.vitality+=b.vitality||0;stats.critical+=b.critical||0;stats.ward+=2*(b.ward||0);
   const max=Math.max(1,Math.round((classes[p.classId].hp+stats.vitality+(level-1)*4)*(1+(pe.maxHpPct||0)/100)));
   return {stats,max,initiative:classes[p.classId].initiative};
 }
@@ -574,7 +578,7 @@ export const passiveCards={
   guardia:[{id:'guardia.baluarte',name:'Baluarte',text:'+15 % de vida máxima, pero −1 PM.',price:500,effects:{maxHpPct:15,movement:-1}}],
   tirador:[{id:'tirador.ojo-de-halcon',name:'Ojo de halcón',text:'+1 de alcance en las habilidades de alcance modificable, pero −15 % de vida máxima.',price:500,effects:{reach:1,maxHpPct:-15}}],
   mistico:[{id:'mistico.fe-ardiente',name:'Fe ardiente',text:'Tus curas curan un 25 % más, pero haces un 10 % menos de daño.',price:500,effects:{healPct:25,dealtAll:-10}}],
-  sombra:[{id:'sombra.sombra-letal',name:'Sombra letal',text:'+12 % de crítico, pero −15 % de armadura.',price:500,effects:{critical:12,ward:-15}}]
+  sombra:[{id:'sombra.sombra-letal',name:'Sombra letal',text:'+12 % de crítico, pero −4 de armadura.',price:500,effects:{critical:12,ward:-4}}]
 };
 /** Catálogo completo de cartas. */
 export const cards=Object.fromEntries(Object.entries(classes).flatMap(([classId,cls])=>[
@@ -687,16 +691,16 @@ export const monsterTraits={
   bat:{movement:1,initiative:9,hamstring:true,resist:{lightning:-30,physical:-15}},
   // Calavera: quita PA solo con su Maldición (cada 3 turnos), no con cada golpe; alcance algo menor.
   skull:{element:'magic',range:5,resist:{chaos:60,magic:30,physical:20}},
-  skeleton:{ward:15,initiative:7,resist:{chaos:50,ice:30,fire:-25}},
+  skeleton:{ward:4,initiative:7,resist:{chaos:50,ice:30,fire:-25}},
   succubus:{element:'chaos',charm:true,range:5,initiative:12,resist:{chaos:40,magic:25,ice:-25}},
   vampire:{lifesteal:.5,element:'chaos',initiative:10,drain:true,resist:{chaos:50,fire:-30}},
   imp:{element:'fire',range:6,initiative:13,resist:{fire:75,ice:-30}},
-  worm:{ward:15,resist:{physical:15,ice:-25}},
-  slimeking:{ward:10,resist:{physical:30,lightning:-30}},
+  worm:{ward:4,resist:{physical:15,ice:-25}},
+  slimeking:{ward:2,resist:{physical:30,lightning:-30}},
   slime:{resist:{physical:25,fire:-25}},
-  slug:{ward:10,slime:true,initiative:5,resist:{chaos:30,ice:-30}},
+  slug:{ward:2,slime:true,initiative:5,resist:{chaos:30,ice:-30}},
   plant:{range:4,movement:-2,poison:true,initiative:8,resist:{chaos:50,fire:-50}},
-  lavaslime:{element:'fire',ward:10,initiative:7,resist:{fire:80,ice:-50}}
+  lavaslime:{element:'fire',ward:2,initiative:7,resist:{fire:80,ice:-50}}
 };
 /** Resistencias de los jefes. */
 export const bossResist={skeletonking:{chaos:50,fire:-20},umbralking:{magic:30,lightning:-20},cerberus:{fire:30,ice:-20},
@@ -706,7 +710,7 @@ export const bossResist={skeletonking:{chaos:50,fire:-20},umbralking:{magic:30,l
  * Suman armadura, velocidad, daño, resistencias o efectos al golpear (−PA, −PM, robo de vida).
  */
 export const monsterVariants={
-  acorazado:{name:'acorazado',text:'+20 % de armadura',apply:u=>{u.stats.ward+=20;}},
+  acorazado:{name:'acorazado',text:'+4 de armadura',apply:u=>{u.stats.ward+=4;}},
   veloz:{name:'veloz',text:'+1 PM y más iniciativa',apply:u=>{u.stats.movement+=1;u.initiative+=4;}},
   furioso:{name:'furioso',text:'+25 % de daño',apply:u=>{u.damage=Math.ceil(u.damage*1.25);}},
   ignifugo:{name:'ignífugo',text:'Resiste el fuego (+50 %)',apply:u=>{u.resist.fire=(u.resist.fire||0)+50;}},
@@ -758,7 +762,8 @@ function monster(species,id,floor,{ranged=false,elite=false,solo=false}={}){
   return {id,name:monsterNames[species],look:species,boss:false,elite,enemy:true,resist:{...(trait.resist||{})},
     initiative:trait.initiative||(ranged?11:6),range:trait.range||(ranged?6:1),hp,
     damage:Math.max(1,Math.round((ranged?2+floor:3+floor)*(solo?.85:1))),
-    stats:{ward:(trait.ward||0)+(elite?15:0),movement:trait.movement||0},effects:{}};
+    // Armadura en puntos: la de su especie, +2 si es élite y +2 cada 6 pisos.
+    stats:{ward:(trait.ward||0)+(elite?2:0)+2*Math.floor((floor-1)/6),movement:trait.movement||0},effects:{}};
 }
 export function encounter(floor,size,options={}) {
   if(typeof options==='boolean')options={elite:options};
@@ -773,7 +778,7 @@ export function encounter(floor,size,options={}) {
       const info=bosses[boss];
       lineup.push({id:'enemy0',name:info.name,look:boss,boss:true,elite:false,enemy:true,initiative:info.initiative,range:info.range,
         hp:Math.round((48+floor*6+8*(size-1))*info.hp*(solo?.9:1)),damage:4+floor,element:info.element,
-        stats:{ward:20,movement:0},effects:{},cycle:0,resist:{...(bossResist[boss]||{})}});
+        stats:{ward:4,movement:0},effects:{},cycle:0,resist:{...(bossResist[boss]||{})}});
       continue;
     }
     const ranged=i%2===1&&floor>1;
@@ -784,7 +789,7 @@ export function encounter(floor,size,options={}) {
   }
   if(!elite)return lineup;
   // Combate de élite: enemigos reforzados; en grupo, además, un refuerzo extra.
-  for(const u of lineup){u.hp=Math.round(u.hp*(solo?1.1:1.2));u.damage+=1;u.stats.ward+=8;}
+  for(const u of lineup){u.hp=Math.round(u.hp*(solo?1.1:1.2));u.damage+=1;u.stats.ward+=2;}
   if(!solo){
     const extra=monster(life.extra,'enemy'+count,floor,{elite:true});
     extra.hp=Math.round(extra.hp*1.3);extra.elite=true;
@@ -1100,13 +1105,13 @@ export function heroOffense(hero){
   });
   return best*(1+critChance(hero)*.5);
 }
-/** Vida efectiva: la armadura reduce cada golpe físico. */
-export const heroDefense=hero=>hero.max/(1-Math.min(ARMOR_CAP,hero.stats?.ward||0)/100*.6);
+/** Vida efectiva: la armadura quita 1 por cada 2 puntos a cada golpe físico (contra golpes de ~10). */
+export const heroDefense=hero=>hero.max/(1-Math.min(.6,(hero.stats?.ward||0)/2/10));
 /** Héroe "esperado" en un piso: nivel, una mejora de habilidad por piso y equipo medio. */
 function expectedHero(classId,floor){
   const ranks=skillRanks(classId);
   for(let i=1;i<floor;i++){const k=ranks.findIndex(r=>r<3);if(k>=0)ranks[k]++;}
-  const stats={action:0,ward:Math.floor((floor-1)/3)*4,critical:(floor-1)*1.5};
+  const stats={action:0,ward:Math.floor((floor-1)/3)*2,critical:(floor-1)*.6};
   // Equipo medio: +5 % de daño por piso, además del +8 % por nivel.
   for(const key of damageKeys)stats[key]=LEVEL_DAMAGE*(floor-1)+5*(floor-1);
   const max=classes[classId].hp+(floor-1)*4+(floor-1)*3;
@@ -1225,7 +1230,7 @@ function labLineup(s){
       const key=entry.kind.slice(5),info=bosses[key];
       if(!info)fail('Jefe desconocido.');
       return {id,name:info.name,look:key,boss:true,elite:false,enemy:true,initiative:info.initiative,range:info.range,
-        hp:Math.round((48+s.floor*6)*info.hp),damage:4+s.floor,element:info.element,stats:{ward:20,movement:0},effects:{},cycle:0,resist:{...(bossResist[key]||{})}};
+        hp:Math.round((48+s.floor*6)*info.hp),damage:4+s.floor,element:info.element,stats:{ward:4,movement:0},effects:{},cycle:0,resist:{...(bossResist[key]||{})}};
     }
     if(!monsterNames[entry.kind])fail('Monstruo desconocido.');
     const ranged=fauna.some(f=>f.ranged.includes(entry.kind));
@@ -1421,20 +1426,22 @@ export function paths(s,unit,limit) {
   return new Map([...best].map(([pos,{path}])=>[pos,path]));
 }
 export const reachable=(s,unit,limit)=>new Map([...paths(s,unit,limit)].map(([pos,path])=>[pos,path.length]));
-export const ARMOR_CAP=75;
-/** Reducción por armadura (en %) contra un tipo de daño: entera contra el físico; el escudo protege la mitad contra el resto. */
-export function armorPercent(target,element){
-  const shield=target.effects?.shield?.value||0;
-  const armor=element==='physical'?(target.stats?.ward||0)+shield:Math.floor(shield/2);
-  return Math.max(0,Math.min(ARMOR_CAP,armor));
-}
+/** Tope de las resistencias elementales (enemigos y, más adelante, héroes). Las debilidades no tienen tope. */
+export const RESIST_CAP=50;
+/**
+ * Armadura (estilo Terraria): puntos de armadura + escudo. Cada 2 puntos quitan 1 de daño a cada golpe FÍSICO;
+ * el daño elemental solo lo frenan las resistencias.
+ */
+export const armorPoints=target=>Math.max(0,(target.stats?.ward||0)+(target.effects?.shield?.value||0));
+export const armorReduction=(target,element)=>element==='physical'?Math.floor(armorPoints(target)/2):0;
 function netDamage(target,raw,element,critical,extra=0){
   // Resistencia (o debilidad, si es negativa) al tipo de daño y armadura: ambas en %.
   // Dardo pestilente: −N a todas las resistencias mientras dure.
-  const resist=Math.max(-100,Math.min(90,(target.resist?.[element]||0)-(target.effects?.corrode?.value||0)));
+  const resist=Math.max(-100,Math.min(RESIST_CAP,(target.resist?.[element]||0)-(target.effects?.corrode?.value||0)));
   const taken=element==='physical'?passiveEffects(target).takenPhysical||0:0;
-  const total=(raw+extra)*(critical?1.5:1)*(1-resist/100)*(1-armorPercent(target,element)/100)*(1+taken/100);
-  return Math.max(raw+extra>0?1:0,Math.round(total));
+  const total=(raw+extra)*(critical?1.5:1)*(1-resist/100)*(1+taken/100);
+  // La armadura resta al final, después de multiplicadores; siempre entra al menos 1.
+  return Math.max(raw+extra>0?1:0,Math.round(total)-armorReduction(target,element));
 }
 export const critChance=unit=>Math.min(1,.12+(unit.stats?.critical||0)/100);
 export function damagePreview(unit,target,skill,scale=1){
@@ -1704,7 +1711,8 @@ function finish(s,rng) {
       p.xp=100;
       p.trainOffer=rollTrainingOffer(p,rng,bossFight);
       p.trained=p.trainOffer.length===0;
-      p.gold+=Math.round((10+s.floor*4)*(elite?1.5:1));
+      // Al principio, al menos 25 de tusi por combate (la tienda y la forja pueden salir en el piso 2 o 3).
+      p.gold+=Math.round(Math.max(25,10+s.floor*4)*(elite?1.5:1));
       const ilvl=itemLevel(s,(elite?1:0)+(bossFight?2:0));
       const luck=elite?.35:0;
       s.offers[p.id]=Array.from({length:3},(_,i)=>rollItem(s,rng,{ilvl,bonus:luck,gear:elite&&i===0}));
@@ -1793,10 +1801,10 @@ function castGlyph(s,boss,heroes) {
 const reachOf=unit=>Math.max(1,(unit.look==='slug'&&skillReady(unit)?3:unit.range)-(unit.effects?.blind?.value||0));
 /** Qué tan apetecible es un héroe: remata a quien pueda matar, va a por sanadores y frágiles. */
 function priority(s,unit,hero,pos){
-  const ward=hero.stats?.ward||0;
-  const lethal=hero.hp<=Math.max(1,Math.round(unit.damage*(1-(unit.range>1?0:Math.min(ARMOR_CAP,ward))/100)))?40:0;
+  const ward=armorPoints(hero);
+  const lethal=hero.hp<=Math.max(1,unit.damage-(unit.range>1?0:Math.floor(ward/2)))?40:0;
   const healer=hero.classId==='mistico'?5:0;
-  const fragile=Math.max(0,32-ward)*.15;
+  const fragile=Math.max(0,16-ward)*.3;
   return lethal+healer+fragile-hero.hp*.35-distance(s,pos,hero.pos)*.3;
 }
 function attackOptions(s,unit,heroes,pos){
@@ -2059,7 +2067,7 @@ export const events={
     {label:'Tónico amargo',detail:'+6 de vida máxima permanente para todos, pero empezáis el próximo combate con el 85 % de la vida.',apply:s=>{addBoon(s,'vitality',6);weaker(s,.85);}},
     {label:'Seguir',detail:'No ocurre nada.',apply:()=>{}}]},
   shrine:{title:'Santuario de los caídos',text:'Cientos de velas rodean las armaduras de antiguos héroes. Un silencio pesado lo cubre todo.',options:[
-    {label:'Arrodillarse',detail:'Todos pierden un 20 % de su vida actual y ganan +4 % de armadura permanente.',apply:s=>{hurtParty(s,.2);addBoon(s,'ward',1);}},
+    {label:'Arrodillarse',detail:'Todos pierden un 20 % de su vida actual y ganan +2 de armadura permanente.',apply:s=>{hurtParty(s,.2);addBoon(s,'ward',1);}},
     {label:'Tomar las ofrendas',detail:'Cada uno recibe 25 de tusi, pero los enemigos del próximo combate tendrán un 20 % más de vida.',apply:s=>{for(const p of s.players)p.gold+=25;tougher(s,1.2);}},
     {label:'Encender una vela',detail:'+1 PM en el próximo combate.',apply:s=>addMod(s,'mp',1)}]},
   dice:{title:'Los dados del esqueleto',text:'Un esqueleto con sombrero agita un cubilete. «¿Una partidita? Los vivos siempre pierden… casi siempre.»',options:[
@@ -2445,8 +2453,8 @@ function bossPower(s,boss,heroes,rng){
     const minions=s.units.filter(u=>alive(u)&&u.minion===boss.id);
     // Invoca cada 3 ciclos (antes cada 2).
     if(cycle%3===0&&minions.length<4)minions.push(...summon(s,boss,'skeleton',2));
-    boss.stats.ward=20+12*minions.length;
-    if(minions.length)note(s,'Escudo de huesos: el Rey Osario tiene un '+Math.min(ARMOR_CAP,boss.stats.ward)+' % de armadura.');
+    boss.stats.ward=4+2*minions.length;
+    if(minions.length)note(s,'Escudo de huesos: el Rey Osario tiene '+boss.stats.ward+' de armadura.');
     return false;
   }
   if(boss.look==='umbralking'&&cycle%2===1){
@@ -2688,7 +2696,7 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
   const opts=skillOptions(skill);
   const value=opts.value;
   if(supportKinds.includes(kind)){
-    if(kind==='shield'){effect(target,'shield',value||25,2);note(s,name+' → '+target.name+': +'+(value||25)+' % de armadura 2 turnos.');emit(s,{kind:'buff',tone:'shield',unit:target.id,pos:target.pos,text:'+'+(value||25)+' % armadura'});return;}
+    if(kind==='shield'){effect(target,'shield',value||4,2);note(s,name+' → '+target.name+': +'+(value||4)+' de armadura 2 turnos.');emit(s,{kind:'buff',tone:'shield',unit:target.id,pos:target.pos,text:'+'+(value||4)+' armadura'});return;}
     if(kind==='domain'){
       effect(target,'domain',value||1,opts.turns||2);
       note(s,name+': durante '+(opts.turns||2)+' turnos, tus Congelamientos y Contagios duran 1 turno más.');

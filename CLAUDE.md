@@ -71,7 +71,11 @@ Tupla: `[nombre, PA, alcance, mín, máx, tipo, símbolo, alcanceMín, {opciones
   `endsTurn`, `anyTarget`, `burnChance:0` (fuego sin quemadura). Busca ejemplos en `classes` de engine.js.
 
 ### Reglas de combate (resumen)
-- 6 PA y 3 PM base. Crítico base 12 % (×1,5). Armadura en % (tope `ARMOR_CAP`=75), resistencias por elemento.
+- 6 PA y 3 PM base. Crítico base 12 % (×1,5), tope 100 %.
+- **Armadura en puntos (estilo Terraria), siempre pares**: cada 2 puntos quitan 1 a cada golpe **físico** (mínimo 1 de
+  daño), después de los multiplicadores (`armorPoints`/`armorReduction`). El escudo suma puntos. El daño elemental solo lo
+  frenan las resistencias, con tope del 50 % (`RESIST_CAP`, enemigos y, cuando existan, héroes).
+- Tusi: cada combate da al menos 25. Sin gemas como recompensa en los pisos 1–2.
 - Daño en área: −20 % por casilla de distancia al centro (mínimo 60 %).
 - Empuje que choca: `2 × casillas que faltan + nivel/2`, sin elemento.
 - Recarga «N turnos» = no se puede usar en los N turnos siguientes.

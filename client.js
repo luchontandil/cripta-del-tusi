@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  lineOfSight,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=174';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=174';
-import {setupSfx} from './music.js?v=174';
-import {icon} from './icons.js?v=174';
-import {openMapEditor} from './mapeditor.js?v=174';
+  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=175';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=175';
+import {setupSfx} from './music.js?v=175';
+import {icon} from './icons.js?v=175';
+import {openMapEditor} from './mapeditor.js?v=175';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -26,7 +26,7 @@ const onPages=location.hostname.endsWith('.github.io');
 el('server').value=localStorage.getItem('amber-server')||(onPages?'https://cripta-del-tusi.onrender.com':location.origin);
 const error=message=>{el('error').textContent=message;};
 const iconName={feeble:'Contagio',tracked:'Rastreado',frozen:'Congelado',chill:'Hielo roto',domain:'Expansión de dominio',reach:'Ojo de águila',corrode:'Corroído',detonate:'Detonado',expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',burn:'Quemadura',weak:'Maldito',haste:'Prisa',shield:'Escudo',fury:'Furia',barrier:'Guardia',blind:'Eclipse'};
-const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',feeble:v=>'hace un '+v+' % menos de daño',tracked:()=>'el arquero no necesita verlo para dispararle',frozen:()=>'el próximo golpe de hielo hace +35 % y quita 1 PM',chill:v=>'−'+v+' PM',domain:()=>'tus Congelamientos y Contagios duran 1 turno más',reach:v=>'+'+v+' de alcance',corrode:v=>'−'+v+' % a todas las resistencias',detonate:v=>'estalla al acabar su turno ('+v+' de fuego a 2 casillas)',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo',fury:v=>'+'+v+' % de daño',barrier:v=>v+' de escudo',blind:v=>'−'+v+' de alcance'};
+const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',feeble:v=>'hace un '+v+' % menos de daño',tracked:()=>'el arquero no necesita verlo para dispararle',frozen:()=>'el próximo golpe de hielo hace +35 % y quita 1 PM',chill:v=>'−'+v+' PM',domain:()=>'tus Congelamientos y Contagios duran 1 turno más',reach:v=>'+'+v+' de alcance',corrode:v=>'−'+v+' % a todas las resistencias',detonate:v=>'estalla al acabar su turno ('+v+' de fuego a 2 casillas)',haste:v=>'+'+v+' PM',shield:v=>'+'+v+' de armadura (−'+Math.floor(v/2)+' de daño físico por golpe)',fury:v=>'+'+v+' % de daño',barrier:v=>v+' de escudo',blind:v=>'−'+v+' de alcance'};
 const specs={guardia:'Lanza, empujes y escudo · controla el frente',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
 const roles={guardia:'Valkyria',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
 // Editor de SFX desactivado por ahora; poner true para volver a mostrarlo al admin.
@@ -146,7 +146,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=174').then(({createIso})=>{
+import('./isometric.js?v=175').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -779,7 +779,7 @@ const statusLong={
   blind:'Eclipse: tiene menos alcance en su próximo turno (mínimo 1).',
   reach:'Más alcance en los hechizos de alcance modificable.',domain:'Sus Congelamientos y Contagios duran 1 turno más.',
   fury:'Hace más daño con todos sus ataques.',barrier:'Escudo de En guardia!: absorbe el daño hasta su próximo turno.',
-  shield:'Más armadura.',haste:'Tendrá más PM en su próximo turno.'};
+  shield:'Más armadura: recibe menos daño físico de cada golpe.',haste:'Tendrá más PM en su próximo turno.'};
 function statusDuration(status){
   if(status.untilTurnOf){
     const who=state?.units.find(u=>u.id===status.untilTurnOf)?.name||'quien lo aplicó';
@@ -840,21 +840,46 @@ function terrainNodes(pos){
   }
   return [];
 }
+/** Qué hace cada estadística (se ve al pasar el ratón por encima). */
+const statHelp={
+  hp:()=>'Puntos de vida. Si llegan a 0, caes.',
+  ap:()=>'Puntos de acción: se gastan al usar habilidades y se recuperan al empezar tu turno.',
+  mp:()=>'Puntos de movimiento: cada casilla que avanzas gasta 1. Se recuperan al empezar tu turno.',
+  ward:u=>'Reduce 1 de daño físico por cada 2 de armadura, en cada golpe (siempre entra al menos 1). El daño elemental no lo frena: para eso están las resistencias.'+(armorPoints(u)?' Ahora: −'+armorReduction(u,'physical')+' por golpe.':''),
+  initiative:()=>'Decide el orden de los turnos: cuanto más alta, antes actúas.',
+  critical:()=>'Probabilidad de que un golpe sea crítico y haga ×1,5 de daño. Máximo 100 %.',
+  reach:()=>'Casillas de más en las habilidades de alcance modificable.',
+  leech:()=>'Recuperas este porcentaje del daño que haces.',
+  damage:()=>'Se suma al daño de cada golpe de tus habilidades.',
+  attack:()=>'Daño de su ataque básico (antes de armadura y resistencias).',
+  range:()=>'Hasta cuántas casillas llega su ataque.',
+  element:key=>key==='physical'?'Aumenta en este porcentaje el daño de tus habilidades físicas.':'Aumenta en este porcentaje el daño de tus habilidades de '+elements[key].toLowerCase()+'.'
+};
+/** Pone la descripción a una fila de estadística: ficha al pasar el ratón (rich) o el título nativo. */
+function describeRow(row,label,text,rich){
+  if(rich){row.tabIndex=0;hoverTip(row,()=>[h('div','tip-head',h('strong',null,label)),h('p','tip-lore',text)],250);}
+  else row.title=text;
+  return row;
+}
 /** Estadísticas completas de un héroe: PV, PA, PM, armadura, iniciativa, crítico, alcance y daños. */
-function heroStatRows(u){
+function heroStatRows(u,rich=false){
   const st=u.stats||{};
+  const row=(key,iconName,label,value,tone='')=>describeRow(statRow(iconName,label,value,tone),label,statHelp[key](u),rich);
   const rows=[
-    statRow('heal','Vida',(u.hp??u.max??'—')+(u.max?' / '+u.max:'')+' PV'),
-    statRow('ap','Acción',(BASE_AP+(st.action||0))+' PA'),
-    statRow('mp','Movimiento',(BASE_MP+(st.movement||0))+' PM'),
-    Object.assign(statRow('ward','Armadura',Math.min(75,st.ward||0)+' %'),{title:'Reduce el daño físico que recibes (máximo 75 %).'}),
-    statRow('initiative','Iniciativa',u.initiative??'—'),
-    statRow('critical','Crítico',Math.round(critChance(u)*100)+' % · ×1,5'),
-    statRow('reach','Alcance extra',st.reach?'+'+st.reach:'0')
+    row('hp','heal','Vida',(u.hp??u.max??'—')+(u.max?' / '+u.max:'')+' PV'),
+    row('ap','ap','Acción',(BASE_AP+(st.action||0))+' PA'),
+    row('mp','mp','Movimiento',(BASE_MP+(st.movement||0))+' PM'),
+    row('ward','ward','Armadura',String(armorPoints(u))),
+    row('initiative','initiative','Iniciativa',u.initiative??'—'),
+    row('critical','critical','Crítico',Math.round(critChance(u)*100)+' % · ×1,5'),
+    row('reach','reach','Alcance extra',st.reach?'+'+st.reach:'0')
   ];
-  if(st.leech)rows.push(statRow('leech','Vampirismo',st.leech+' % del daño'));
-  for(const key of Object.keys(elements))if(st[key])rows.push(statRow(key,'Daño '+elements[key].toLowerCase(),'+'+st[key]+' %','element-'+key));
-  if(st.damage)rows.push(statRow('attack','Daño plano','+'+st.damage+' a cada golpe'));
+  if(st.leech)rows.push(row('leech','leech','Vampirismo',st.leech+' % del daño'));
+  for(const key of Object.keys(elements))if(st[key]){
+    const label='Daño '+elements[key].toLowerCase();
+    rows.push(describeRow(statRow(key,label,'+'+st[key]+' %','element-'+key),label,statHelp.element(key),rich));
+  }
+  if(st.damage)rows.push(row('damage','attack','Daño plano','+'+st.damage+' a cada golpe'));
   return rows;
 }
 /** Casillas a las que puede llegar un enemigo en su turno (al pasarle el ratón). */
@@ -889,10 +914,11 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
   const stats=h('div','tip-stats');
   if(unit.enemy){
     stats.append(
-      statRow('ward','Armadura',Math.min(75,unit.stats?.ward||0)+' %'),
-      statRow('initiative','Iniciativa',unit.initiative),
-      statRow('mp','Movimiento',Math.max(0,3+(unit.stats?.movement||0)-(unit.effects?.slow?.value||0))+' PM'),
-      statRow('attack','Ataque',unit.damage+'–'+(unit.damage+2)),statRow('range','Alcance',String(unit.range)));
+      describeRow(statRow('ward','Armadura',String(armorPoints(unit))),'Armadura',statHelp.ward(unit)),
+      describeRow(statRow('initiative','Iniciativa',unit.initiative),'Iniciativa',statHelp.initiative()),
+      describeRow(statRow('mp','Movimiento',Math.max(0,3+(unit.stats?.movement||0)-(unit.effects?.slow?.value||0))+' PM'),'Movimiento',statHelp.mp()),
+      describeRow(statRow('attack','Ataque',unit.damage+'–'+(unit.damage+2)),'Ataque',statHelp.attack()),
+      describeRow(statRow('range','Alcance',String(unit.range)),'Alcance',statHelp.range()));
   }else stats.append(...heroStatRows(unit));
   nodes.push(stats);
   const note=unit.boss?bosses[unit.look]?.powers:traitNote(monsterTraits[unit.look]);
@@ -901,7 +927,7 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
   if(unit.enemy&&unit.variant)nodes.push(h('p','tip-note tip-variant',h('strong',null,'Variante '+monsterVariants[unit.variant].name+': '),monsterVariants[unit.variant].text+'.'));
   const resist=Object.entries(unit.resist||{}).filter(([,v])=>v);
   if(unit.enemy&&resist.length)nodes.push(h('div','tip-resists',...resist.sort((a,b)=>b[1]-a[1]).map(([key,v])=>
-    h('span','resist-chip '+(v>0?'resist':'weak')+' element-'+key,icon(key),(v>0?'Resiste ':'Débil al ')+elements[key].toLowerCase()+' '+Math.abs(v)+' %'))));
+    h('span','resist-chip '+(v>0?'resist':'weak')+' element-'+key,icon(key),(v>0?'Resiste ':'Débil al ')+elements[key].toLowerCase()+' '+Math.abs(Math.min(RESIST_CAP,v))+' %'))));
   const special=unit.enemy&&!unit.boss&&monsterSkills[unit.look];
   const extra=unit.enemy&&!unit.boss&&monsterExtraSkills[unit.look];
   if(extra)nodes.push(h('p','tip-note tip-skill',h('strong',null,extra.name+': '),extra.text+((unit.vineCd??0)<=0?' · ¡Lista!':'')));
@@ -1509,7 +1535,7 @@ function renderInventory(player){
   const unitNow=state.units.find(u=>u.id===player.id&&!u.enemy);
   const me=unitNow&&state.phase==='combat'?unitNow:{...heroStats(player),hp:unitNow?.hp,level:player.level};
   if(me.hp===undefined)me.hp=me.max;
-  sheet.append(h('div','tip-stats hero-sheet',...heroStatRows(me)));
+  sheet.append(h('div','tip-stats hero-sheet',...heroStatRows(me,true)));
   holder.replaceChildren(gear,bag,sheet);
   if(rewards.hidden){rewards.replaceChildren();return;}
   const loot=panel('Botín · Elige una recompensa','xp');

@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=164';
-import {playerColors} from './engine.js?v=164';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=165';
+import {playerColors} from './engine.js?v=165';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -139,7 +139,7 @@ const look=u=>u.look||u.classId;
 
 export function createIso(mount,onCell){
   let renderer;
-  try{renderer=new T.WebGLRenderer({antialias:true,alpha:true,powerPreference:'low-power'});}
+  try{renderer=new T.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});}
   catch{return null;}
   renderer.setPixelRatio(1);
   renderer.outputColorSpace=T.SRGBColorSpace;
@@ -147,6 +147,9 @@ export function createIso(mount,onCell){
   renderer.toneMappingExposure=1.48;
   renderer.shadowMap.enabled=true;
   renderer.shadowMap.type=T.PCFSoftShadowMap;
+  // Las sombras no se recalculan en cada fotograma: solo cuando algo se mueve (y unas pocas veces por segundo en
+  // reposo). Las 3 antorchas proyectan sombra en cubo (6 pasadas cada una): era casi la mitad del coste del dibujo.
+  renderer.shadowMap.autoUpdate=false;
   renderer.domElement.setAttribute('aria-hidden','true');
   let statusRenderer=null;
   const labels=document.createElement('div');
@@ -231,6 +234,8 @@ export function createIso(mount,onCell){
   let dust=null;
   const models=new Map();
   const effects=[];
+  const heroLamps=[];
+  let lastShadow=0,compiling=0;
   const steps=new Map();
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
   let stageKey='',state,active=false,hover=null,frame=0,viewWidth=0,viewHeight=0;
@@ -532,6 +537,8 @@ export function createIso(mount,onCell){
     for(let x=0;x<w;x++){if(!holes.has(x)){const c=logical(state,x);tall(c.x,c.z-.65,true);}}
     for(let z=0;z<h;z++){if(!holes.has(z*w)){const c=logical(state,z*w);tall(c.x-.65,c.z,false);}}
     let candles=0;
+    // Siempre las mismas luces en escena (velas sobrantes apagadas): si cambia el número de luces, Three.js
+    // recompila todos los shaders, y eso congelaba la entrada a cada combate.
     for(let pos=0;pos<w*h;pos++){
       if(walls.has(pos)||holes.has(pos)||state.water?.includes(pos)||state.traps?.some(t=>t.pos===pos))continue;
       const v=random(state.mapSeed,pos+5003),c=logical(state,pos),ox=(random(state.mapSeed,pos+71)-.5)*.5,oz=(random(state.mapSeed,pos+13)-.5)*.5;
@@ -554,6 +561,10 @@ export function createIso(mount,onCell){
         p.material=new T.MeshStandardMaterial({color:'#3a4660',roughness:.12,metalness:.35,transparent:true,opacity:.7});
       }
     }
+    for(;candles<7;candles++){const l=new T.PointLight('#ffb15a',0,3.2,2);l.position.set(0,-6,0);stage.add(l);}
+    // Luces de los héroes: un juego fijo de 4 que sigue a cada héroe vivo (ver draw).
+    heroLamps.length=0;
+    for(let i=0;i<4;i++){const l=new T.PointLight('#ffe6c4',0,2.6,2);l.position.set(0,-6,0);stage.add(l);heroLamps.push(l);}
   }
   function rebuild(){
     if(dust){dust.geometry.dispose();dust.material.dispose();dust=null;}
@@ -742,6 +753,7 @@ export function createIso(mount,onCell){
     if(id!==stageKey){
       stageKey=id;
       rebuild();
+      compiling=-1;
     }
     const snareSig=JSON.stringify(state.snares||[]);
     if(snareSig!==snareSignature){
@@ -783,7 +795,6 @@ export function createIso(mount,onCell){
         model.shadow=shadow;
         Object.assign(model,makeLabel(u),{unit:u,phase:random(next.mapSeed,u.pos)*Math.PI*2});
         // HD: cada héroe lleva una luz suave encima para no perderse en la penumbra.
-        if(deluxe&&!u.enemy){const lamp=new T.PointLight('#ffe6c4',1.6,2.6,2);lamp.position.set(0,1.9,.25);model.root.add(lamp);}
         models.set(u.id,model);
       }
       const model=models.get(u.id);
@@ -1490,6 +1501,12 @@ export function createIso(mount,onCell){
   }
   function draw(now){
     if(!active)return;
+    // Tras montar un escenario nuevo, los shaders se compilan en segundo plano (sin congelar la página).
+    if(compiling===-1){
+      compiling=now+4000;
+      renderer.compileAsync(scene,camera).catch(()=>{}).finally(()=>{compiling=0;});
+    }
+    if(compiling&&now<compiling){frame=requestAnimationFrame(draw);return;}
     const delta=previousFrame?Math.min(45,Math.max(0,now-previousFrame)):0;
     previousFrame=now;
     clock.value=now/1000;
@@ -1658,6 +1675,18 @@ export function createIso(mount,onCell){
       if(k>=1)shake=null;
       else{const a=shake.power*(1-k);shook=camera.position.clone();camera.position.x+=(Math.random()-.5)*a;camera.position.y+=(Math.random()-.5)*a;}
     }
+    // Luces de los héroes: siguen a cada héroe vivo; las que sobran, apagadas.
+    if(heroLamps.length){
+      let n=0;
+      for(const model of models.values()){
+        if(n>=heroLamps.length||model.unit.enemy||model.dying)continue;
+        const lamp=heroLamps[n++];lamp.intensity=1.6;
+        lamp.position.copy(model.root.position);lamp.position.y+=1.9;lamp.position.z+=.25;
+      }
+      for(;n<heroLamps.length;n++)heroLamps[n].intensity=0;
+    }
+    const moving=steps.size||effects.length||shake;
+    if(moving||now-lastShadow>150){renderer.shadowMap.needsUpdate=true;lastShadow=now;}
     renderer.setRenderTarget(pixels);
     renderer.render(scene,camera);
     if(shook)camera.position.copy(shook);

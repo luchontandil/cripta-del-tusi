@@ -1,5 +1,5 @@
 // Sonido del juego: efectos, ambiente por acto y música de fondo.
-import {icon} from './icons.js?v=164';
+import {icon} from './icons.js?v=165';
 export function setupSfx(button){
   let context,master;
   let muted=false;

@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=159';
-import {playerColors} from './engine.js?v=159';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=160';
+import {playerColors} from './engine.js?v=160';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -224,7 +224,8 @@ export function createIso(mount,onCell){
   const torches=[];
   const torchLights=[];
   const gasPuffs=[];
-  const hoverMarker=new T.Mesh(flatTile,overlayMaterial('#ffffff',.55));
+  // Casilla bajo el ratón: mismo estilo que las de movimiento (relleno tenue + esquinas en «L» que laten), en blanco.
+  const hoverMarker=new T.Mesh(flatTile,overlayMaterial('#ffffff',1,.18,1,.38,.19,1.15));
   hoverMarker.visible=false;
   hoverMarker.renderOrder=3;
   let dust=null;
@@ -817,7 +818,9 @@ export function createIso(mount,onCell){
       o.visible=!!type;
       // Las casillas a las que puedes moverte: casi transparentes, solo el borde, para ver el suelo y los glifos.
       // La ruta ya la dibuja la flecha: sus casillas se ven como las de movimiento.
-      if(type)o.material=type==='walk'||type==='route'?overlayMaterial(overlayColors.walk,1.05,.2,1):overlayMaterial(overlayColors[type],type==='route'||type==='area'?1.25:glyph?1.6:type.startsWith('snare')?1.5:1,glyph?1.6:type.startsWith('snare')?1.3:1);
+      if(type)o.material=type==='walk'||type==='route'?overlayMaterial(overlayColors.walk,1.05,.2,1):
+        // Alcance de movimiento de los enemigos: el mismo estilo, en rojo.
+        type==='foe'?overlayMaterial('#e0604f',1.05,.2,1):overlayMaterial(overlayColors[type],type==='route'||type==='area'?1.25:glyph?1.6:type.startsWith('snare')?1.5:1,glyph?1.6:type.startsWith('snare')?1.3:1);
       // La casilla entera (los glifos un pelín menos, para que se distingan del suelo resaltado).
       const size=glyph?.96:1;
       o.scale.set(size,1,size);

@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=181';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=181';
-import {setupSfx} from './music.js?v=181';
-import {icon} from './icons.js?v=181';
-import {openMapEditor} from './mapeditor.js?v=181';
+  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=182';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=182';
+import {setupSfx} from './music.js?v=182';
+import {icon} from './icons.js?v=182';
+import {openMapEditor} from './mapeditor.js?v=182';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -154,7 +154,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=181').then(({createIso})=>{
+import('./isometric.js?v=182').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -619,14 +619,9 @@ function renderShardShop(){
     h('p','hint',account.user?'Las Esquirlas se ganan al terminar cada partida: 10 por piso, 40 por jefe, 100 por acto superado y 300 por ganar.':'Crea una cuenta para ganar Esquirlas y comprar cartas.'),
     tabs,body);
 }
-function classPreview(){
-  const kind=el('class').value;
+/** Ficha de una clase (nombre, rol, datos, habilidades del mazo, «Preparar cartas» y perfil en barras). */
+function heroSheetNodes(kind){
   const cls=classes[kind];
-  for(const card of el('class-cards').children){
-    const on=card.dataset.kind===kind;
-    card.setAttribute('aria-checked',String(on));
-    card.tabIndex=on?0:-1;
-  }
   const sample={classId:kind,stats:{},level:1};
   // Tu mazo para esta clase: las activas con las que empiezas y la pasiva.
   const loadout=myLoadout(kind);
@@ -647,7 +642,7 @@ function classPreview(){
   const profile=h('div','class-profile',...Object.entries(classProfile[kind]||{}).map(([label,value])=>
     h('div','profile-row',h('span','profile-label',label),
       h('span','profile-pips',...[1,2,3,4,5].map(n=>h('i',n<=value?'on':null))))));
-  el('class-preview').replaceChildren(
+  return [
     h('div','preview-body',
       h('div','preview-head',h('strong',null,cls.name),h('span','role-tag',roles[kind])),
       h('p',null,specs[kind]),
@@ -655,14 +650,27 @@ function classPreview(){
       skills,
       // Botón del mazo debajo de las habilidades, centrado.
       h('div','preview-deck',deck)),
-    profile);
+    profile];
+}
+/** Ilustración de una clase (tiles/card_<clase>.jpg); si no carga, el retrato pequeño dibujado. */
+function classIllustration(kind){
+  const art=Object.assign(document.createElement('img'),{src:'tiles/card_'+kind+'.jpg?v=182',alt:'',loading:'eager',decoding:'async'});
+  art.onerror=()=>art.replaceWith(portrait(kind));
+  return art;
+}
+function classPreview(){
+  const kind=el('class').value;
+  for(const card of el('class-cards').children){
+    const on=card.dataset.kind===kind;
+    card.setAttribute('aria-checked',String(on));
+    card.tabIndex=on?0:-1;
+  }
+  el('class-preview').replaceChildren(...heroSheetNodes(kind));
 }
 el('class').onchange=classPreview;
 el('class-cards').replaceChildren(...Object.entries(classes).map(([kind,cls])=>{
   // Tarjeta vertical con la ilustración del personaje (tiles/card_<clase>.jpg); si no carga, el retrato pequeño.
-  const art=Object.assign(document.createElement('img'),{src:'tiles/card_'+kind+'.jpg?v=181',alt:'',loading:'eager',decoding:'async'});
-  art.onerror=()=>art.replaceWith(portrait(kind));
-  const card=h('button','class-card',h('span','class-art',art),h('span','class-name',cls.name),h('small',null,roles[kind]));
+  const card=h('button','class-card',h('span','class-art',classIllustration(kind)),h('span','class-name',cls.name),h('small',null,roles[kind]));
   card.type='button';
   card.dataset.kind=kind;
   card.setAttribute('role','radio');
@@ -1957,50 +1965,61 @@ function renderEvent(box){
     voteStatus()));
 }
 /** Sala de espera: grupo con sus colores e invitación a amigos. */
+/**
+ * Sala multijugador: los 4 huecos como tarjetas con la ilustración de cada héroe (borde del color del jugador),
+ * el código de la sala bien visible, tu héroe (elegir clase + ficha) e invitar amigos.
+ */
 function renderLobby(box){
   const host=state.players[0]?.id===session.id;
   const party=h('ul','lobby-party',...[0,1,2,3].map(i=>{
     const p=state.players[i];
     const color=playerColors[i];
-    const slot=h('li','lobby-slot'+(p?' taken':''),h('span','slot-color',h('i')));
+    const slot=h('li','lobby-slot'+(p?' taken':' empty')+(p?.id===session.id?' mine':''));
     slot.style.setProperty('--player',color.hex);
-    if(p)slot.append(h('span','slot-art',unitArt(p)),h('span','slot-info',h('b',null,p.name+(p.id===session.id?' (tú)':'')),h('small',null,'Jugador '+(i+1)+' · '+color.name+' · '+classes[p.classId].name)));
-    else slot.append(h('span','slot-info',h('b',null,'Libre'),h('small',null,'Jugador '+(i+1)+' · '+color.name)));
+    if(p){
+      slot.append(h('span','slot-portrait',classIllustration(p.classId)),
+        h('span','slot-info',
+          h('b',null,p.name),
+          h('small',null,classes[p.classId].name+' · '+roles[p.classId]),
+          h('span','slot-tags',i===0?h('span','slot-tag host',icon('crown'),'Anfitrión'):null,p.id===session.id?h('span','slot-tag me','Tú'):null)));
+    }else slot.append(h('span','slot-portrait slot-wait',h('span','slot-plus','+')),
+      h('span','slot-info',h('b',null,'Hueco libre'),h('small',null,'Jugador '+(i+1)+' · '+color.name)));
     return slot;
   }));
-  const invite=[];
+  // Código grande para compartir + invitar amigos.
+  const copy=btn('',()=>{navigator.clipboard?.writeText(session.code||'');copy.replaceChildren(icon('check'),'Copiado');setTimeout(()=>{copy.replaceChildren(icon('copy'),'Copiar');},1500);});
+  copy.className='ghost small-button';copy.append(icon('copy'),'Copiar');
+  const side=[h('div','lobby-code',h('small',null,'Código de la sala'),h('strong',null,session.code||'—'),copy,
+    h('p','hint','Pásalo a tus amigos para que se unan desde «Jugar con amigos».'))];
   if(session.code&&account.user){
     const list=account.friends.filter(f=>!state.players.some(p=>p.account===f.nick||p.name===f.nick));
-    invite.push(h('h3',null,icon('users'),'Invitar amigos'));
-    if(!list.length)invite.push(h('p','hint','Agrega amigos por su nick desde la pantalla de inicio.'));
-    invite.push(h('ul','friend-list',...list.map(f=>{
+    side.push(h('h3',null,icon('users'),'Invitar amigos'));
+    if(!list.length)side.push(h('p','hint','Agrega amigos por su nick desde la pantalla de inicio.'));
+    side.push(h('ul','friend-list',...list.map(f=>{
       const b=btn('',async()=>{try{await accountCall('invite',{nick:f.nick,code:session.code});b.disabled=true;b.replaceChildren(icon('check'),'Invitado');}catch(e){error(e.message);}});
       b.append(icon('play'),'Invitar');
       return h('li','friend'+(f.online?' online':''),h('span','dot'),h('b',null,f.nick),h('small',null,f.online?'Conectado':'Desconectado'),b);
     })));
-  }else if(session.code)invite.push(h('p','hint','Entra con tu cuenta para invitar a tus amigos directamente.'));
-  // Tu hueco: elegir clase y maestrías antes de empezar.
+  }else if(session.code)side.push(h('p','hint','Entra con tu cuenta para invitar a tus amigos directamente.'));
+  // Tu héroe: tarjetas pequeñas para cambiar de clase y la ficha de la elegida.
   const me=state.players.find(p=>p.id===session.id);
   const setup=[];
   if(me){
     const picks=h('div','lobby-classes',...Object.keys(classes).map(kind=>{
-      const b=h('button','lobby-class'+(me.classId===kind?' on':''),h('span','class-art',portrait(kind)),h('span',null,classes[kind].name));
+      const b=h('button','lobby-class'+(me.classId===kind?' on':''),h('span','lobby-class-art',classIllustration(kind)),h('span','lobby-class-name',classes[kind].name));
       b.type='button';b.title=classes[kind].name+' · '+roles[kind];
       b.setAttribute('aria-pressed',String(me.classId===kind));
       b.onclick=()=>{if(me.classId===kind)return;send({type:'class',classId:kind});const select=el('class');if(select){select.value=kind;classPreview();}};
       return b;
     }));
-    const learned=me.skillRanks.filter(r=>r>0).length;
-    const masteryLine=account.user
-      ?h('div','lobby-mastery',h('span',null,icon('level'),learned+' cartas activas'+(me.passives?.length?' · '+me.passives.map(id=>cards[id]?.name).join(', '):' · sin pasiva')),
-        Object.assign(btn('',()=>openDeck(me.classId)),{className:'primary'}))
-      :h('p','hint','Sin cuenta juegas con las cartas de inicio.');
-    masteryLine.querySelector?.('button')?.append(icon('level'),'Preparar cartas');
-    setup.push(h('div','lobby-setup',h('h3',null,icon('level'),'Tu personaje'),picks,masteryLine));
+    setup.push(h('section','lobby-setup',h('h3',null,icon('level'),'Tu héroe'),picks,h('div','class-preview',...heroSheetNodes(me.classId))));
   }
+  const ready=state.players.length;
   box.replaceChildren(
-    h('div','journey-head',h('h3',null,icon('users'),'Sala '+(session.code||'')),h('p',null,host?'Cuando estéis todos, pulsa «Iniciar expedición».':'Esperando a que el anfitrión inicie la expedición.')),
-    party,...setup,...invite);
+    h('div','lobby-head',h('h3',null,icon('users'),'Tu grupo'),
+      h('p',null,ready+' de 4 jugadores · '+(host?'cuando estéis todos, pulsa «Iniciar expedición».':'esperando a que el anfitrión inicie la expedición.'))),
+    party,
+    h('div','lobby-columns',h('div','lobby-main',...setup),h('aside','lobby-side',...side)));
 }
 function renderJourney(){
   const box=el('journey');
@@ -2410,6 +2429,7 @@ function render(){
   el('entry').hidden=!!state;
   el('game').hidden=!state;
   document.body.classList.toggle('in-expedition',!!state);
+  document.body.classList.toggle('in-lobby',state?.phase==='lobby');
   renderPause();
   if(!state){if(trainingDialog.open)trainingDialog.close();if(gameoverDialog.open)gameoverDialog.close();return;}
   const turn=state.units[state.turn];
@@ -2444,7 +2464,11 @@ function render(){
   el('pa').textContent=mine?state.ap:'—';
   el('pm').textContent=mine?state.mp:'—';
   for(const id of ['pa','pm'])el(id).closest('.points').style.visibility=mine?'visible':'hidden';
-  if(state.phase==='lobby'&&host)controls.append(actionButton('Iniciar expedición','start'));
+  if(state.phase==='lobby'){
+    // Sala: botón grande para el anfitrión; el resto ve que se espera por él.
+    if(host){const start=actionButton('','start');start.className='primary big lobby-start';start.append(icon('play'),'Iniciar expedición');controls.append(start);}
+    else controls.append(h('p','lobby-waiting',icon('clock'),'Esperando a que el anfitrión inicie la expedición…'));
+  }
   if(rewardReady&&host){
     const next=actionButton('Siguiente piso','next');
     next.disabled=state.picks.length!==state.players.length||(state.training&&state.players.some(p=>!p.trained));

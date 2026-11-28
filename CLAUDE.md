@@ -58,6 +58,7 @@ capturas y espera su visto bueno.
 | `tiles/*.png` | Tileset por bioma y `props.png` (ver §6). |
 | `tiles/card_<clase>.jpg` | Ilustraciones de la selección de personaje (las hace el usuario con IA; 3:4; todas con el mismo recorte (36,40)-(828,1096) sobre el original de 864×1152 y escaladas a 480×640, sin cortar pies ni armas). |
 | Página de inicio | Fila «Elige tu héroe» a todo el ancho (ilustraciones ampliadas ×1,32 por CSS); debajo cuenta · ficha del héroe (perfil en 5 barras `classProfile`) + «Jugar en solitario» · jugar con amigos. |
+| Sala multijugador | `renderLobby`: 4 huecos con ilustración y color del jugador, «Tu héroe» (miniaturas + `heroSheetNodes`), código e invitar amigos; laterales ocultos (`body.in-lobby`). |
 | `docs/skills-<clase>.md` | Hoja de habilidades de cada clase con **todas** las decisiones tomadas. Léela antes de tocar esa clase. |
 
 ### Habilidades

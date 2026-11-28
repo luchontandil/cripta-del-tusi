@@ -1691,3 +1691,12 @@ body.in-lobby .arena{max-width:1320px;width:100%;margin:0 auto}
 .lobby-side .friend button{grid-column:1/-1;justify-content:center;margin-top:4px;width:100%}
 /* Escudo en la barra de vida: tramo gris azulado con rayas, justo detrás de la vida. */
 .np-bar u{position:absolute;top:0;bottom:0;left:var(--hp,100%);width:var(--sh,0%);background:repeating-linear-gradient(135deg,#c9d6ea 0 2px,#8a9bb8 2px 4px);box-shadow:inset 0 1px 0 #ffffff80;transition:width .25s,left .25s;text-decoration:none}
+/* Tarjetas de héroe: la ilustración ocupa toda la tarjeta y se funde a negro por abajo; nombre y rol van encima. */
+.hero-row .class-card{padding:0!important;background:#000!important;display:block;position:relative}
+.hero-row .class-card .class-art{margin:0!important}
+.hero-row .class-card .class-art::after{background:linear-gradient(180deg,transparent 48%,#000000b0 72%,#000 100%)!important}
+.hero-row .class-card .class-name,.hero-row .class-card small{position:absolute;left:0;right:0;text-align:center;margin:0!important;z-index:2;text-shadow:0 1px 3px #000}
+.hero-row .class-card .class-name{bottom:26px}
+.hero-row .class-card small{bottom:10px;background:none!important;color:#cfc2a8}
+.hero-row .class-card[aria-checked=true] small{color:var(--gold)}
+@media(max-width:700px){.hero-row .class-card .class-name{bottom:6px}.hero-row .class-card small{display:none}}

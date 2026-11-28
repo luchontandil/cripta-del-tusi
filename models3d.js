@@ -494,11 +494,6 @@ function slime(kind){
     for(const [x,z] of [[-.22,-.1],[.18,-.2],[.05,.22],[-.1,.12]])add(body,'gem',solid('#3a1a12'),x,.52,z,.16,.1,.14).rotation.y=x*9;
     for(const x of [-.3,.3])add(body,'orb',solid('#ffd36b',true),x,.08,.18,.07,.1,.07);
   }
-  for(const x of [-.13,.13]){
-    add(body,'orb',solid('#f6fff6'),x,.42,.3,.13,.15,.08);
-    add(body,'orb',solid('#14281a'),x,.42,.335,.065,.085,.04);
-  }
-  add(body,'cube',solid('#1d3b26'),0,.31,.33,.12,.025,.02);
   if(king){
     add(body,'column',solid('#f2c45c'),0,.62,0,.3,.07,.3);
     for(const a of [0,1.26,2.51,3.77,5.03])add(body,'cone',solid('#ffd977'),Math.sin(a)*.14,.71,Math.cos(a)*.14,.07,.12,.07);
@@ -1298,7 +1293,7 @@ function ps1Skeleton(){
   };
   return {root,figure,legs,arms,head:1.28*.95,animate};
 }
-/** Limo (y limo colosal): masa facetada translúcida con núcleo, ojos simples y gotas. */
+/** Limo (y limo colosal): masa facetada translúcida con núcleo y gotas; sin cara (es gelatina). */
 function ps1Slime(kind){
   const king=kind==='slimeking',lava=kind==='lavaslime';
   const tone=king?'#9a4ad0':lava?'#ff5a1a':'#4fbf5a',dark=king?'#5a2a86':lava?'#7a1a08':'#1f6b2a';
@@ -1311,8 +1306,6 @@ function ps1Slime(kind){
   const jelly=new T.Mesh(jellyGeo,jellyMat);jelly.scale.set(.7,.62,.7);jelly.position.y=.24;jelly.castShadow=true;body.add(jelly);
   const d=[];
   lp(d,P.oct,king?'#ffe27a':lava?'#ffe08a':'#d9ff9e',[0,.22,0],[0,0,0],[.16,.2,.16]);   // núcleo
-  for(const s of [-1,1]){lp(d,P.box,'#f6fff6',[s*.1,.36,.26],[0,s*.2,0],[.08,.09,.02]);lp(d,P.box,'#101010',[s*.1,.355,.272],[0,s*.2,0],[.04,.05,.01]);}
-  lp(d,P.box,dark,[0,.27,.29],[0,0,0],[.1,.02,.01]);                                 // boca
   if(king){lp(d,P.prism6,'#d9a441',[0,.58,0],[0,0,0],[.3,.07,.3]);for(let i=0;i<5;i++){const a=i*Math.PI*2/5;lp(d,P.cone6,'#ffd977',[Math.sin(a)*.12,.67,Math.cos(a)*.12],[0,0,0],[.06,.12,.06]);}}
   if(lava)for(const [x,z] of [[-.2,-.1],[.15,-.18],[.05,.2],[-.1,.12]])lp(d,P.oct,'#2a1410',[x,.42,z],[0,x*9,0],[.14,.08,.12]);
   body.add(fuse(d,'details'));

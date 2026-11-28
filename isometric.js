@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=167';
-import {playerColors} from './engine.js?v=167';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=168';
+import {playerColors} from './engine.js?v=168';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -18,6 +18,8 @@ const query=(()=>{try{return new URLSearchParams(location.search);}catch{return 
 // Gráficos mejorados por defecto (tileset + relieve + luces cálidas + sombras de antorchas + decorado + muros altos).
 // ?classic vuelve al aspecto anterior de colores planos.
 const deluxe=!query.has('classic');
+/** Color del mortero entre losas, por bioma. */
+const groutColor={crypt:'#2e2a38',hell:'#3a2420',jungle:'#2a3424'};
 const useTiles=deluxe||query.has('tiles')||(()=>{try{return localStorage.getItem('tiles')==='1';}catch{return false;}})();
 const tileFiles={crypt:'tiles/crypt.png',hell:'tiles/hell.png'};
 const TILE_COLS=4,TILE_ROWS=4,FLOOR_TILES=12,WALL_ROW=3;
@@ -599,7 +601,13 @@ export function createIso(mount,onCell){
       const v=random(state.mapSeed,pos);
       const color=palette[Math.floor(v*palette.length)];
       if(!state.water?.includes(pos)){
-        const slab=piece(stage,'cube',color,coord.x,-.057,coord.z,.963,.114,.963);
+        // Juntas: antes cada losa era un bloque con una ranura honda alrededor; con una luz baja cerca, las caras
+        // laterales se iluminaban y la ranura quedaba negra, como si las losas estuvieran muy separadas.
+        // Ahora la ranura es poco profunda: debajo hay una capa de mortero casi a ras del suelo.
+        const grout=query.get('grout')||'a';
+        const gap=grout==='b'?.995:.963;
+        const slab=piece(stage,'cube',color,coord.x,-.057,coord.z,gap,.114,gap);
+        if(grout==='a')piece(stage,'cube',groutColor[mode]||'#2b2633',coord.x,-.03,coord.z,1,.036,1);
         // Con tileset: la losa lleva su dibujo (variante y giro según la semilla).
         const r=random(state.mapSeed,pos+911);
         // De más sana a más rota: las sanas salen mucho más a menudo.

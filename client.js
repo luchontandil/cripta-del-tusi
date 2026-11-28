@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=189';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=189';
-import {setupSfx} from './music.js?v=189';
-import {icon} from './icons.js?v=189';
-import {openMapEditor} from './mapeditor.js?v=189';
+  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=191';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=191';
+import {setupSfx} from './music.js?v=191';
+import {icon} from './icons.js?v=191';
+import {openMapEditor} from './mapeditor.js?v=191';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -154,7 +154,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=189').then(({createIso})=>{
+import('./isometric.js?v=191').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -163,15 +163,8 @@ import('./isometric.js?v=189').then(({createIso})=>{
   iso?.setStatusRenderer?.(statusBadge);
   renderPlates();
   // Fuera del combate, el 3D prepara sus shaders en segundo plano para que el primer mapa entre al momento.
-  // Cuando la página ya cargó (imágenes incluidas) y está tranquila, y sin bloquearla de golpe (ver iso.warm).
-  const startWarm=()=>setTimeout(async()=>{
-    if(iso?.active||!iso?.warm)return;
-    // Aviso discreto mientras se preparan los gráficos (puede trabar un instante en equipos lentos).
-    const note=h('div','warm-note',h('i'),'Preparando la cripta…');
-    document.body.append(note);
-    try{await iso.warm();}finally{note.classList.add('done');setTimeout(()=>note.remove(),600);}
-  },1200);
-  if(document.readyState==='complete')startWarm();else window.addEventListener('load',startWarm,{once:true});
+  // Sin precarga de shaders en la portada (en Firefox congelaba la selección): se preparan al entrar al primer
+  // combate, con un cartel de carga (ver show() en isometric.js).
   syncViewport();
   if(iso?.active){
     iso.sync(state,hidePawn);
@@ -679,7 +672,7 @@ function heroSheetNodes(kind){
 }
 /** Ilustración de una clase (tiles/card_<clase>.jpg); si no carga, el retrato pequeño dibujado. */
 function classIllustration(kind){
-  const art=Object.assign(document.createElement('img'),{src:'tiles/card_'+kind+'.jpg?v=189',alt:'',loading:'eager',decoding:'async'});
+  const art=Object.assign(document.createElement('img'),{src:'tiles/card_'+kind+'.jpg?v=191',alt:'',loading:'eager',decoding:'async'});
   art.onerror=()=>art.replaceWith(portrait(kind));
   return art;
 }

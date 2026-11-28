@@ -1716,3 +1716,9 @@ body.in-lobby .arena{max-width:1320px;width:100%;margin:0 auto}
 .warm-note.done{opacity:0}
 @keyframes warmSpin{to{transform:rotate(360deg)}}
 @keyframes warmIn{from{opacity:0;transform:translateY(6px)}}
+/* Cartel de carga la primera vez que se abre el 3D. */
+.iso-loading{position:absolute;inset:0;z-index:30;display:grid;place-content:center;justify-items:center;gap:12px;background:radial-gradient(circle at 50% 45%,#1a1422,#07060a 70%);color:var(--muted);font-size:.95rem;transition:opacity .45s}
+.iso-loading i{width:28px;height:28px;border-radius:50%;border:3px solid var(--gold);border-right-color:transparent;animation:warmSpin .8s linear infinite}
+.iso-loading.done{opacity:0;pointer-events:none}
+/* «Jugar en solitario»: del ancho de su texto y centrado. */
+.gateway-center #solo{width:auto!important;justify-self:center;padding-inline:2.4em}

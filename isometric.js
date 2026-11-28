@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=189';
-import {playerColors} from './engine.js?v=189';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=191';
+import {playerColors} from './engine.js?v=191';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -1132,6 +1132,15 @@ export function createIso(mount,onCell){
     if(value){
       previousFrame=0;
       fit();
+      // Primera vez que se ve el 3D: el navegador tiene que preparar los shaders y, en Firefox, eso congela la
+      // página unos segundos. Se muestra antes un cartel de carga (y se esperan 2 fotogramas para que se pinte).
+      if(!firstShown){
+        firstShown=true;
+        loading=document.createElement('div');loading.className='iso-loading';
+        loading.innerHTML='<i></i><span>Preparando la cripta…</span>';
+        mount.append(loading);
+        waitFrames=2;
+      }
       frame=requestAnimationFrame(draw);
     }else{
       cancelAnimationFrame(frame);
@@ -1665,8 +1674,13 @@ export function createIso(mount,onCell){
       }
     }
   }
+  let firstShown=false,loading=null,waitFrames=0;
   function draw(now){
     if(!active)return;
+    if(waitFrames>0){waitFrames--;frame=requestAnimationFrame(draw);return;}
+    // Tras el primer dibujado (el que compila), se quita el cartel con un fundido.
+    if(loading&&loading.dataset.drawn){const el=loading;loading=null;el.classList.add('done');setTimeout(()=>el.remove(),500);}
+    else if(loading)loading.dataset.drawn='1';
     const delta=previousFrame?Math.min(45,Math.max(0,now-previousFrame)):0;
     previousFrame=now;
     clock.value=now/1000;

@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=166';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=166';
-import {setupSfx} from './music.js?v=166';
-import {icon} from './icons.js?v=166';
-import {openMapEditor} from './mapeditor.js?v=166';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=167';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=167';
+import {setupSfx} from './music.js?v=167';
+import {icon} from './icons.js?v=167';
+import {openMapEditor} from './mapeditor.js?v=167';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -43,8 +43,8 @@ function togglePause(){
   send({type:'pause'});
 }
 pauseButton.onclick=togglePause;
-// Nombres y barras de vida: se pueden ocultar (botón del tablero o tecla V); se recuerda en el navegador.
-let platesShown=localStorage.getItem('cripta-plates')!=='off';
+// Nombres y barras de vida: se pueden ocultar (botón del tablero o tecla V); al recargar vuelven a verse.
+let platesShown=true;
 function renderPlates(){
   el('battlefield').classList.toggle('hide-plates',!platesShown);
   const b=el('field-plates');
@@ -53,7 +53,7 @@ function renderPlates(){
   b.title=platesShown?'Ocultar nombres y barras de vida (V)':'Mostrar nombres y barras de vida (V)';
   iso?.setPlates?.(platesShown);
 }
-el('field-plates').onclick=()=>{platesShown=!platesShown;localStorage.setItem('cripta-plates',platesShown?'on':'off');renderPlates();};
+el('field-plates').onclick=()=>{platesShown=!platesShown;renderPlates();};
 document.addEventListener('keydown',event=>{
   if(event.ctrlKey||event.metaKey||event.altKey)return;
   if(/input|textarea|select/i.test(document.activeElement?.tagName||''))return;
@@ -146,7 +146,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=166').then(({createIso})=>{
+import('./isometric.js?v=167').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -154,6 +154,8 @@ import('./isometric.js?v=166').then(({createIso})=>{
   });
   iso?.setStatusRenderer?.(statusBadge);
   renderPlates();
+  // Fuera del combate, el 3D prepara sus shaders en segundo plano para que el primer mapa entre al momento.
+  setTimeout(()=>{if(!iso?.active)iso?.warm?.();},400);
   syncViewport();
   if(iso?.active){
     iso.sync(state,hidePawn);

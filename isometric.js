@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=166';
-import {playerColors} from './engine.js?v=166';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=167';
+import {playerColors} from './engine.js?v=167';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -139,7 +139,7 @@ const look=u=>u.look||u.classId;
 
 export function createIso(mount,onCell){
   let renderer;
-  try{renderer=new T.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});}
+  try{renderer=new T.WebGLRenderer({antialias:true,alpha:true,powerPreference:'low-power'});}
   catch{return null;}
   renderer.setPixelRatio(1);
   renderer.outputColorSpace=T.SRGBColorSpace;
@@ -147,9 +147,6 @@ export function createIso(mount,onCell){
   renderer.toneMappingExposure=1.48;
   renderer.shadowMap.enabled=true;
   renderer.shadowMap.type=T.PCFSoftShadowMap;
-  // Las sombras no se recalculan en cada fotograma: solo cuando algo se mueve (y unas pocas veces por segundo en
-  // reposo). Las 3 antorchas proyectan sombra en cubo (6 pasadas cada una): era casi la mitad del coste del dibujo.
-  renderer.shadowMap.autoUpdate=false;
   renderer.domElement.setAttribute('aria-hidden','true');
   let statusRenderer=null;
   const labels=document.createElement('div');
@@ -235,7 +232,6 @@ export function createIso(mount,onCell){
   const models=new Map();
   const effects=[];
   const heroLamps=[];
-  let lastShadow=0;
   const steps=new Map();
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
   let stageKey='',state,active=false,hover=null,frame=0,viewWidth=0,viewHeight=0;
@@ -537,8 +533,8 @@ export function createIso(mount,onCell){
     for(let x=0;x<w;x++){if(!holes.has(x)){const c=logical(state,x);tall(c.x,c.z-.65,true);}}
     for(let z=0;z<h;z++){if(!holes.has(z*w)){const c=logical(state,z*w);tall(c.x-.65,c.z,false);}}
     let candles=0;
-    // Siempre las mismas luces en escena (velas sobrantes apagadas): si cambia el número de luces, Three.js
-    // recompila todos los shaders, y eso congelaba la entrada a cada combate.
+    // Siempre el mismo número de luces en escena: si cambia, Three.js recompila TODOS los shaders, y eso
+    // congelaba unos segundos la entrada a cada combate (cada mapa traía un número distinto de velas).
     for(let pos=0;pos<w*h;pos++){
       if(walls.has(pos)||holes.has(pos)||state.water?.includes(pos)||state.traps?.some(t=>t.pos===pos))continue;
       const v=random(state.mapSeed,pos+5003),c=logical(state,pos),ox=(random(state.mapSeed,pos+71)-.5)*.5,oz=(random(state.mapSeed,pos+13)-.5)*.5;
@@ -562,7 +558,7 @@ export function createIso(mount,onCell){
       }
     }
     for(;candles<7;candles++){const l=new T.PointLight('#ffb15a',0,3.2,2);l.position.set(0,-6,0);stage.add(l);}
-    // Luces de los héroes: un juego fijo de 4 que sigue a cada héroe vivo (ver draw).
+    // Luces de los héroes: un juego fijo de 4 que sigue a cada héroe vivo (ver draw), por el mismo motivo.
     heroLamps.length=0;
     for(let i=0;i<4;i++){const l=new T.PointLight('#ffe6c4',0,2.6,2);l.position.set(0,-6,0);stage.add(l);heroLamps.push(l);}
   }
@@ -753,7 +749,6 @@ export function createIso(mount,onCell){
     if(id!==stageKey){
       stageKey=id;
       rebuild();
-      lastShadow=0;
     }
     const snareSig=JSON.stringify(state.snares||[]);
     if(snareSig!==snareSignature){
@@ -959,6 +954,28 @@ export function createIso(mount,onCell){
     e.preventDefault();
     mount.dispatchEvent(new Event('graphicslost'));
   });
+  /**
+   * Prepara los shaders antes del primer combate: monta en segundo plano un escenario de prueba (con las mismas
+   * luces que uno real) y lo compila sin bloquear la página. Sin esto, el primer mapa tardaba unos segundos.
+   */
+  let warmed=false;
+  function warm(biome='crypt'){
+    if(warmed||active||state)return;
+    warmed=true;
+    const units=['guardia','tirador','mago','mistico','sombra'].map((c,i)=>({id:'w'+i,classId:c,name:'',hp:1,max:1,pos:8+i,effects:{},color:'p1'}))
+      .concat(['skeleton','bat','slug'].map((l,i)=>({id:'e'+i,look:l,enemy:true,name:'',hp:1,max:1,pos:20+i,effects:{}})));
+    try{
+      sync({floor:-1,width:6,height:6,mapSeed:7,biome,walls:[14],water:[27],voids:[],traps:[],snares:[],units,phase:'combat',turn:0},()=>false);
+      const done=()=>{if(active||state?.floor!==-1)return;
+        // Un dibujado de prueba (fuera de pantalla) termina de preparar las sombras y sube las texturas.
+        try{renderer.setRenderTarget(pixels);renderer.render(scene,camera);renderer.setRenderTarget(null);}catch{}for(const id of [...models.keys()])removeModel(id);state=null;stageKey='';};
+      // Se compila contra el mismo destino que el dibujo real (la textura de píxeles): si no, los shaders salen distintos.
+      renderer.setRenderTarget(pixels);
+      const job=renderer.compileAsync?renderer.compileAsync(scene,camera):Promise.resolve(renderer.compile(scene,camera));
+      renderer.setRenderTarget(null);
+      job.catch(()=>{}).finally(done);
+    }catch{state=null;stageKey='';}
+  }
   function show(value){
     if(active===value)return;
     active=value;
@@ -1675,12 +1692,10 @@ export function createIso(mount,onCell){
       for(const model of models.values()){
         if(n>=heroLamps.length||model.unit.enemy||model.dying)continue;
         const lamp=heroLamps[n++];lamp.intensity=1.6;
-        lamp.position.copy(model.root.position);lamp.position.y+=1.9;lamp.position.z+=.25;
+        lamp.position.set(0,1.9,.25).applyMatrix4(model.root.matrixWorld);
       }
       for(;n<heroLamps.length;n++)heroLamps[n].intensity=0;
     }
-    const moving=steps.size||effects.length||shake;
-    if(moving||now-lastShadow>150){renderer.shadowMap.needsUpdate=true;lastShadow=now;}
     renderer.setRenderTarget(pixels);
     renderer.render(scene,camera);
     if(shook)camera.position.copy(shook);
@@ -1707,7 +1722,7 @@ export function createIso(mount,onCell){
     const after=groundAt(event);
     if(before&&after){pan.x+=before.x-after.x;pan.z+=before.z-after.z;fit();}
   }
-  return {show,sync,anchor,highlight,move,impact,zoom,setPlates(on){plates=!!on;},setStatusRenderer(fn){statusRenderer=fn;for(const m of models.values())m.fxSig='';},resetHover(){hover=null;},get active(){return active;},
+  return {warm,show,sync,anchor,highlight,move,impact,zoom,setPlates(on){plates=!!on;},setStatusRenderer(fn){statusRenderer=fn;for(const m of models.values())m.fxSig='';},resetHover(){hover=null;},get active(){return active;},
     set aiming(value){groundOnly=!!value;}};
 }
 

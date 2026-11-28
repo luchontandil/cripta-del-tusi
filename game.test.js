@@ -1847,3 +1847,17 @@ test('las invocaciones del Rey Osario pegan menos que él y solo caen ellas con 
   for(const m of made)assert.equal(m.hp,0);
   for(const u of normal)assert.ok(u.hp>0,'los monstruos normales siguen vivos');
 });
+test('pulir siempre mejora el modificador elegido',async()=>{
+  const E=await import('./engine.js');
+  const s=battle('guardia');
+  const player=s.players[0];
+  for(let i=0;i<40;i++){
+    const item=rollItem(s,Math.random,{gear:true,ilvl:20});
+    if(!E.polishable(item).length)continue;
+    const before=item.affixes.map(m=>m.value).reduce((a,b)=>a+b,0);
+    Object.assign(s,{phase:'forge',ready:[]});player.gold=99999;player.bag=[item];
+    act(s,player.id,{type:'forge',item:item.id,mode:'polish'});
+    const after=item.affixes.map(m=>m.value).reduce((a,b)=>a+b,0);
+    assert.ok(after>before,'sube el total de los modificadores');
+  }
+});

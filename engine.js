@@ -458,7 +458,8 @@ export function forgeBlock(item,mode){
   if(mode==='polish'&&!polishable(item).length)return 'Todos sus modificadores ya están en su tier máximo.';
   return null;
 }
-function forgeItem(item,mode,rng){
+/** Aplica una operación de forja. En «Pulir», deja en info qué modificador cambió y cómo (para el registro). */
+function forgeItem(item,mode,rng,info={}){
   const level=item.ilvl,wasGrade=item.grade;
   const reroll=type=>{
     const count=item.affixes.filter(m=>m.type===type).length;
@@ -474,12 +475,16 @@ function forgeItem(item,mode,rng){
     return item;
   }
   if(mode==='polish'){
-    // Pulir: un modificador al azar sube un tier y vuelve a tirar su valor en el rango nuevo.
+    // Pulir: un modificador al azar sube un tier y vuelve a tirar su valor en el rango nuevo. Siempre mejora:
+    // como los rangos de tiers vecinos se tocan (y hay objetos de antes con valores viejos), si la tirada no
+    // supera el valor que tenía, sube al menos un paso (2 en la armadura, que va en pares).
     const mod=pick(polishable(item),rng);
     const tiers=affixes[mod.type][mod.stat];
     const [need,low,high,label]=tiers[mod.tier];
-    mod.tier++;mod.value=rollStat(mod.stat,low,high,rng);mod.label=label;
+    const from=mod.value;
+    mod.tier++;mod.value=Math.max(rollStat(mod.stat,low,high,rng),from+(mod.stat==='ward'?2:1));mod.label=label;
     if(need>level)mod.ascended=true;
+    Object.assign(info,{stat:mod.stat,from,to:mod.value});
   }
   else if(mode==='reroll'){reroll('prefix');reroll('suffix');}
   else if(mode==='prefix')reroll('prefix');
@@ -2941,8 +2946,10 @@ export function act(s,id,a,rng=Math.random) {
     if(player.gold<cost)fail('No tienes suficiente tusi.');
     player.gold-=cost;
     const before=item.rarity;
-    forgeItem(item,a.mode,rng);
-    note(s,player.name+' forja '+item.name+' ('+forgeModes[a.mode].name.toLowerCase()+(before!==item.rarity?' → '+item.rarity.toLowerCase():'')+') por '+cost+' tusi.');
+    const result={};
+    forgeItem(item,a.mode,rng,result);
+    const detail=result.stat?': '+statNames[result.stat]+' '+result.from+' → '+result.to:'';
+    note(s,player.name+' forja '+item.name+' ('+forgeModes[a.mode].name.toLowerCase()+(before!==item.rarity?' → '+item.rarity.toLowerCase():'')+detail+') por '+cost+' tusi.');
     return;
   }
   if(s.phase==='shop'&&a.type==='reroll-shop'){

@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=172';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=172';
-import {setupSfx} from './music.js?v=172';
-import {icon} from './icons.js?v=172';
-import {openMapEditor} from './mapeditor.js?v=172';
+  lineOfSight,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=173';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=173';
+import {setupSfx} from './music.js?v=173';
+import {icon} from './icons.js?v=173';
+import {openMapEditor} from './mapeditor.js?v=173';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -146,7 +146,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=172').then(({createIso})=>{
+import('./isometric.js?v=173').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -2241,8 +2241,15 @@ function paintPath(path,origin){
 }
 function paintArea(area=[],center=null,skill=null,caster=null){
   const board=el('board');
-  for(const cell of board.querySelectorAll('.area-preview,.area-center'))cell.classList.remove('area-preview','area-center');
-  for(const pos of area)board.children[pos]?.classList.add('area-preview');
+  for(const cell of board.querySelectorAll('.area-preview,.area-center,.area-hidden'))cell.classList.remove('area-preview','area-center','area-hidden');
+  // Hechizos que solo dañan lo que se ve desde el impacto: las casillas tapadas se marcan aparte.
+  const sight=center!==null&&skill&&skillOptions(skill).blastSight;
+  for(const pos of area){
+    const cell=board.children[pos];
+    if(!cell)continue;
+    cell.classList.add('area-preview');
+    if(sight&&pos!==center&&!lineOfSight(state,center,pos,state.units.find(u=>u.hp>0&&u.pos===pos)?.id))cell.classList.add('area-hidden');
+  }
   if(center!==null&&area.includes(center))board.children[center]?.classList.add('area-center');
   if(iso?.active)iso.highlight(board.children);
   aimDamage(skill&&caster?area:[],skill,caster,center);

@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=172';
-import {playerColors} from './engine.js?v=172';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=173';
+import {playerColors} from './engine.js?v=173';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -102,6 +102,48 @@ function makeWater(clockUniform,mode='crypt'){
   return waterMaterial;
 }
 const clock={value:0};
+const areaCache=new Map();
+/**
+ * Casilla del área de un hechizo, con el mismo lenguaje que el resto (relleno suave, «L» con latido), pero el área
+ * se lee como UNA forma: las «L» solo van en las esquinas exteriores de la forma y una línea fina marca su contorno.
+ * edges = contorno en (+x, −x, +z, −z); corners = «L» en (+x+z, −x+z, +x−z, −x−z). fill baja con la distancia.
+ */
+function areaMaterial(color,edges,corners,fill){
+  const key=color+edges+'/'+corners+'/'+fill;
+  if(areaCache.has(key))return areaCache.get(key);
+  const material=new T.ShaderMaterial({
+    uniforms:{tint:{value:new T.Color(color)},time:clock,edges:{value:new T.Vector4(...edges)},corners:{value:new T.Vector4(...corners)},fill:{value:fill}},
+    vertexShader:`varying vec2 vLocal; varying vec3 vWorld;
+      void main(){vec4 w=modelMatrix*vec4(position,1.);vWorld=w.xyz;vLocal=position.xz;gl_Position=projectionMatrix*viewMatrix*w;}`,
+    fragmentShader:`uniform vec3 tint; uniform float time; uniform vec4 edges; uniform vec4 corners; uniform float fill;
+      varying vec2 vLocal; varying vec3 vWorld;
+      void main(){
+        vec2 l=vLocal;
+        vec2 q=.5-abs(l);                                // distancia a cada borde de la casilla
+        // Contorno exterior: línea fina en los lados que dan fuera del área.
+        float sx=l.x>0.?edges.x:edges.y, sz=l.y>0.?edges.z:edges.w;
+        float line=max(sx*smoothstep(.03,.0,q.x),sz*smoothstep(.03,.0,q.y));
+        // «L» en las esquinas exteriores de la forma (mismo grosor y latido que las del movimiento).
+        float c=l.x>0.?(l.y>0.?corners.x:corners.z):(l.y>0.?corners.y:corners.w);
+        float arm=.3;
+        float bandX=smoothstep(.05,.065,q.x)*smoothstep(.11,.095,q.x)*step(q.y,arm)*step(.05,q.y);
+        float bandZ=smoothstep(.05,.065,q.y)*smoothstep(.11,.095,q.y)*step(q.x,arm)*step(.05,q.x);
+        float bracket=c*max(bandX,bandZ);
+        // Latido como el de la casilla de destino del movimiento: más rápido y marcado; el contorno late con él.
+        float beatT=fract(time/.7);
+        float beat=exp(-pow(beatT*11.,2.))+.65*exp(-pow((beatT-.2)*11.,2.));
+        float throb=1.-.85*.7+.85*beat;
+        bracket*=1.7*2.2*throb;
+        line*=.7+.9*throb;
+        float pulse=.94+.06*sin(time*2.4+(vWorld.x+vWorld.z)*.55);
+        float alpha=(.20*fill+line*.3+bracket*.32)*pulse*1.1;
+        gl_FragColor=vec4(tint*(1.+bracket*.25+line*.15),alpha);
+      }`,
+    transparent:true,depthWrite:false,toneMapped:false
+  });
+  areaCache.set(key,material);
+  return material;
+}
 const overlayCache=new Map();
 /** Material de resaltado: relleno translúcido, borde luminoso y pulso suave. */
 /** Material de casilla resaltada. corners=1: en vez de borde completo, solo «L» en las cuatro esquinas. */
@@ -833,7 +875,7 @@ export function createIso(mount,onCell){
   function highlight(cells){
     if(!active)return;
     const route=[],area=[];
-    let areaCenter=null;
+    let areaCenter=null;const areaHidden=new Set();
     for(const [i,cell] of [...cells].entries()){
       const o=overlays[i];
       if(!o)continue;
@@ -844,8 +886,8 @@ export function createIso(mount,onCell){
         c.contains('aim')?'aim':c.contains('hero-trap-poison')?'snareToxic':c.contains('hero-trap')?'snare':c.contains('cast-range')?'cast':c.contains('walk')?'walk':c.contains('foe-reach')?'foe':c.contains('guard-zone')?'guard':null);
       // Las casillas a las que puedes moverte: casi transparentes, solo el borde, para ver el suelo y los glifos.
       // La ruta ya la dibuja la flecha: sus casillas se ven como las de movimiento.
-      if(c.contains('area-preview')){area.push(i);if(c.contains('area-center'))areaCenter=i;}
-      // El área la dibuja su propia capa (una sola mancha); la casilla de debajo no se pinta.
+      if(c.contains('area-preview')){area.push(i);if(c.contains('area-center'))areaCenter=i;if(c.contains('area-hidden'))areaHidden.add(i);}
+      // El área la dibuja su propia capa (una sola forma); la casilla de debajo no se pinta.
       o.visible=!!type&&type!=='area';
       if(type)o.material=type==='walk'||type==='route'?overlayMaterial(overlayColors.walk,1.05,.2,1):
         // Alcance de movimiento de los enemigos: el mismo estilo, en rojo.
@@ -859,7 +901,7 @@ export function createIso(mount,onCell){
       o.scale.set(size,1,size);
       if(c.contains('route'))route.push([Number(cell.dataset.step),i]);
     }
-    paintAreaShape(area,areaCenter);
+    paintAreaShape(area,areaCenter,areaHidden);
     route.sort((a,b)=>a[0]-b[0]);
     const signature=route.map(([,pos])=>pos).join(',');
     if(signature===routeSignature)return;
@@ -871,24 +913,36 @@ export function createIso(mount,onCell){
   function clearArea(){
     areaGroup.clear();areaSignature='';
   }
-  /** Dibuja el área del hechizo (centro destacado y relleno que baja con la distancia, como el daño). */
-  function paintAreaShape(area,center){
-    const sig=area.join(',')+'@'+center;
+  /** Dibuja el área del hechizo como una sola forma (ver areaMaterial); el impacto, con «L» largas. */
+  function paintAreaShape(area,center,hidden=new Set()){
+    const sig=area.join(',')+'@'+center+'/'+[...hidden].join(',');
     if(sig===areaSignature)return;
     clearArea();areaSignature=sig;
     if(!area.length)return;
-    const w=state.width;
+    const w=state.width,h=state.height;
     const origin=center??area[0];
+    // Las casillas tapadas (hechizos que necesitan visión desde el impacto) no forman parte de la forma.
+    const shape=new Set(area.filter(pos=>!hidden.has(pos)));
+    const inShape=(x,z)=>x>=0&&x<w&&z>=0&&z<h&&shape.has(z*w+x);
     for(const pos of area){
       const p=logical(state,pos),x=pos%w,z=Math.floor(pos/w);
-      const steps=Math.abs(x-origin%w)+Math.abs(z-Math.floor(origin/w));
-      // Mismo estilo que el resto de casillas (relleno suave + «L» en las esquinas con latido). El relleno baja
-      // con la distancia al centro, como el daño; el impacto lleva «L» largas y su propio latido, como el destino.
-      const power=Math.max(.6,1-.2*steps);
-      const material=pos===origin&&center!=null?overlayMaterial('#ffb070',1.1,.4,1,.85,.3,2.2,.7)
-        :overlayMaterial(overlayColors.area,1.1,+(power*.38).toFixed(2),1);
+      let material;
+      if(hidden.has(pos))material=overlayMaterial('#a86a78',.8,.12,1,0);
+      else{
+        // Columna → x del mundo, fila → z.
+        const e=[!inShape(x+1,z),!inShape(x-1,z),!inShape(x,z+1),!inShape(x,z-1)].map(Number);
+        const corners=[e[0]&&e[2],e[1]&&e[2],e[0]&&e[3],e[1]&&e[3]].map(Number);
+        const steps=Math.abs(x-origin%w)+Math.abs(z-Math.floor(origin/w));
+        // El relleno baja con la distancia al impacto, como el daño (−20 % por casilla, mínimo 60 %).
+        material=areaMaterial(overlayColors.area,e,corners,+(Math.max(.6,1-.2*steps)*1.05).toFixed(2));
+      }
       const mesh=new T.Mesh(flatTile,material);
       mesh.position.set(p.x,.026,p.z);mesh.renderOrder=6;
+      // Impacto: «L» largas con su propio latido, como la casilla de destino del movimiento.
+      if(pos===origin&&center!=null){
+        const mark=new T.Mesh(flatTile,overlayMaterial('#ffc890',1.1,0,1,.85,.3,2.2,.7));
+        mark.position.set(p.x,.03,p.z);mark.renderOrder=7;areaGroup.add(mark);
+      }
       areaGroup.add(mesh);
     }
   }

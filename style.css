@@ -1564,3 +1564,4 @@ body:not(.in-expedition) .live-version.update{color:#1b1206;background:#ffd76a}
 #battlefield.hide-plates .iso-label{opacity:0!important}
 #battlefield.hide-plates .pawn .hp,#battlefield.hide-plates .pawn-name{display:none}
 #field-plates[aria-pressed="false"]{opacity:.55}
+.cell.area-preview.area-hidden{background:#3a2c34;box-shadow:inset 0 0 0 1px #a86a7888}

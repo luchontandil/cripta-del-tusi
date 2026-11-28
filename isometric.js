@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=162';
-import {playerColors} from './engine.js?v=162';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=163';
+import {playerColors} from './engine.js?v=163';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -723,7 +723,7 @@ export function createIso(mount,onCell){
     if(tint)label.style.setProperty('--player',tint.hex);
     const name=document.createElement('span');
     name.textContent=u.name;
-    // Barra de vida: relleno, rastro del daño reciente (se encoge con retraso) y 4 marcas al 20/40/60/80 %.
+    // Barra de vida: relleno, rastro del daño reciente (se encoge con retraso) y 3 marcas que la parten en cuartos.
     const hp=document.createElement('div');hp.className='np-bar';
     const lag=document.createElement('b');lag.className='np-lag';
     const fill=document.createElement('i');fill.className='np-fill';

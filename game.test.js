@@ -1873,3 +1873,13 @@ test('el escudo absorbe el daño antes que la vida',()=>{
   assert.equal(hero.effects.shield,undefined,'el escudo se rompe');
   assert.equal(hero.hp,hp-2);
 });
+test('golpes de arma con elemento: restan armadura y aplican la debilidad del elemento',()=>{
+  const s=battle('tirador');
+  const hero=s.units.find(u=>!u.enemy),foe=s.units.find(u=>u.enemy);
+  hero.stats={...hero.stats,fire:0,physical:0};
+  const detonadora=classes.tirador.skills.find(k=>k[0]==='Detonadora');
+  foe.stats.ward=0;foe.resist={};
+  const base=damagePreview(hero,foe,detonadora).normal;
+  foe.stats.ward=4;foe.resist={fire:-25};
+  assert.deepEqual(damagePreview(hero,foe,detonadora).normal,base.map(v=>Math.max(1,Math.round(v*1.25)-2)));
+});

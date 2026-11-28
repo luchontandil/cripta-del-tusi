@@ -177,7 +177,14 @@ export function damageBonus(unit,skill){
   return scaledDamage(unit,skill,average)-average;
 }
 /** La armadura frena las habilidades físicas; los hechizos la atraviesan. */
-const armorType=(unit,skill)=>skillSchool(unit,skill)==='physical'?'physical':skillElement(unit,skill);
+/**
+ * Tipo de daño de una habilidad. Las de arma (escuela física) con elemento hacen «physical:<elemento>»: les resta la
+ * armadura Y les afecta la resistencia/debilidad de su elemento. Las mágicas, solo su elemento.
+ */
+const armorType=(unit,skill)=>{
+  const element=skillElement(unit,skill);
+  return skillSchool(unit,skill)==='physical'?(element&&element!=='physical'?'physical:'+element:'physical'):element;
+};
 export const modifiableRange=skill=>skillOptions(skill).modifiable??(skill[2]>1&&!['dash','swap'].includes(skill[5]));
 /** Tipos de habilidad que se lanzan sobre aliados. */
 export const supportKinds=['heal','cleanse','shield','haste','sprint','fury','eclipse','reach','domain'];
@@ -1440,13 +1447,16 @@ export const RESIST_CAP=50;
 export const armorPoints=target=>Math.max(0,target.stats?.ward||0);
 export const armorReduction=(target,element)=>element==='physical'?Math.floor(armorPoints(target)/2):0;
 function netDamage(target,raw,element,critical,extra=0){
-  // Resistencia (o debilidad, si es negativa) al tipo de daño y armadura: ambas en %.
-  // Dardo pestilente: −N a todas las resistencias mientras dure.
-  const resist=Math.max(-100,Math.min(RESIST_CAP,(target.resist?.[element]||0)-(target.effects?.corrode?.value||0)));
-  const taken=element==='physical'?passiveEffects(target).takenPhysical||0:0;
+  // «physical:fire» = golpe de arma con elemento: armadura (por ser físico) + resistencia de su elemento.
+  const [first,second]=String(element).split(':');
+  const physical=first==='physical';
+  const resistOf=second||first;
+  // Resistencia (o debilidad, si es negativa) al elemento. Dardo pestilente: −N a todas las resistencias.
+  const resist=Math.max(-100,Math.min(RESIST_CAP,(target.resist?.[resistOf]||0)-(target.effects?.corrode?.value||0)));
+  const taken=physical?passiveEffects(target).takenPhysical||0:0;
   const total=(raw+extra)*(critical?1.5:1)*(1-resist/100)*(1+taken/100);
   // La armadura resta al final, después de multiplicadores; siempre entra al menos 1.
-  return Math.max(raw+extra>0?1:0,Math.round(total)-armorReduction(target,element));
+  return Math.max(raw+extra>0?1:0,Math.round(total)-(physical?armorReduction(target,'physical'):0));
 }
 export const critChance=unit=>Math.min(1,.12+(unit.stats?.critical||0)/100);
 export function damagePreview(unit,target,skill,scale=1){
@@ -1462,6 +1472,7 @@ export function hit(s,actor,target,raw,kind='damage',critical=false,element='phy
   if(kind==='damage'&&actor?.effects?.feeble)raw=Math.max(1,Math.round(raw*(1-actor.effects.feeble.value/100)));
   const extra=kind==='damage'?(target.effects.expose?.value||0):0;
   let incoming=netDamage(target,raw,element,critical,extra);
+  element=String(element).split(':')[0];
   // Escudos (Escudo sagrado y En guardia!): vida extra que se gasta antes que los PV.
   for(const key of ['shield','barrier']){
     const guard=target.effects[key];

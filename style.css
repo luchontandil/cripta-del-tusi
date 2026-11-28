@@ -1681,3 +1681,11 @@ body.in-lobby .arena{max-width:1320px;width:100%;margin:0 auto}
 }
 @media(max-width:520px){#journey .lobby-classes{gap:4px}.lobby-class-name{font-size:.62rem}}
 .lobby-side .hint{font-size:.8rem;margin:0}
+/* Código de la sala: letra de interfaz, gruesa y espaciada (sin confundir 0/O ni 1/I). */
+.lobby-code strong{font-family:var(--font-ui),system-ui,sans-serif;font-weight:800;font-size:1.9rem;letter-spacing:.14em;font-variant-numeric:tabular-nums slashed-zero}
+/* Amigos en la columna estrecha: nombre y estado arriba, botón debajo a todo el ancho. */
+.lobby-side .friend-list{grid-template-columns:1fr}
+.lobby-side .friend{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;min-width:0}
+.lobby-side .friend b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lobby-side .friend small{grid-column:2;margin:0}
+.lobby-side .friend button{grid-column:1/-1;justify-content:center;margin-top:4px;width:100%}

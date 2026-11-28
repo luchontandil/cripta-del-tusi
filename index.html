@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="./style.css?v=180">
+  <link rel="stylesheet" href="./style.css?v=181">
 </head>
 <body><main>
   <header class="brand">
@@ -18,17 +18,21 @@
   </header>
   <section id="entry" class="gateway">
     <p class="tagline">Dungeon crawler táctico por turnos · seis pisos · hasta cuatro jugadores</p>
+    <!-- Selección de héroe a todo el ancho; debajo, cuenta | ficha y jugar | amigos. -->
+    <section class="panel gateway-main hero-row">
+      <h2>Elige tu héroe</h2>
+      <label class="field">Nombre <input id="name" maxlength="22" placeholder="Aventurero" autocomplete="nickname"></label>
+      <fieldset class="class-picker">
+        <legend class="visually-hidden">Clase</legend>
+        <div id="class-cards" class="class-cards" role="radiogroup" aria-label="Clase"></div>
+        <select id="class" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="guardia">Valkyria</option><option value="tirador">Arquero</option><option value="mistico">Paladín</option><option value="mago">Mago</option><option value="sombra">Ninja</option></select>
+      </fieldset>
+    </section>
     <div class="gateway-grid">
       <section id="account" class="panel gateway-account" aria-live="polite"></section>
-      <div class="panel gateway-main">
-        <h2>Entrar a la cripta</h2>
-        <label class="field">Nombre <input id="name" maxlength="22" placeholder="Aventurero" autocomplete="nickname"></label>
-        <fieldset class="class-picker">
-          <legend>Clase</legend>
-          <div id="class-cards" class="class-cards" role="radiogroup" aria-label="Clase"></div>
-          <select id="class" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="guardia">Valkyria</option><option value="tirador">Arquero</option><option value="mistico">Paladín</option><option value="mago">Mago</option><option value="sombra">Ninja</option></select>
-        </fieldset>
-        <div id="class-preview" class="class-preview" aria-live="polite"></div>
+      <!-- Centro sin caja propia: ficha del héroe elegido y botón de jugar. -->
+      <div class="gateway-center">
+        <div id="class-preview" class="class-preview hero-sheet-box" aria-live="polite"></div>
         <button id="solo" class="primary big">Jugar en solitario</button>
       </div>
       <details class="panel gateway-online" open>
@@ -103,5 +107,5 @@
   <p id="gameover-points" class="gameover-points" hidden></p>
   <button id="gameover-home" class="primary big">Volver al inicio</button>
 </dialog>
-<script type="module" src="./client.js?v=180"></script></body>
+<script type="module" src="./client.js?v=181"></script></body>
 </html>

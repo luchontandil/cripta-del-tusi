@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=179';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=179';
-import {setupSfx} from './music.js?v=179';
-import {icon} from './icons.js?v=179';
-import {openMapEditor} from './mapeditor.js?v=179';
+  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=180';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=180';
+import {setupSfx} from './music.js?v=180';
+import {icon} from './icons.js?v=180';
+import {openMapEditor} from './mapeditor.js?v=180';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -146,7 +146,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=179').then(({createIso})=>{
+import('./isometric.js?v=180').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -637,7 +637,7 @@ function classPreview(){
   }),...(loadout.passives||[]).map(id=>h('li','passive-line',h('span','passive-art',icon('crown')),h('span',null,cards[id].name),h('small','stat-pa','Pasiva'))));
   const deck=btn('',()=>openDeck(kind));deck.className='ghost small-button deck-open';deck.append(icon('level'),'Preparar cartas');
   // Ilustración grande del personaje elegido a la izquierda; nombre, estadísticas y mazo a la derecha.
-  const big=Object.assign(document.createElement('img'),{src:'tiles/card_'+kind+'.jpg?v=179',alt:cls.name});
+  const big=Object.assign(document.createElement('img'),{src:'tiles/card_'+kind+'.jpg?v=180',alt:cls.name});
   big.onerror=()=>big.parentNode?.remove();
   el('class-preview').replaceChildren(
     h('div','preview-art',big),
@@ -650,7 +650,7 @@ function classPreview(){
 el('class').onchange=classPreview;
 el('class-cards').replaceChildren(...Object.entries(classes).map(([kind,cls])=>{
   // Tarjeta vertical con la ilustración del personaje (tiles/card_<clase>.jpg); si no carga, el retrato pequeño.
-  const art=Object.assign(document.createElement('img'),{src:'tiles/card_'+kind+'.jpg?v=179',alt:'',loading:'eager',decoding:'async'});
+  const art=Object.assign(document.createElement('img'),{src:'tiles/card_'+kind+'.jpg?v=180',alt:'',loading:'eager',decoding:'async'});
   art.onerror=()=>art.replaceWith(portrait(kind));
   const card=h('button','class-card',h('span','class-art',art),h('span','class-name',cls.name),h('small',null,roles[kind]));
   card.type='button';

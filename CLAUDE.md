@@ -56,7 +56,7 @@ capturas y espera su visto bueno.
 | `server.js` / `accounts.js` / `store.js` | Servidor HTTP/salas, cuentas y cartas, guardado en Upstash. |
 | `game.test.js` | Tests (`node:test`). Helpers: `battle(classId)`, `timeout(s)` para avanzar turnos de la IA. |
 | `tiles/*.png` | Tileset por bioma y `props.png` (ver §6). |
-| `tiles/card_<clase>.jpg` | Ilustraciones de la selección de personaje (las hace el usuario con IA; 3:4, enteras, escaladas a 480×640: no recortar, se cortan pies y armas). |
+| `tiles/card_<clase>.jpg` | Ilustraciones de la selección de personaje (las hace el usuario con IA; 3:4; todas con el mismo recorte (36,40)-(828,1096) sobre el original de 864×1152 y escaladas a 480×640, sin cortar pies ni armas). |
 | `docs/skills-<clase>.md` | Hoja de habilidades de cada clase con **todas** las decisiones tomadas. Léela antes de tocar esa clase. |
 
 ### Habilidades

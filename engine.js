@@ -703,16 +703,16 @@ export const monsterTraits={
   bat:{movement:1,initiative:9,hamstring:true,resist:{lightning:-30,physical:-15}},
   // Calavera: quita PA solo con su Maldición (cada 3 turnos), no con cada golpe; alcance algo menor.
   skull:{element:'magic',range:5,resist:{chaos:60,magic:30,physical:20}},
-  skeleton:{ward:4,initiative:7,resist:{chaos:50,ice:30,fire:-25}},
+  skeleton:{ward:2,initiative:7,resist:{chaos:50,ice:30,fire:-25}},
   succubus:{element:'chaos',charm:true,range:5,initiative:12,resist:{chaos:40,magic:25,ice:-25}},
   vampire:{lifesteal:.5,element:'chaos',initiative:10,drain:true,resist:{chaos:50,fire:-30}},
   imp:{element:'fire',range:6,initiative:13,resist:{fire:75,ice:-30}},
-  worm:{ward:4,resist:{physical:15,ice:-25}},
+  worm:{ward:2,resist:{physical:15,ice:-25}},
   slimeking:{ward:2,resist:{physical:30,lightning:-30}},
   slime:{resist:{physical:25,fire:-25}},
-  slug:{ward:2,slime:true,initiative:5,resist:{chaos:30,ice:-30}},
+  slug:{ward:0,slime:true,initiative:5,resist:{chaos:30,ice:-30}},
   plant:{range:4,movement:-2,poison:true,initiative:8,resist:{chaos:50,fire:-50}},
-  lavaslime:{element:'fire',ward:2,initiative:7,resist:{fire:80,ice:-50}}
+  lavaslime:{element:'fire',ward:0,initiative:7,resist:{fire:80,ice:-50}}
 };
 /** Resistencias de los jefes. */
 export const bossResist={skeletonking:{chaos:50,fire:-20},umbralking:{magic:30,lightning:-20},cerberus:{fire:30,ice:-20},
@@ -722,7 +722,7 @@ export const bossResist={skeletonking:{chaos:50,fire:-20},umbralking:{magic:30,l
  * Suman armadura, velocidad, daño, resistencias o efectos al golpear (−PA, −PM, robo de vida).
  */
 export const monsterVariants={
-  acorazado:{name:'acorazado',text:'+4 de armadura',apply:u=>{u.stats.ward+=4;}},
+  acorazado:{name:'acorazado',text:'+2 de armadura',apply:u=>{u.stats.ward+=2;}},
   veloz:{name:'veloz',text:'+1 PM y más iniciativa',apply:u=>{u.stats.movement+=1;u.initiative+=4;}},
   furioso:{name:'furioso',text:'+25 % de daño',apply:u=>{u.damage=Math.ceil(u.damage*1.25);}},
   ignifugo:{name:'ignífugo',text:'Resiste el fuego (+50 %)',apply:u=>{u.resist.fire=(u.resist.fire||0)+50;}},
@@ -774,8 +774,8 @@ function monster(species,id,floor,{ranged=false,elite=false,solo=false}={}){
   return {id,name:monsterNames[species],look:species,boss:false,elite,enemy:true,resist:{...(trait.resist||{})},
     initiative:trait.initiative||(ranged?11:6),range:trait.range||(ranged?6:1),hp,
     damage:Math.max(1,Math.round((ranged?2+floor:3+floor)*(solo?.85:1))),
-    // Armadura en puntos: la de su especie, +2 si es élite y +2 cada 6 pisos.
-    stats:{ward:(trait.ward||0)+(elite?2:0)+2*Math.floor((floor-1)/6),movement:trait.movement||0},effects:{}};
+    // Armadura en puntos: la de su especie, +2 si es élite y +2 cada 8 pisos (al principio, casi nada).
+    stats:{ward:(trait.ward||0)+(elite?2:0)+2*Math.floor((floor-1)/8),movement:trait.movement||0},effects:{}};
 }
 export function encounter(floor,size,options={}) {
   if(typeof options==='boolean')options={elite:options};
@@ -801,7 +801,7 @@ export function encounter(floor,size,options={}) {
   }
   if(!elite)return lineup;
   // Combate de élite: enemigos reforzados; en grupo, además, un refuerzo extra.
-  for(const u of lineup){u.hp=Math.round(u.hp*(solo?1.1:1.2));u.damage+=1;u.stats.ward+=2;}
+  for(const u of lineup){u.hp=Math.round(u.hp*(solo?1.1:1.2));u.damage+=1;}
   if(!solo){
     const extra=monster(life.extra,'enemy'+count,floor,{elite:true});
     extra.hp=Math.round(extra.hp*1.3);extra.elite=true;

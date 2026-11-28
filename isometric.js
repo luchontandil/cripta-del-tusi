@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=171';
-import {playerColors} from './engine.js?v=171';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=172';
+import {playerColors} from './engine.js?v=172';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -39,7 +39,7 @@ function tileMaterial(mode,col,row){
 }
 const biomeLight={crypt:'#ffa45a',jungle:'#e8ff8a',roots:'#c1f195',bones:'#9dffb8',hell:'#ff8a3a'};
 const biomeFog={crypt:'#07060d',jungle:'#0c1a0e',roots:'#0d1412',bones:'#12110e',hell:'#0e0b0a'};
-const overlayColors={walk:'#62d68e',cast:'#9484b8',aim:'#e9c48a',route:'#bfe6f2',area:'#e09a72',blocked:'#b06070',damage:'#ea6a50',poison:'#9abe56',slow:'#9a86ff',foe:'#c97a6e',guard:'#d8c27a',snare:'#8fe3ff',snareToxic:'#a6d64a'};
+const overlayColors={walk:'#62d68e',cast:'#9484b8',aim:'#e9c48a',route:'#bfe6f2',area:'#ff8a4a',blocked:'#b06070',damage:'#ea6a50',poison:'#9abe56',slow:'#9a86ff',foe:'#c97a6e',guard:'#d8c27a',snare:'#8fe3ff',snareToxic:'#a6d64a'};
 const ink='#121423';
 const flatTile=new T.PlaneGeometry(1,1).rotateX(-Math.PI/2);
 const waterGeometry=new T.PlaneGeometry(1,1,6,6).rotateX(-Math.PI/2);
@@ -102,39 +102,6 @@ function makeWater(clockUniform,mode='crypt'){
   return waterMaterial;
 }
 const clock={value:0};
-/**
- * Casilla del área de un hechizo: el área se ve como UNA mancha (borde solo por fuera, sin rejilla interior),
- * más intensa en el centro (el daño baja un 20 % por casilla) y con ondas que salen del punto de impacto.
- * edges = borde en (+x, −x, +z, −z) si esa casilla vecina no es del área.
- */
-function areaMaterial(color,edges,power,center,isCenter){
-  return new T.ShaderMaterial({
-    uniforms:{tint:{value:new T.Color(color)},time:clock,edges:{value:new T.Vector4(...edges)},power:{value:power},
-      center:{value:new T.Vector2(center.x,center.z)},isCenter:{value:isCenter?1:0}},
-    vertexShader:`varying vec3 vWorld; varying vec2 vLocal;
-      void main(){vec4 w=modelMatrix*vec4(position,1.);vWorld=w.xyz;vLocal=position.xz;gl_Position=projectionMatrix*viewMatrix*w;}`,
-    fragmentShader:`uniform vec3 tint; uniform float time; uniform vec4 edges; uniform float power; uniform vec2 center; uniform float isCenter;
-      varying vec3 vWorld; varying vec2 vLocal;
-      void main(){
-        vec2 l=vLocal;                                   // de −0,5 a 0,5 dentro de la casilla
-        float bx=edges.x*smoothstep(.43,.49,l.x)+edges.y*smoothstep(-.43,-.49,l.x);
-        float bz=edges.z*smoothstep(.43,.49,l.y)+edges.w*smoothstep(-.43,-.49,l.y);
-        float border=clamp(bx+bz,0.,1.);
-        float glow=clamp((edges.x*smoothstep(.2,.5,l.x)+edges.y*smoothstep(-.2,-.5,l.x)+edges.z*smoothstep(.2,.5,l.y)+edges.w*smoothstep(-.2,-.5,l.y)),0.,1.);
-        float d=distance(vWorld.xz,center);
-        // Ondas que salen del impacto y se apagan hacia fuera.
-        float wave=smoothstep(.75,1.,sin(d*5.2-time*5.))*exp(-d*.45);
-        // Punto de impacto: anillo que late en la casilla central.
-        float r=length(l);
-        float ring=isCenter*smoothstep(.06,0.,abs(r-.26-.04*sin(time*4.)))*1.;
-        float core=isCenter*smoothstep(.2,0.,r)*.35;
-        float alpha=.06+.28*power+border*.75+glow*.12+wave*.22*power+ring*.8+core;
-        vec3 col=tint*(1.+border*.5+ring*.6+wave*.3)+vec3(1.,.9,.7)*(core+ring*.25);
-        gl_FragColor=vec4(col,clamp(alpha,0.,1.));
-      }`,
-    transparent:true,depthWrite:false,toneMapped:false
-  });
-}
 const overlayCache=new Map();
 /** Material de resaltado: relleno translúcido, borde luminoso y pulso suave. */
 /** Material de casilla resaltada. corners=1: en vez de borde completo, solo «L» en las cuatro esquinas. */
@@ -293,7 +260,7 @@ export function createIso(mount,onCell){
   const pan={x:0,z:0};
   const routeGroup=new T.Group();
   stage.add(routeGroup);
-  // Área del hechizo apuntado (ver areaMaterial).
+  // Área del hechizo apuntado.
   const areaGroup=new T.Group();
   stage.add(areaGroup);
   let areaSignature='';
@@ -902,27 +869,25 @@ export function createIso(mount,onCell){
     if(route.length&&mover)routeArrow([mover.pos,...route.map(([,pos])=>pos)]);
   }
   function clearArea(){
-    for(const m of areaGroup.children)m.material.dispose();
     areaGroup.clear();areaSignature='';
   }
-  /** Dibuja el área del hechizo como una sola mancha con borde exterior (ver areaMaterial). */
+  /** Dibuja el área del hechizo (centro destacado y relleno que baja con la distancia, como el daño). */
   function paintAreaShape(area,center){
     const sig=area.join(',')+'@'+center;
     if(sig===areaSignature)return;
     clearArea();areaSignature=sig;
     if(!area.length)return;
-    const w=state.width,set=new Set(area);
-    const origin=center??area[0],oc=logical(state,origin);
+    const w=state.width;
+    const origin=center??area[0];
     for(const pos of area){
       const p=logical(state,pos),x=pos%w,z=Math.floor(pos/w);
-      const edges=[0,0,0,0];
-      for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){
-        const nx=x+dx,nz=z+dz;
-        if(nx>=0&&nx<w&&nz>=0&&nz<state.height&&set.has(nz*w+nx))continue;
-        edges[dx>0?0:dx<0?1:dz>0?2:3]=1;                 // columna → x del mundo, fila → z
-      }
       const steps=Math.abs(x-origin%w)+Math.abs(z-Math.floor(origin/w));
-      const mesh=new T.Mesh(flatTile,areaMaterial(overlayColors.area,edges,Math.max(.6,1-.2*steps),oc,pos===origin&&center!=null));
+      // Mismo estilo que el resto de casillas (relleno suave + «L» en las esquinas con latido). El relleno baja
+      // con la distancia al centro, como el daño; el impacto lleva «L» largas y su propio latido, como el destino.
+      const power=Math.max(.6,1-.2*steps);
+      const material=pos===origin&&center!=null?overlayMaterial('#ffb070',1.1,.4,1,.85,.3,2.2,.7)
+        :overlayMaterial(overlayColors.area,1.1,+(power*.38).toFixed(2),1);
+      const mesh=new T.Mesh(flatTile,material);
       mesh.position.set(p.x,.026,p.z);mesh.renderOrder=6;
       areaGroup.add(mesh);
     }

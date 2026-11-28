@@ -2852,7 +2852,10 @@ function gearAction(s,p,a,rng) {
     if(p.gold<s.stock[i].price)fail('No tienes suficiente tusi.');
     const [bought]=s.stock.splice(i,1);
     p.gold-=bought.price;
-    p.bag.push(bought);
+    // Equipo para una ranura vacía: se pone directamente (los anillos, en el primer anillo libre).
+    const key=bought.kind==='gear'?equipTarget(p,bought):null;
+    if(key&&!p.equipment[key]){p.equipment[key]=bought;note(s,p.name+' compra y se equipa '+bought.name+'.');}
+    else p.bag.push(bought);
   }else if(a.type==='unequip'){
     if(!Object.hasOwn(p.equipment,a.slot))fail('Ranura vacía.');
     p.bag.push(p.equipment[a.slot]);

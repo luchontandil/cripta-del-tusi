@@ -456,6 +456,8 @@ test('la tienda es una sala del mapa: se compra y vende allí y se sigue cuando 
   const p=s.players[0];
   p.gold=500;
   const item=s.stock[0];
+  // Ranura ocupada: lo comprado va a la mochila (con la ranura vacía se equiparía solo).
+  if(item.kind==='gear'){const key=item.slot==='ring'?'ring':item.slot;p.equipment[key]={...item,id:'old'};if(item.slot==='ring')p.equipment.ring2={...item,id:'old2'};}
   act(s,'p0',{type:'buy',item:item.id},rng);
   assert.ok(p.bag.includes(item));
   const before=p.gold;
@@ -1882,4 +1884,21 @@ test('golpes de arma con elemento: restan armadura y aplican la debilidad del el
   const base=damagePreview(hero,foe,detonadora).normal;
   foe.stats.ward=4;foe.resist={fire:-25};
   assert.deepEqual(damagePreview(hero,foe,detonadora).normal,base.map(v=>Math.max(1,Math.round(v*1.25)-2)));
+});
+test('lo comprado para una ranura vacía se equipa solo',()=>{
+  const s=battle('guardia');
+  const p=s.players[0];
+  const gear=rollItem(s,Math.random,{gear:true,ilvl:3});
+  const key=gear.slot==='ring'?'ring':gear.slot;
+  delete p.equipment[key];if(gear.slot==='ring')delete p.equipment.ring2;
+  Object.assign(s,{phase:'shop',stock:[{...gear,price:1}]});p.gold=10;p.bag=[];
+  act(s,p.id,{type:'buy',item:gear.id});
+  assert.equal(p.equipment[key]?.id,gear.id);
+  assert.equal(p.bag.length,0);
+  // Si la ranura está ocupada, va a la mochila.
+  const other=rollItem(s,Math.random,{gear:true,ilvl:3,slot:gear.slot});
+  s.stock=[{...other,slot:gear.slot,price:1}];
+  if(gear.slot==='ring')p.equipment.ring2=gear;
+  act(s,p.id,{type:'buy',item:other.id});
+  assert.equal(p.bag.length,1);
 });

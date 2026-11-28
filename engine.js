@@ -1378,19 +1378,47 @@ export function lineOfSight(s,from,to,ignoreId) {
   }
   return true;
 }
+/** ¿Pisar esta casilla le hace daño a esta unidad, y lo puede ver? (trampas del mapa, Trampitas y zonas de En guardia!). */
+function hazardFor(s,unit,pos){
+  if(s.traps?.some(t=>t.pos===pos))return 1;
+  for(const t of s.snares||[]){
+    if(!t.visible||distance(s,t.pos,pos)>(t.trigger??1))continue;
+    const owner=s.units.find(u=>u.id===t.owner);
+    const skill=owner&&classes[owner.classId]?.skills.find(k=>k[0]===t.skill);
+    if(skillOptions(skill||[]).anyone||(owner&&!!owner.enemy!==!!unit.enemy))return 1;
+  }
+  for(const z of s.guardZones||[]){
+    const owner=s.units.find(u=>u.id===z.owner);
+    if(owner&&alive(owner)&&!!owner.enemy!==!!unit.enemy&&!z.hit?.includes(unit.id)&&distance(s,owner.pos,pos)<=(z.size||2))return 1;
+  }
+  return 0;
+}
+/**
+ * Caminos desde la unidad a cada casilla alcanzable en «limit» pasos. Entre los caminos posibles elige el que pisa
+ * menos trampas visibles y, a igualdad, el más corto (aunque dé un rodeo, si le llegan los PM).
+ */
 export function paths(s,unit,limit) {
   if(!onBoard(s,unit.pos))return new Map();
   const blocked=new Set([...s.walls,...(s.water||[]),...s.units.filter(alive).map(u=>u.pos)]);
-  const routes=new Map([[unit.pos,[]]]);
-  for(const [pos,path] of routes) {
-    if(path.length>=limit)continue;
-    for(const next of adjacent(s,pos)){
-      if(blocked.has(next)||routes.has(next))continue;
-      routes.set(next,[...path,next]);
+  const best=new Map([[unit.pos,{h:0,path:[]}]]);
+  let frontier=[{pos:unit.pos,h:0,path:[]}];
+  for(let step=0;step<limit&&frontier.length;step++){
+    const next=new Map();
+    for(const node of frontier)for(const to of adjacent(s,node.pos)){
+      if(blocked.has(to))continue;
+      const h=node.h+hazardFor(s,unit,to);
+      const known=best.get(to);
+      // Solo sigue un camino si llega antes o pisando menos trampas que cualquiera anterior.
+      if(known&&known.h<=h)continue;
+      const prev=next.get(to);
+      if(prev&&prev.h<=h)continue;
+      next.set(to,{pos:to,h,path:[...node.path,to]});
     }
+    for(const node of next.values())best.set(node.pos,{h:node.h,path:node.path});
+    frontier=[...next.values()];
   }
-  routes.delete(unit.pos);
-  return routes;
+  best.delete(unit.pos);
+  return new Map([...best].map(([pos,{path}])=>[pos,path]));
 }
 export const reachable=(s,unit,limit)=>new Map([...paths(s,unit,limit)].map(([pos,path])=>[pos,path.length]));
 export const ARMOR_CAP=75;

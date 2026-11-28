@@ -1804,3 +1804,17 @@ test('la IA esquiva las Trampitas visibles',()=>{
   const plan=planEnemy(s,foe,[hero]);
   assert.ok(!plan.includes(w+3),'no pisa la trampa: '+plan);
 });
+
+test('los caminos rodean las trampas visibles si llegan los PM',()=>{
+  const s=battle('tirador');
+  const w=s.width,hero=s.units.find(u=>!u.enemy);
+  s.walls=[];s.water=[];s.voids=[];s.snares=[];s.guardZones=[];
+  for(const u of s.units)if(u!==hero)u.pos=-50;
+  hero.pos=2*w+2;
+  s.traps=[{pos:hero.pos+1,kind:'spikes'}];
+  const path=paths(s,hero,4).get(hero.pos+2);
+  assert.ok(path&&!path.includes(hero.pos+1),'rodea: '+path);
+  assert.equal(path.length,4);
+  // Sin PM suficientes para rodear, pasa por encima.
+  assert.equal(paths(s,hero,2).get(hero.pos+2).length,2);
+});

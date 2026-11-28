@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=161';
-import {playerColors} from './engine.js?v=161';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=162';
+import {playerColors} from './engine.js?v=162';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -713,6 +713,9 @@ export function createIso(mount,onCell){
     }
     fit();
   }
+  /** Carteles de nombre y vida visibles (el botón del tablero los oculta; los iconos de estado bajan a su sitio). */
+  let plates=true;
+  /** Crea el cartel de nombre y vida de una unidad y su capa de iconos de estado. */
   function makeLabel(u){
     const label=document.createElement('div');
     label.className='iso-label'+(u.enemy?' enemy-label':'')+(u.boss?' boss-label':'');
@@ -720,7 +723,11 @@ export function createIso(mount,onCell){
     if(tint)label.style.setProperty('--player',tint.hex);
     const name=document.createElement('span');
     name.textContent=u.name;
-    const hp=document.createElement('i');
+    // Barra de vida: relleno, rastro del daño reciente (se encoge con retraso) y 4 marcas al 20/40/60/80 %.
+    const hp=document.createElement('div');hp.className='np-bar';
+    const lag=document.createElement('b');lag.className='np-lag';
+    const fill=document.createElement('i');fill.className='np-fill';
+    hp.append(lag,fill);
     // Estados encima del nombre (iconos con ficha al pasar el ratón; los dibuja el cliente).
     // Van en su propia capa, por encima de todos los nombres, para que ningún otro cartel los tape.
     const fx=document.createElement('div');fx.className='iso-effects';
@@ -783,7 +790,9 @@ export function createIso(mount,onCell){
       model.unit=u;
       model.label.classList.toggle('active',next.phase==='combat'&&next.units[next.turn]?.id===u.id);
       model.ring.visible=next.phase==='combat'&&next.units[next.turn]?.id===u.id;
-      model.hp.style.setProperty('--hp',(u.hp/u.max*100)+'%');
+      const ratio=Math.max(0,Math.min(1,u.hp/u.max));
+      model.hp.style.setProperty('--hp',(ratio*100)+'%');
+      model.label.classList.toggle('low',ratio>0&&ratio<=.3);
       const sig=JSON.stringify(u.effects||{});
       if(sig!==model.fxSig){
         model.fxSig=sig;
@@ -1601,7 +1610,7 @@ export function createIso(mount,onCell){
       model.shadow.position.z=model.root.position.z;
       const pos=projected(model.root.position.x,model.head+.15+model.figure.position.y,model.root.position.z);
       model.label.style.transform='translate('+pos.x+'px,'+pos.y+'px) translate(-50%,-100%)';
-      if(model.fx.firstChild)model.fx.style.transform='translate('+pos.x+'px,'+(pos.y-model.label.offsetHeight-3)+'px) translate(-50%,-100%)';
+      if(model.fx.firstChild)model.fx.style.transform='translate('+pos.x+'px,'+(pos.y-(plates?model.label.offsetHeight+3:-2))+'px) translate(-50%,-100%)';
     }
     for(let i=effects.length-1;i>=0;i--){
       const fx=effects[i];
@@ -1672,7 +1681,7 @@ export function createIso(mount,onCell){
     const after=groundAt(event);
     if(before&&after){pan.x+=before.x-after.x;pan.z+=before.z-after.z;fit();}
   }
-  return {show,sync,anchor,highlight,move,impact,zoom,setStatusRenderer(fn){statusRenderer=fn;for(const m of models.values())m.fxSig='';},resetHover(){hover=null;},get active(){return active;},
+  return {show,sync,anchor,highlight,move,impact,zoom,setPlates(on){plates=!!on;},setStatusRenderer(fn){statusRenderer=fn;for(const m of models.values())m.fxSig='';},resetHover(){hover=null;},get active(){return active;},
     set aiming(value){groundOnly=!!value;}};
 }
 

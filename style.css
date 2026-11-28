@@ -201,14 +201,6 @@ summary{cursor:pointer}
 #iso-world::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;box-shadow:inset 0 0 0 1px #ffffff0a,inset 0 0 120px #0b0712cc}
 #iso-world canvas{display:block;width:100%;height:100%;touch-action:manipulation;cursor:crosshair;image-rendering:auto}
 .iso-labels{position:absolute;inset:0;pointer-events:none}
-.iso-label{
-  position:absolute;top:0;left:0;width:104px;padding:2px 6px 3px;border-radius:5px;
-  background:#0d0b14e6;border:1px solid #ffffff1c;color:#fff1d0;font-size:.68rem;font-weight:800;line-height:1.15;text-align:center;
-  box-shadow:0 2px 6px #0008;
-}
-.iso-label span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.iso-label.active{border-color:var(--gold);color:#ffe2a1;box-shadow:0 0 10px #f2cd8a55,0 2px 6px #0008}
-.iso-label.enemy-label span{color:#ffb6a4}
 .iso-badges{z-index:3}
 .iso-effects{position:absolute;top:0;left:0;display:flex;gap:2px;pointer-events:auto;flex-wrap:nowrap}
 .iso-effects:empty{display:none}
@@ -219,8 +211,6 @@ summary{cursor:pointer}
 .status-badge.status-poison,.status-badge.status-feeble,.status-badge.status-corrode{border-color:#8cbf3a;color:#d4f59a}
 .status-badge.status-burn,.status-badge.status-detonate{border-color:#ff8a3d;color:#ffc58a}
 .status-badge b{position:absolute;right:-3px;bottom:-4px;font-size:9px;line-height:1;color:#fff;text-shadow:0 0 2px #000,0 0 2px #000}
-.iso-label i{display:block;height:3px;background:linear-gradient(to right,#9fe07f var(--hp),#3a3346 var(--hp));border-radius:2px;margin-top:3px}
-.iso-label.enemy-label i{background:linear-gradient(to right,#ff8466 var(--hp),#3a3346 var(--hp))}
 #battlefield.isometric #board{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);border:0}
 #battlefield.isometric #animations{inset:0;pointer-events:none}
 #battlefield.isometric .impact{z-index:8}
@@ -702,7 +692,6 @@ summary{cursor:pointer}
   #phase{grid-area:phase}.status{grid-area:status}.top-actions{grid-area:actions}
   .topbar .label{display:none}
   #iso-world{height:clamp(260px,72vw,420px)}
-  .iso-label{font-size:.58rem;width:88px}
   .loot-cards{grid-template-columns:1fr}
   .loot-card{display:grid;grid-template-columns:58px 1fr;column-gap:10px;align-items:center}
   .loot-card>*:not(.loot-icon){grid-column:2}
@@ -821,9 +810,6 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 .field-menu button{box-shadow:none;border:2px solid transparent}
 .field-menu button:hover:not(:disabled){background:#2a221f;border-color:#000}
 .field-menu button[aria-pressed=true]{background:#2a2014;border-color:#000;box-shadow:inset 0 0 0 2px var(--gold-2)}
-.iso-label{background:#000;border:2px solid #000;box-shadow:inset 1px 1px 0 #4a3c34;font-family:var(--font-ui);font-size:.7rem;font-weight:600}
-.iso-label.active{box-shadow:inset 0 0 0 1px var(--gold)}
-.iso-label i{height:3px}
 .cell{border:1px solid #00000080}
 .pawn-name{background:#000;font-family:var(--font-ui);font-weight:600}
 .impact.damage-number{font-family:var(--font-ui);-webkit-text-stroke:0;text-shadow:2px 2px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000}
@@ -872,8 +858,6 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 /* Color de cada jugador (J1 rojo, J2 azul, J3 verde, J4 amarillo). */
 .initiative li.ally{box-shadow:inset 4px 0 0 var(--player,transparent),inset 1px 1px 0 #3a302c}
 .initiative li.ally.current{box-shadow:inset 4px 0 0 var(--player,transparent),inset 0 0 0 2px var(--gold)}
-.iso-label:not(.enemy-label){border-color:var(--player,#000)!important;box-shadow:inset 0 0 0 1px var(--player,#4a3c34)}
-.iso-label.boss-label{font-size:.8rem;border-color:#c9402f!important}
 .turn-art canvas,.voter canvas,.ready-chip canvas{filter:drop-shadow(0 0 0 var(--player,transparent))}
 
 /* ───────────── Cuenta, amigos, maestrías y sala ───────────── */
@@ -959,7 +943,6 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 /* Arrastrar objetos: casillas válidas iluminadas */
 .inventory-slot.drop-valid,.drop-valid{outline:2px dashed #f2cd8a;outline-offset:-2px;box-shadow:0 0 12px #f2cd8a88,inset 0 0 14px #f2cd8a44;animation:dropPulse 1s ease-in-out infinite}
 @keyframes dropPulse{50%{box-shadow:0 0 18px #f2cd8acc,inset 0 0 18px #f2cd8a66}}
-.iso-label{box-sizing:border-box}
 .tip-skill strong{color:#f3c46b}
 .effect-weak{color:#c9a3ff}
 /* Editor de SFX (administradores) */
@@ -1062,7 +1045,7 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 .effect-chip.effect-burn .icon{color:var(--fire)}
 #unit-tooltip.docked{max-width:none;box-shadow:0 0 0 1px #f2cd8a55,0 10px 30px #000c}
 /* Pausa */
-.pause-veil{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:#0b0910b8;backdrop-filter:blur(2px)}
+.pause-veil{position:fixed;inset:0;z-index:500;display:grid;place-items:center;background:#0b0910b8;backdrop-filter:blur(2px)}
 .pause-veil[hidden]{display:none}
 .pause-card{display:grid;justify-items:center;gap:8px;padding:22px 28px;border:2px solid #4a3a2a;background:#17131c;border-radius:10px;box-shadow:0 12px 40px #000c;text-align:center;max-width:340px}
 .pause-card .icon{width:34px;height:34px;color:var(--gold)}
@@ -1546,3 +1529,34 @@ body:not(.in-expedition) .live-version.update{color:#1b1206;background:#ffd76a}
 /* Zona de En guardia! en el tablero 2D */
 .cell.guard-zone{box-shadow:inset 0 0 0 2px #d8c27a88}
 .cell.hero-trap{box-shadow:inset 0 0 0 2px #8fe3ff99}
+
+/* ───────────── Cartel de nombre y vida sobre cada unidad ───────────── */
+.iso-label{
+  position:absolute;top:0;left:0;box-sizing:border-box;width:92px;padding:2px 4px 3px;border-radius:3px;
+  background:linear-gradient(180deg,#1b1622f2,#0a0810f2);border:1px solid #ffffff2b;
+  box-shadow:inset 0 1px 0 #ffffff14,0 2px 6px #000b;
+  font-family:var(--font-ui);font-size:.64rem;font-weight:600;line-height:1.1;letter-spacing:.01em;color:#f2e6cc;text-align:center;
+  transition:border-color .2s,box-shadow .2s;
+}
+.iso-label span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 0 #000}
+/* Héroes: franja fina con el color del jugador a la izquierda. */
+.iso-label:not(.enemy-label){border-left:2px solid var(--player,#8a7a62)}
+.iso-label.enemy-label span{color:#ffbfae}
+.iso-label.boss-label{width:116px;font-size:.72rem;border-color:#c9402fcc}
+.iso-label.boss-label span{color:#ffd2a0}
+.iso-label.active{border-color:#f2cd8a;box-shadow:inset 0 1px 0 #ffffff1c,0 0 8px #f2cd8a66,0 2px 6px #000b}
+.iso-label.active:not(.enemy-label){border-left-color:var(--player,#f2cd8a)}
+.np-bar{position:relative;height:5px;margin-top:2px;border-radius:1px;background:#231c2a;box-shadow:0 0 0 1px #000;overflow:hidden}
+.np-bar i,.np-bar b{position:absolute;inset:0 auto 0 0;width:var(--hp,100%)}
+.np-fill{background:linear-gradient(180deg,#c4f59f,#62b648 60%,#478f33);transition:width .25s ease-out}
+.np-lag{background:#f6e7bd;transition:width .55s ease-in .45s}
+.enemy-label .np-fill{background:linear-gradient(180deg,#ffab90,#e2553b 60%,#b23a26)}
+.boss-label .np-bar{height:6px}
+.iso-label.low:not(.enemy-label) .np-fill{background:linear-gradient(180deg,#ffd27a,#e5892f 60%,#b8641c);animation:npLow 1.1s ease-in-out infinite}
+@keyframes npLow{50%{filter:brightness(1.35)}}
+/* 4 marcas que dividen la vida en tramos del 20 %. */
+.np-bar::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),#000c calc(20% - 1px) 20%)}
+/* Botón para ocultar los carteles. */
+#battlefield.hide-plates .iso-label{opacity:0!important}
+#battlefield.hide-plates .pawn .hp,#battlefield.hide-plates .pawn-name{display:none}
+#field-plates[aria-pressed="false"]{opacity:.55}

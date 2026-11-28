@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=161';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=161';
-import {setupSfx} from './music.js?v=161';
-import {icon} from './icons.js?v=161';
-import {openMapEditor} from './mapeditor.js?v=161';
+  playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=162';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=162';
+import {setupSfx} from './music.js?v=162';
+import {icon} from './icons.js?v=162';
+import {openMapEditor} from './mapeditor.js?v=162';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -34,14 +34,36 @@ const SFX_EDITOR=false;
 const sfx=setupSfx(el('field-sfx'));
 // Pausa: botón en el tablero y tecla P.
 const pauseButton=el('field-pause');
-pauseButton.onclick=()=>send({type:'pause'});
+// pauseIntent: el cartel sale al instante, sin esperar a que el servidor conteste (en Render puede tardar).
+let pauseIntent=null,pauseQueued=false;
+function togglePause(){
+  if(!state||['lobby','over'].includes(state.phase))return;
+  pauseIntent=!state.paused;
+  renderPause();
+  send({type:'pause'});
+}
+pauseButton.onclick=togglePause;
+// Nombres y barras de vida: se pueden ocultar (botón del tablero o tecla V); se recuerda en el navegador.
+let platesShown=localStorage.getItem('cripta-plates')!=='off';
+function renderPlates(){
+  el('battlefield').classList.toggle('hide-plates',!platesShown);
+  const b=el('field-plates');
+  b.replaceChildren(icon('hp'));
+  b.setAttribute('aria-pressed',String(platesShown));
+  b.title=platesShown?'Ocultar nombres y barras de vida (V)':'Mostrar nombres y barras de vida (V)';
+  iso?.setPlates?.(platesShown);
+}
+el('field-plates').onclick=()=>{platesShown=!platesShown;localStorage.setItem('cripta-plates',platesShown?'on':'off');renderPlates();};
 document.addEventListener('keydown',event=>{
-  if(event.key.toLowerCase()!=='p'||event.ctrlKey||event.metaKey||event.altKey)return;
+  if(event.ctrlKey||event.metaKey||event.altKey)return;
   if(/input|textarea|select/i.test(document.activeElement?.tagName||''))return;
-  if(state&&!['lobby','over'].includes(state.phase)&&!el('game').hidden){event.preventDefault();send({type:'pause'});}
+  const key=event.key.toLowerCase();
+  if(key==='v'&&state&&!el('game').hidden){event.preventDefault();el('field-plates').click();return;}
+  if(key!=='p')return;
+  if(state&&!['lobby','over'].includes(state.phase)&&!el('game').hidden){event.preventDefault();togglePause();}
 });
 function renderPause(){
-  const paused=!!state?.paused;
+  const paused=pauseIntent??!!state?.paused;
   pauseButton.replaceChildren(icon(paused?'play':'pause'));
   pauseButton.title=paused?'Reanudar (P)':'Pausa (P)';
   pauseButton.setAttribute('aria-pressed',String(paused));
@@ -49,12 +71,12 @@ function renderPause(){
   if(paused&&!veil){
     veil=h('div','pause-veil',h('div','pause-card',icon('pause'),h('strong',null,'Pausa'),h('p',null,''),h('button','primary','Reanudar')));
     veil.id='pause-veil';
-    veil.querySelector('button').onclick=()=>send({type:'pause'});
+    veil.querySelector('button').onclick=togglePause;
     document.body.append(veil);
   }
   if(veil){
     veil.hidden=!paused;
-    if(paused)veil.querySelector('p').textContent=state.paused.by+' ha pausado la partida. Pulsa P o «Reanudar» para seguir.';
+    if(paused)veil.querySelector('p').textContent=(state?.paused?state.paused.by+' ha pausado la partida.':'Pausando la partida…')+' Pulsa P o «Reanudar» para seguir.';
   }
 }
 sfx.attach(el('entry-sfx'));
@@ -124,13 +146,14 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=161').then(({createIso})=>{
+import('./isometric.js?v=162').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
     else cell?.dispatchEvent(new PointerEvent('pointer'+event));
   });
   iso?.setStatusRenderer?.(statusBadge);
+  renderPlates();
   syncViewport();
   if(iso?.active){
     iso.sync(state,hidePawn);
@@ -2487,7 +2510,8 @@ async function request(base,path,body,key){
 /** Sonido de cada acción del jugador fuera del combate (equipo, tienda, botín, mejora). */
 const actionSounds={equip:'equip',unequip:'equip',socket:'equip',unsocket:'equip',buy:'coins',sell:'coins',give:'coins',vote:'page',ready:'door',next:'door'};
 async function send(action){
-  if(busy)return;
+  // La pausa no se pierde si otra acción sigue en camino: se manda en cuanto termine.
+  if(busy){if(action.type==='pause')pauseQueued=true;return;}
   if(actionSounds[action.type])sfx(actionSounds[action.type],{volume:action.type==='train'?.7:.8});
   const epoch=generation;
   busy=true;

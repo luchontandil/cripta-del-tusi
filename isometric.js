@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=169';
-import {playerColors} from './engine.js?v=169';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=171';
+import {playerColors} from './engine.js?v=171';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -102,6 +102,39 @@ function makeWater(clockUniform,mode='crypt'){
   return waterMaterial;
 }
 const clock={value:0};
+/**
+ * Casilla del área de un hechizo: el área se ve como UNA mancha (borde solo por fuera, sin rejilla interior),
+ * más intensa en el centro (el daño baja un 20 % por casilla) y con ondas que salen del punto de impacto.
+ * edges = borde en (+x, −x, +z, −z) si esa casilla vecina no es del área.
+ */
+function areaMaterial(color,edges,power,center,isCenter){
+  return new T.ShaderMaterial({
+    uniforms:{tint:{value:new T.Color(color)},time:clock,edges:{value:new T.Vector4(...edges)},power:{value:power},
+      center:{value:new T.Vector2(center.x,center.z)},isCenter:{value:isCenter?1:0}},
+    vertexShader:`varying vec3 vWorld; varying vec2 vLocal;
+      void main(){vec4 w=modelMatrix*vec4(position,1.);vWorld=w.xyz;vLocal=position.xz;gl_Position=projectionMatrix*viewMatrix*w;}`,
+    fragmentShader:`uniform vec3 tint; uniform float time; uniform vec4 edges; uniform float power; uniform vec2 center; uniform float isCenter;
+      varying vec3 vWorld; varying vec2 vLocal;
+      void main(){
+        vec2 l=vLocal;                                   // de −0,5 a 0,5 dentro de la casilla
+        float bx=edges.x*smoothstep(.43,.49,l.x)+edges.y*smoothstep(-.43,-.49,l.x);
+        float bz=edges.z*smoothstep(.43,.49,l.y)+edges.w*smoothstep(-.43,-.49,l.y);
+        float border=clamp(bx+bz,0.,1.);
+        float glow=clamp((edges.x*smoothstep(.2,.5,l.x)+edges.y*smoothstep(-.2,-.5,l.x)+edges.z*smoothstep(.2,.5,l.y)+edges.w*smoothstep(-.2,-.5,l.y)),0.,1.);
+        float d=distance(vWorld.xz,center);
+        // Ondas que salen del impacto y se apagan hacia fuera.
+        float wave=smoothstep(.75,1.,sin(d*5.2-time*5.))*exp(-d*.45);
+        // Punto de impacto: anillo que late en la casilla central.
+        float r=length(l);
+        float ring=isCenter*smoothstep(.06,0.,abs(r-.26-.04*sin(time*4.)))*1.;
+        float core=isCenter*smoothstep(.2,0.,r)*.35;
+        float alpha=.06+.28*power+border*.75+glow*.12+wave*.22*power+ring*.8+core;
+        vec3 col=tint*(1.+border*.5+ring*.6+wave*.3)+vec3(1.,.9,.7)*(core+ring*.25);
+        gl_FragColor=vec4(col,clamp(alpha,0.,1.));
+      }`,
+    transparent:true,depthWrite:false,toneMapped:false
+  });
+}
 const overlayCache=new Map();
 /** Material de resaltado: relleno translúcido, borde luminoso y pulso suave. */
 /** Material de casilla resaltada. corners=1: en vez de borde completo, solo «L» en las cuatro esquinas. */
@@ -260,6 +293,10 @@ export function createIso(mount,onCell){
   const pan={x:0,z:0};
   const routeGroup=new T.Group();
   stage.add(routeGroup);
+  // Área del hechizo apuntado (ver areaMaterial).
+  const areaGroup=new T.Group();
+  stage.add(areaGroup);
+  let areaSignature='';
   // Trampas de los héroes (Tramposa, Trampita): una marca en la casilla, que late.
   const snareGroup=new T.Group();
   stage.add(snareGroup);
@@ -572,6 +609,7 @@ export function createIso(mount,onCell){
     routeGroup.clear();
     stage.add(routeGroup);
     routeSignature='';
+    clearArea();stage.add(areaGroup);
     snareGroup.clear();stage.add(snareGroup);snareSignature='';
     overlays.length=0;
     torches.length=0;
@@ -827,7 +865,8 @@ export function createIso(mount,onCell){
   }
   function highlight(cells){
     if(!active)return;
-    const route=[];
+    const route=[],area=[];
+    let areaCenter=null;
     for(const [i,cell] of [...cells].entries()){
       const o=overlays[i];
       if(!o)continue;
@@ -836,17 +875,24 @@ export function createIso(mount,onCell){
       // Los glifos siempre se ven: por encima de la ruta, del movimiento y del alcance (solo el área del hechizo los tapa).
       const type=c.contains('area-preview')?'area':glyph||(c.contains('route')?'route':c.contains('no-sight')?'blocked':null)||(
         c.contains('aim')?'aim':c.contains('hero-trap-poison')?'snareToxic':c.contains('hero-trap')?'snare':c.contains('cast-range')?'cast':c.contains('walk')?'walk':c.contains('foe-reach')?'foe':c.contains('guard-zone')?'guard':null);
-      o.visible=!!type;
       // Las casillas a las que puedes moverte: casi transparentes, solo el borde, para ver el suelo y los glifos.
       // La ruta ya la dibuja la flecha: sus casillas se ven como las de movimiento.
+      if(c.contains('area-preview')){area.push(i);if(c.contains('area-center'))areaCenter=i;}
+      // El área la dibuja su propia capa (una sola mancha); la casilla de debajo no se pinta.
+      o.visible=!!type&&type!=='area';
       if(type)o.material=type==='walk'||type==='route'?overlayMaterial(overlayColors.walk,1.05,.2,1):
         // Alcance de movimiento de los enemigos: el mismo estilo, en rojo.
-        type==='foe'?overlayMaterial('#e0604f',1.05,.2,1):overlayMaterial(overlayColors[type],type==='route'||type==='area'?1.25:glyph?1.6:type.startsWith('snare')?1.5:1,glyph?1.6:type.startsWith('snare')?1.3:1);
+        type==='foe'?overlayMaterial('#e0604f',1.05,.2,1):
+        // Alcance del hechizo: mismo estilo de esquinas, en celeste (color de los PA); sin línea de visión, gris rojizo.
+        type==='cast'?overlayMaterial('#7cc4ff',1.05,.2,1):
+        type==='blocked'?overlayMaterial('#a86a78',.8,.12,1,0):
+        type==='aim'?overlayMaterial('#9fd8ff',1.15,.26,1):overlayMaterial(overlayColors[type],type==='route'||type==='area'?1.25:glyph?1.6:type.startsWith('snare')?1.5:1,glyph?1.6:type.startsWith('snare')?1.3:1);
       // La casilla entera (los glifos un pelín menos, para que se distingan del suelo resaltado).
       const size=glyph?.96:1;
       o.scale.set(size,1,size);
       if(c.contains('route'))route.push([Number(cell.dataset.step),i]);
     }
+    paintAreaShape(area,areaCenter);
     route.sort((a,b)=>a[0]-b[0]);
     const signature=route.map(([,pos])=>pos).join(',');
     if(signature===routeSignature)return;
@@ -854,6 +900,32 @@ export function createIso(mount,onCell){
     routeGroup.clear();
     const mover=state.units?.[state.turn];
     if(route.length&&mover)routeArrow([mover.pos,...route.map(([,pos])=>pos)]);
+  }
+  function clearArea(){
+    for(const m of areaGroup.children)m.material.dispose();
+    areaGroup.clear();areaSignature='';
+  }
+  /** Dibuja el área del hechizo como una sola mancha con borde exterior (ver areaMaterial). */
+  function paintAreaShape(area,center){
+    const sig=area.join(',')+'@'+center;
+    if(sig===areaSignature)return;
+    clearArea();areaSignature=sig;
+    if(!area.length)return;
+    const w=state.width,set=new Set(area);
+    const origin=center??area[0],oc=logical(state,origin);
+    for(const pos of area){
+      const p=logical(state,pos),x=pos%w,z=Math.floor(pos/w);
+      const edges=[0,0,0,0];
+      for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const nx=x+dx,nz=z+dz;
+        if(nx>=0&&nx<w&&nz>=0&&nz<state.height&&set.has(nz*w+nx))continue;
+        edges[dx>0?0:dx<0?1:dz>0?2:3]=1;                 // columna → x del mundo, fila → z
+      }
+      const steps=Math.abs(x-origin%w)+Math.abs(z-Math.floor(origin/w));
+      const mesh=new T.Mesh(flatTile,areaMaterial(overlayColors.area,edges,Math.max(.6,1-.2*steps),oc,pos===origin&&center!=null));
+      mesh.position.set(p.x,.026,p.z);mesh.renderOrder=6;
+      areaGroup.add(mesh);
+    }
   }
   /**
    * Ruta de movimiento: un surco hundido en las losas que sigue el camino, se curva en los giros y acaba en punta

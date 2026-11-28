@@ -1065,8 +1065,8 @@ input,select{font-family:var(--font-ui);background:#0a0809;border:2px solid #000
 /* Casillas resaltadas (2D) más sutiles y a casilla completa */
 .cell.walk{background:#2c4f61;box-shadow:inset 0 0 0 1px #6aa3bb88}
 .cell.walk:hover,.cell.walk:focus-visible,.cell.walk.route{background:#35627a;box-shadow:inset 0 0 0 1px #bfe6f2}
-.cell.cast-range{background:#3d3452;box-shadow:inset 0 0 0 1px #9484b888}
-.cell.aim{box-shadow:inset 0 0 0 1px #e9c48a,0 0 6px #e9c48a44}
+.cell.cast-range{background:#2f4256;box-shadow:inset 0 0 0 1px #7cc4ff88}
+.cell.aim{box-shadow:inset 0 0 0 1px #9fd8ff,0 0 6px #9fd8ff44}
 /* Movimiento posible de un enemigo (al pasar el ratón por él) */
 .cell.foe-reach{background:#4a2f30;box-shadow:inset 0 0 0 1px #c97a6e88}
 /* Panel de estadísticas bajo la mochila */

@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=187';
-import {playerColors} from './engine.js?v=187';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=188';
+import {playerColors} from './engine.js?v=188';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -1065,22 +1065,48 @@ export function createIso(mount,onCell){
    * luces que uno real) y lo compila sin bloquear la página. Sin esto, el primer mapa tardaba unos segundos.
    */
   let warmed=false;
-  function warm(biome='crypt'){
+  // Espera a un momento libre del navegador (o, como mucho, timeout ms) para no trabar la página.
+  const idle=(timeout=1500)=>new Promise(resolve=>(window.requestIdleCallback||((cb)=>setTimeout(cb,60)))(resolve,{timeout}));
+  /**
+   * Prepara los shaders en segundo plano, por etapas y en ratos libres (montar escena → compilar → un dibujado
+   * de prueba → limpiar), para que la página no se congele de golpe. Devuelve una promesa.
+   */
+  async function warm(biome='crypt'){
     if(warmed||active||state)return;
     warmed=true;
     const units=['guardia','tirador','mago','mistico','sombra'].map((c,i)=>({id:'w'+i,classId:c,name:'',hp:1,max:1,pos:8+i,effects:{},color:'p1'}))
       .concat(['skeleton','bat','slug'].map((l,i)=>({id:'e'+i,look:l,enemy:true,name:'',hp:1,max:1,pos:20+i,effects:{}})));
+    const aborted=()=>active||state?.floor!==-1;
+    const cleanup=()=>{if(aborted())return;for(const id of [...models.keys()])removeModel(id);state=null;stageKey='';};
     try{
+      await idle();
+      if(active||state)return;
       sync({floor:-1,width:6,height:6,mapSeed:7,biome,walls:[14],water:[27],voids:[],traps:[],snares:[],units,phase:'combat',turn:0},()=>false);
-      const done=()=>{if(active||state?.floor!==-1)return;
-        // Un dibujado de prueba (fuera de pantalla) termina de preparar las sombras y sube las texturas.
-        try{renderer.setRenderTarget(pixels);renderer.render(scene,camera);renderer.setRenderTarget(null);}catch{}for(const id of [...models.keys()])removeModel(id);state=null;stageKey='';};
+      await idle();
+      if(aborted())return;
       // Se compila contra el mismo destino que el dibujo real (la textura de píxeles): si no, los shaders salen distintos.
       renderer.setRenderTarget(pixels);
       const job=renderer.compileAsync?renderer.compileAsync(scene,camera):Promise.resolve(renderer.compile(scene,camera));
       renderer.setRenderTarget(null);
-      job.catch(()=>{}).finally(done);
-    }catch{state=null;stageKey='';}
+      await job.catch(()=>{});
+      await idle();
+      if(aborted())return;
+      // Dibujados de prueba en una textura diminuta (mismo formato que la real, así los shaders sirven):
+      // primero sin sombras (sube texturas y termina los shaders) y, en otro rato libre, con sombras.
+      const tiny=pixels.clone();tiny.setSize(32,32);
+      const draw=withShadows=>{
+        const auto=renderer.shadowMap.autoUpdate;
+        renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=withShadows;
+        try{renderer.setRenderTarget(tiny);renderer.render(scene,camera);}catch{}
+        renderer.setRenderTarget(null);renderer.shadowMap.autoUpdate=auto;
+      };
+      draw(false);
+      await idle();
+      if(!aborted())draw(true);
+      tiny.dispose();
+      await idle();
+      cleanup();
+    }catch{if(!active){state=null;stageKey='';}}
   }
   function show(value){
     if(active===value)return;

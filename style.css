@@ -1710,3 +1710,9 @@ body.in-lobby .arena{max-width:1320px;width:100%;margin:0 auto}
 .preview-locked small svg{width:13px;height:13px}
 @media(max-width:520px){.preview-skillsets{grid-template-columns:1fr}}
 .preview-skills small{white-space:nowrap;flex-shrink:0}
+/* Aviso discreto de carga de gráficos (abajo a la derecha). */
+.warm-note{position:fixed;right:14px;bottom:34px;z-index:40;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:99px;background:#0d0b14e6;border:1px solid #ffffff1c;color:var(--muted);font-size:.78rem;pointer-events:none;animation:warmIn .4s ease-out;transition:opacity .5s}
+.warm-note i{width:10px;height:10px;border-radius:50%;border:2px solid var(--gold);border-right-color:transparent;animation:warmSpin .8s linear infinite}
+.warm-note.done{opacity:0}
+@keyframes warmSpin{to{transform:rotate(360deg)}}
+@keyframes warmIn{from{opacity:0;transform:translateY(6px)}}

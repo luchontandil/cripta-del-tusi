@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=158';
-import {playerColors} from './engine.js?v=158';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=159';
+import {playerColors} from './engine.js?v=159';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -37,7 +37,7 @@ function tileMaterial(mode,col,row){
 }
 const biomeLight={crypt:'#ffa45a',jungle:'#e8ff8a',roots:'#c1f195',bones:'#9dffb8',hell:'#ff8a3a'};
 const biomeFog={crypt:'#07060d',jungle:'#0c1a0e',roots:'#0d1412',bones:'#12110e',hell:'#0e0b0a'};
-const overlayColors={walk:'#6aa3bb',cast:'#9484b8',aim:'#e9c48a',route:'#bfe6f2',area:'#e09a72',blocked:'#b06070',damage:'#ea6a50',poison:'#9abe56',slow:'#9a86ff',foe:'#c97a6e',guard:'#d8c27a',snare:'#8fe3ff',snareToxic:'#a6d64a'};
+const overlayColors={walk:'#62d68e',cast:'#9484b8',aim:'#e9c48a',route:'#bfe6f2',area:'#e09a72',blocked:'#b06070',damage:'#ea6a50',poison:'#9abe56',slow:'#9a86ff',foe:'#c97a6e',guard:'#d8c27a',snare:'#8fe3ff',snareToxic:'#a6d64a'};
 const ink='#121423';
 const flatTile=new T.PlaneGeometry(1,1).rotateX(-Math.PI/2);
 const waterGeometry=new T.PlaneGeometry(1,1,6,6).rotateX(-Math.PI/2);
@@ -102,20 +102,30 @@ function makeWater(clockUniform,mode='crypt'){
 const clock={value:0};
 const overlayCache=new Map();
 /** Material de resaltado: relleno translúcido, borde luminoso y pulso suave. */
-function overlayMaterial(color,strength=1,fill=1){
-  const key=color+strength+'/'+fill;
+/** Material de casilla resaltada. corners=1: en vez de borde completo, solo «L» en las cuatro esquinas. */
+function overlayMaterial(color,strength=1,fill=1,corners=0,amp=.38,arm=.19,boost=1,period=1.6){
+  const key=color+strength+'/'+fill+'/'+corners+'/'+amp+'/'+arm+'/'+boost+'/'+period;
   if(overlayCache.has(key))return overlayCache.get(key);
   const material=new T.ShaderMaterial({
-    uniforms:{tint:{value:new T.Color(color)},time:clock,strength:{value:strength},fill:{value:fill}},
+    uniforms:{tint:{value:new T.Color(color)},time:clock,strength:{value:strength},fill:{value:fill},corners:{value:corners},amp:{value:amp},arm:{value:arm},boost:{value:boost},period:{value:period}},
     vertexShader:`varying vec2 vUv; varying vec3 vWorld;
       void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.);vWorld=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,
-    fragmentShader:`uniform vec3 tint; uniform float time; uniform float strength; uniform float fill; varying vec2 vUv; varying vec3 vWorld;
+    fragmentShader:`uniform vec3 tint; uniform float time; uniform float strength; uniform float fill; uniform float corners; uniform float amp; uniform float arm; uniform float boost; uniform float period; varying vec2 vUv; varying vec3 vWorld;
       void main(){
         vec2 q=min(vUv,1.-vUv);
         float d=min(q.x,q.y);
         float edge=smoothstep(.045,.0,d);
+        // Esquinas en «L»: el borde solo existe a menos de un 19 % del vértice en los dos ejes.
+        // (un poco metidas hacia dentro para que las de casillas vecinas no se junten en una cruz).
+        float inCorner=step(q.x,arm)*step(q.y,arm)*step(.05,q.x)*step(.05,q.y);
+        float band=smoothstep(.05,.065,d)*smoothstep(.11,.095,d);
+        // Latido tenue de las esquinas: doble pulso (pum-pum) cada 1,6 s, igual en todas las casillas.
+        float beatT=fract(time/period);
+        float beat=exp(-pow(beatT*11.,2.))+.65*exp(-pow((beatT-.2)*11.,2.));
+        edge=mix(edge,band*inCorner*1.7*boost*(1.-amp*.7+amp*beat),corners);
+        float fillNow=fill;
         float pulse=.94+.06*sin(time*2.4+(vWorld.x+vWorld.z)*.55);
-        float alpha=(.20*fill+edge*.32)*pulse*strength;
+        float alpha=(.20*fillNow+edge*.32)*pulse*strength;
         gl_FragColor=vec4(tint*(1.+edge*.25),alpha);
       }`,
     transparent:true,depthWrite:false,toneMapped:false
@@ -224,6 +234,22 @@ export function createIso(mount,onCell){
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
   let stageKey='',state,active=false,hover=null,frame=0,viewWidth=0,viewHeight=0;
   let routeSignature='';
+  const destinationPlane=new T.PlaneGeometry(1,1).rotateX(-Math.PI/2);
+  // Materiales del surco de la ruta.
+  const grooveRim=new T.ShaderMaterial({
+    uniforms:{time:clock,total:{value:1}},
+    vertexShader:`attribute float along; varying float vAlong;
+      void main(){vAlong=along;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader:`uniform float time; uniform float total; varying float vAlong;
+      void main(){
+        // Destello que recorre el borde desde el héroe hasta el destino cada 1,4 s.
+        float head=fract(time/1.4)*(total+.8)-.4;
+        float glint=exp(-pow((vAlong-head)*3.2,2.));
+        gl_FragColor=vec4(vec3(.36,.78,.5)*(1.+glint*1.4),.62+glint*.35);
+      }`,
+    transparent:true,depthWrite:false,side:T.DoubleSide});
+  const grooveDeep=new T.MeshBasicMaterial({color:'#060c08',transparent:true,opacity:.88,depthWrite:false,side:T.DoubleSide});
+  const grooveFloor=new T.MeshStandardMaterial({color:'#1d3a27',roughness:1,transparent:true,opacity:.7,depthWrite:false,side:T.DoubleSide});
   let previousFrame=0;
   let magnification=1.13;
   // Desplazamiento de la cámara (para hacer zoom hacia donde apunta el ratón).
@@ -790,7 +816,8 @@ export function createIso(mount,onCell){
         c.contains('aim')?'aim':c.contains('hero-trap-poison')?'snareToxic':c.contains('hero-trap')?'snare':c.contains('cast-range')?'cast':c.contains('walk')?'walk':c.contains('foe-reach')?'foe':c.contains('guard-zone')?'guard':null);
       o.visible=!!type;
       // Las casillas a las que puedes moverte: casi transparentes, solo el borde, para ver el suelo y los glifos.
-      if(type)o.material=type==='walk'?overlayMaterial(overlayColors.walk,.85,.22):overlayMaterial(overlayColors[type],type==='route'||type==='area'?1.25:glyph?1.6:type.startsWith('snare')?1.5:1,glyph?1.6:type.startsWith('snare')?1.3:1);
+      // La ruta ya la dibuja la flecha: sus casillas se ven como las de movimiento.
+      if(type)o.material=type==='walk'||type==='route'?overlayMaterial(overlayColors.walk,1.05,.2,1):overlayMaterial(overlayColors[type],type==='route'||type==='area'?1.25:glyph?1.6:type.startsWith('snare')?1.5:1,glyph?1.6:type.startsWith('snare')?1.3:1);
       // La casilla entera (los glifos un pelín menos, para que se distingan del suelo resaltado).
       const size=glyph?.96:1;
       o.scale.set(size,1,size);
@@ -801,10 +828,65 @@ export function createIso(mount,onCell){
     if(signature===routeSignature)return;
     routeSignature=signature;
     routeGroup.clear();
-    for(const [,pos] of route){
-      const p=logical(state,pos);
-      piece(routeGroup,'disc','#e1fbff',p.x,.048,p.z,.21,.024,.21,true);
+    const mover=state.units?.[state.turn];
+    if(route.length&&mover)routeArrow([mover.pos,...route.map(([,pos])=>pos)]);
+  }
+  /**
+   * Ruta de movimiento: un surco hundido en las losas que sigue el camino, se curva en los giros y acaba en punta
+   * en la casilla apuntada. Fondo oscuro + borde fino verde iluminado; un destello recorre el borde hacia el destino.
+   */
+  function routeArrow(cells){
+    const pts=cells.map(pos=>{const p=logical(state,pos);return new T.Vector2(p.x,p.z);});
+    pts[0]=pts[0].clone().lerp(pts[1],.42);
+    const path=[pts[0]];
+    for(let i=1;i<pts.length-1;i++){
+      const a=pts[i-1],b=pts[i],c=pts[i+1];
+      const straight=Math.abs((b.x-a.x)*(c.y-b.y)-(b.y-a.y)*(c.x-b.x))<1e-6;
+      if(straight){path.push(b);continue;}
+      const m1=a.clone().lerp(b,i===1?.4:.5),m2=b.clone().lerp(c,.5);
+      for(let k=0;k<=8;k++){const t=k/8,u=1-t;path.push(new T.Vector2(u*u*m1.x+2*u*t*b.x+t*t*m2.x,u*u*m1.y+2*u*t*b.y+t*t*m2.y));}
     }
+    const end=pts.at(-1),dir=end.clone().sub(pts.at(-2)).normalize();
+    const tipLen=.42,tipBase=end.clone().addScaledVector(dir,.22-tipLen),tip=end.clone().addScaledVector(dir,.24);
+    path.push(tipBase);
+    const basePath=path;
+    const lengths=[0];for(let i=1;i<path.length;i++)lengths.push(lengths[i-1]+path[i].distanceTo(path[i-1]));
+    const total=lengths.at(-1)+tipLen;
+    // Cinta con punta; «along» = distancia recorrida (para el destello que viaja).
+    const ribbon=(width,y,material,order,shift=0)=>{
+      const pos=[],along=[],idx=[];
+      // Las capas interiores se meten un poco en la punta para que no quede una raya verde entre cuerpo y punta.
+      const path=[...basePath.slice(0,-1),basePath.at(-1).clone().addScaledVector(dir,(.4-width)*1.4)];
+      for(let i=0;i<path.length;i++){
+        const p=path[i],q=path[Math.min(path.length-1,i+1)],o=path[Math.max(0,i-1)];
+        const t=q.clone().sub(o).normalize(),n=new T.Vector2(-t.y,t.x);
+        const c=p.clone().addScaledVector(n,shift);
+        pos.push(c.x+n.x*width/2,y,c.y+n.y*width/2,c.x-n.x*width/2,y,c.y-n.y*width/2);along.push(lengths[i],lengths[i]);
+        if(i)idx.push((i-1)*2,(i-1)*2+1,i*2,(i-1)*2+1,i*2+1,i*2);
+      }
+      // Punta: el mismo triángulo para todas las capas, encogido hacia su incentro para que el borde verde
+      // tenga el mismo grosor en los tres lados.
+      const side=new T.Vector2(-dir.y,dir.x),b=pos.length/3;
+      const A=tipBase.clone().addScaledVector(side,.46),B=tipBase.clone().addScaledVector(side,-.46),C=tip.clone();
+      const la=B.distanceTo(C),lb=A.distanceTo(C),lc=A.distanceTo(B),per=la+lb+lc;
+      const inc=new T.Vector2((A.x*la+B.x*lb+C.x*lc)/per,(A.y*la+B.y*lb+C.y*lc)/per);
+      const area=Math.abs((B.x-A.x)*(C.y-A.y)-(C.x-A.x)*(B.y-A.y))/2,r=2*area/per;
+      const k=Math.max(.05,(r-(.4-width)/2)/r);
+      const [a2,b2,c2]=[A,B,C].map(v=>inc.clone().add(v.clone().sub(inc).multiplyScalar(k)).addScaledVector(side,shift));
+      pos.push(a2.x,y,a2.y,b2.x,y,b2.y,c2.x,y,c2.y);
+      along.push(lengths.at(-1),lengths.at(-1),total);
+      idx.push(b,b+1,b+2);
+      const g=new T.BufferGeometry();
+      g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('along',new T.Float32BufferAttribute(along,1));g.setIndex(idx);
+      const m=new T.Mesh(g,material);m.renderOrder=order;routeGroup.add(m);
+    };
+    grooveRim.uniforms.total.value=total;
+    ribbon(.4,.05,grooveRim,3);              // borde verde (lo que asoma alrededor del surco)
+    ribbon(.31,.053,grooveDeep,4);           // fondo oscuro del surco
+    ribbon(.2,.056,grooveFloor,5,.03);       // fondo algo más claro, desplazado: da sensación de profundidad
+    // Casilla de destino: esquinas más largas y brillantes con su propio latido rápido.
+    const goal=new T.Mesh(destinationPlane,overlayMaterial('#8dffb4',1.05,0,1,.85,.3,2.2,.7));
+    goal.position.set(end.x,.046,end.y);goal.renderOrder=2;routeGroup.add(goal);
   }
   // Con una habilidad elegida se apunta a casillas: las figuras no tapan las casillas de detrás.
   let groundOnly=false;

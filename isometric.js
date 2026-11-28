@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=188';
-import {playerColors} from './engine.js?v=188';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=189';
+import {playerColors} from './engine.js?v=189';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -1100,7 +1100,24 @@ export function createIso(mount,onCell){
         try{renderer.setRenderTarget(tiny);renderer.render(scene,camera);}catch{}
         renderer.setRenderTarget(null);renderer.shadowMap.autoUpdate=auto;
       };
-      draw(false);
+      // Firefox no compila shaders en paralelo (sin KHR_parallel_shader_compile): ahí cada shader nuevo congela
+      // la página mientras se compila. Para que no sea un único parón largo, se dibuja material a material
+      // (el resto, oculto), cada uno en su rato libre: muchos tirones mínimos en vez de uno grande.
+      if(!renderer.extensions.has('KHR_parallel_shader_compile')){
+        const meshes=[];scene.traverse(o=>{if(o.isMesh||o.isPoints||o.isLine||o.isSprite)meshes.push(o);});
+        const shown=new Map(meshes.map(o=>[o,o.visible]));
+        const groups=new Map();
+        for(const o of meshes)for(const m of [].concat(o.material)){const key=m.type+'|'+(m.map?1:0)+(m.bumpMap?1:0)+(m.transparent?1:0)+(m.vertexColors?1:0)+'|'+(m.onBeforeCompile?m.uuid:'');if(!groups.has(key))groups.set(key,o);}
+        for(const target of groups.values()){
+          if(aborted())break;
+          for(const o of meshes)o.visible=o===target||!o.isMesh&&!o.isPoints&&!o.isLine&&!o.isSprite;
+          let p=target.parent;while(p){p.visible=true;p=p.parent;}
+          draw(false);
+          await idle(400);
+        }
+        for(const [o,v] of shown)o.visible=v;
+      }
+      if(!aborted())draw(false);
       await idle();
       if(!aborted())draw(true);
       tiny.dispose();

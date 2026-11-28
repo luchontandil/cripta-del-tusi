@@ -1700,3 +1700,13 @@ body.in-lobby .arena{max-width:1320px;width:100%;margin:0 auto}
 .hero-row .class-card small{bottom:10px;background:none!important;color:#cfc2a8}
 .hero-row .class-card[aria-checked=true] small{color:var(--gold)}
 @media(max-width:700px){.hero-row .class-card .class-name{bottom:6px}.hero-row .class-card small{display:none}}
+/* Ficha: habilidades iniciales y, al lado, las 3 siguientes bloqueadas (en gris, para previsualizarlas). */
+.preview-skillsets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 18px;margin-top:6px}
+.skillset-title{display:block;font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.class-preview .preview-skillsets .preview-skills{grid-template-columns:1fr!important}
+.preview-locked li{filter:grayscale(1) brightness(.6);cursor:help}
+.preview-locked li:hover,.preview-locked li:focus{filter:grayscale(.6) brightness(.85)}
+.preview-locked small{margin-left:auto;color:var(--muted)}
+.preview-locked small svg{width:13px;height:13px}
+@media(max-width:520px){.preview-skillsets{grid-template-columns:1fr}}
+.preview-skills small{white-space:nowrap;flex-shrink:0}

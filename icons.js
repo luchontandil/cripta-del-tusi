@@ -60,6 +60,7 @@ const paths={
   water:'<path d="M3 10c2 0 2-1.5 4.5-1.5S9.5 10 12 10s2.5-1.5 4.5-1.5S19 10 21 10M3 15c2 0 2-1.5 4.5-1.5S9.5 15 12 15s2.5-1.5 4.5-1.5S19 15 21 15"/>',
   spikes:'<path d="M3 20h18M5 20l2-9 2 9M10 20l2-12 2 12M15 20l2-9 2 9" fill="currentColor" fill-opacity=".2"/>',
   gas:'<path d="M5 15a3.5 3.5 0 0 1 1-6.8A5 5 0 0 1 15.5 7 4 4 0 0 1 19 15Z" fill="currentColor" fill-opacity=".25"/><path d="M7 19h4M13 19h4"/>',
+  lock:'<rect x="5.5" y="10.5" width="13" height="10" rx="2"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/>',
   cleanse:'<path d="M12 3.5 14 9.5l6 .5-4.6 3.9L17 20l-5-3.3L7 20l1.6-6.1L4 10l6-.5Z"/>'
 };
 paths.dash=paths.shadow;paths.venom=paths.poison;paths.blast=paths.fire;paths.push=paths.mp;paths.damage=paths.attack;

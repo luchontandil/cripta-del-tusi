@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=186';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=186';
-import {setupSfx} from './music.js?v=186';
-import {icon} from './icons.js?v=186';
-import {openMapEditor} from './mapeditor.js?v=186';
+  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=187';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=187';
+import {setupSfx} from './music.js?v=187';
+import {icon} from './icons.js?v=187';
+import {openMapEditor} from './mapeditor.js?v=187';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -154,7 +154,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=186').then(({createIso})=>{
+import('./isometric.js?v=187').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -637,6 +637,23 @@ function heroSheetNodes(kind){
     item.onpointerleave=item.onblur=hideUnit;
     return item;
   }),...(loadout.passives||[]).map(id=>h('li','passive-line',h('span','passive-art',icon('crown')),h('span',null,cards[id].name),h('small','stat-pa','Pasiva'))));
+  // Vista previa de habilidades futuras: las 3 siguientes de la clase que no llevas, en gris y con candado.
+  const owned=new Set(loadout.actives.map(id=>cards[id].index));
+  const future=cls.skills.map((skill,index)=>({skill,index})).filter(({index})=>!owned.has(index)).slice(0,3);
+  const locked=h('ul','preview-skills preview-locked',...future.map(({skill,index})=>{
+    const item=h('li','locked',spellIcon(skill[5],skill[6],skill[0]),h('span',null,skill[0]),h('small',null,icon('lock')));
+    item.tabIndex=0;
+    const show=()=>{
+      const rect=item.getBoundingClientRect();
+      showTip(skillTipNodes(sample,index,skill,1),{left:rect.left,top:rect.top,bottom:rect.bottom},'tip-skill');
+    };
+    item.onpointerenter=item.onfocus=show;
+    item.onpointerleave=item.onblur=hideUnit;
+    return item;
+  }));
+  const skillBox=h('div','preview-skillsets',
+    h('div',null,h('span','skillset-title','Iniciales'),skills),
+    future.length?h('div',null,h('span','skillset-title','Por desbloquear'),locked):null);
   const deck=btn('',()=>openDeck(kind));deck.className='ghost small-button deck-open';deck.append(icon('level'),'Preparar cartas');
   // Perfil de la clase en 5 barras (1–5): qué tal se le da cada cosa, para comparar de un vistazo.
   const profile=h('div','class-profile',...Object.entries(classProfile[kind]||{}).map(([label,value])=>
@@ -647,14 +664,14 @@ function heroSheetNodes(kind){
       h('div','preview-head',h('strong',null,cls.name),h('span','role-tag',roles[kind])),
       h('p',null,specs[kind]),
       h('div','preview-stats',h('span','mini-stat',icon('hp'),cls.hp+' PV'),h('span','mini-stat',icon('initiative'),'Iniciativa '+cls.initiative)),
-      skills,
+      skillBox,
       // Botón del mazo debajo de las habilidades, centrado.
       h('div','preview-deck',deck)),
     profile];
 }
 /** Ilustración de una clase (tiles/card_<clase>.jpg); si no carga, el retrato pequeño dibujado. */
 function classIllustration(kind){
-  const art=Object.assign(document.createElement('img'),{src:'tiles/card_'+kind+'.jpg?v=186',alt:'',loading:'eager',decoding:'async'});
+  const art=Object.assign(document.createElement('img'),{src:'tiles/card_'+kind+'.jpg?v=187',alt:'',loading:'eager',decoding:'async'});
   art.onerror=()=>art.replaceWith(portrait(kind));
   return art;
 }

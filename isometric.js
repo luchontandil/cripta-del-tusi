@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=196';
-import {playerColors} from './engine.js?v=196';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=197';
+import {playerColors} from './engine.js?v=197';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -305,6 +305,10 @@ export function createIso(mount,onCell){
   const areaGroup=new T.Group();
   stage.add(areaGroup);
   let areaSignature='';
+  // Zona de En guardia!: misma forma única con «L» exteriores que las áreas de hechizo, en dorado.
+  const guardGroup=new T.Group();
+  stage.add(guardGroup);
+  let guardSignature='';
   // Trampas de los héroes (Tramposa, Trampita): una marca en la casilla, que late.
   const snareGroup=new T.Group();
   stage.add(snareGroup);
@@ -618,6 +622,7 @@ export function createIso(mount,onCell){
     stage.add(routeGroup);
     routeSignature='';
     clearArea();stage.add(areaGroup);
+    guardGroup.clear();guardSignature='';stage.add(guardGroup);
     snareGroup.clear();stage.add(snareGroup);snareSignature='';
     overlays.length=0;
     torches.length=0;
@@ -882,7 +887,7 @@ export function createIso(mount,onCell){
   }
   function highlight(cells){
     if(!active)return;
-    const route=[],area=[];
+    const route=[],area=[],guard=[];
     let areaCenter=null,areaElement='fire';const areaHidden=new Set();
     for(const [i,cell] of [...cells].entries()){
       const o=overlays[i];
@@ -894,9 +899,10 @@ export function createIso(mount,onCell){
         c.contains('aim')?'aim':c.contains('hero-trap-poison')?'snareToxic':c.contains('hero-trap')?'snare':c.contains('cast-range')?'cast':c.contains('walk')?'walk':c.contains('foe-reach')?'foe':c.contains('guard-zone')?'guard':null);
       // Las casillas a las que puedes moverte: casi transparentes, solo el borde, para ver el suelo y los glifos.
       // La ruta ya la dibuja la flecha: sus casillas se ven como las de movimiento.
+      if(c.contains('guard-zone'))guard.push(i);
       if(c.contains('area-preview')){area.push(i);areaElement=cell.dataset.element||areaElement;if(c.contains('area-center'))areaCenter=i;if(c.contains('area-hidden'))areaHidden.add(i);}
       // El área la dibuja su propia capa (una sola forma); la casilla de debajo no se pinta.
-      o.visible=!!type&&type!=='area';
+      o.visible=!!type&&type!=='area'&&type!=='guard';
       if(type)o.material=type==='walk'||type==='route'?overlayMaterial(overlayColors.walk,1.05,.2,1):
         // Alcance de movimiento de los enemigos: el mismo estilo, en rojo.
         type==='foe'?overlayMaterial('#e0604f',1.05,.2,1):
@@ -910,6 +916,7 @@ export function createIso(mount,onCell){
       if(c.contains('route'))route.push([Number(cell.dataset.step),i]);
     }
     paintAreaShape(area,areaCenter,areaHidden,areaElement);
+    paintGuardShape(guard);
     route.sort((a,b)=>a[0]-b[0]);
     const signature=route.map(([,pos])=>pos).join(',');
     if(signature===routeSignature)return;
@@ -920,6 +927,23 @@ export function createIso(mount,onCell){
   }
   function clearArea(){
     areaGroup.clear();areaSignature='';
+  }
+  /** Zona de En guardia! como una sola forma: relleno suave dorado y «L» que laten en las esquinas exteriores. */
+  function paintGuardShape(cells){
+    const sig=cells.join(',');
+    if(sig===guardSignature)return;
+    guardGroup.clear();guardSignature=sig;
+    if(!cells.length)return;
+    const w=state.width,h=state.height,set=new Set(cells);
+    const inShape=(x,z)=>x>=0&&x<w&&z>=0&&z<h&&set.has(z*w+x);
+    for(const pos of cells){
+      const p=logical(state,pos),x=pos%w,z=Math.floor(pos/w);
+      const e=[!inShape(x+1,z),!inShape(x-1,z),!inShape(x,z+1),!inShape(x,z-1)].map(Number);
+      const corners=[e[0]&&e[2],e[1]&&e[2],e[0]&&e[3],e[1]&&e[3]].map(Number);
+      const mesh=new T.Mesh(flatTile,areaMaterial(overlayColors.guard,e,corners,.7));
+      mesh.position.set(p.x,.024,p.z);mesh.renderOrder=5;
+      guardGroup.add(mesh);
+    }
   }
   /** Dibuja el área del hechizo como una sola forma (ver areaMaterial); el impacto, con «L» largas. */
   function paintAreaShape(area,center,hidden=new Set(),element='fire'){

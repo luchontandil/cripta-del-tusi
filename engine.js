@@ -41,7 +41,7 @@ export const classes = {
     ['Flecha Explosiva',3,7,5,7,'damage','✹',1,{element:'fire',burnChance:0,area:'circle',size:2,blastSight:true,casts:1,modifiable:true}],
     ['Flecha Rastreadora',4,8,6,8,'track','⌖',1,{element:'fire',burnChance:0,turns:2,casts:1,cooldown:3,modifiable:true}]
   ]},
-  mistico: {name:'Clérigo', hp:36, initiative:12, skills:[
+  mistico: {name:'Paladín', hp:36, initiative:12, skills:[
     ['Luz ardiente',2,4,5,8,'damage','✦',0,{element:'magic',max:{range:1}}],
     ['Restaurar',2,5,6,10,'heal','✚',0,{max:{range:1}}],
     ['Sello de fragilidad',1,4,1,3,'expose','✷',0,{element:'magic',value:3,max:{value:2}}],
@@ -132,7 +132,7 @@ export function skillElement(unit,skill){
 }
 /**
  * Escuela de una habilidad: «physical» (flechas, dagas, espadas, mazas…) o «magic» (hechizos).
- * Las de mago y clérigo son mágicas; el resto, físicas (aunque tengan un elemento, como Detonadora).
+ * Las de mago y paladín son mágicas; el resto, físicas (aunque tengan un elemento, como Detonadora).
  */
 export function skillSchool(unit,skill){
   const opts=skillOptions(skill);

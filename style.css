@@ -1567,3 +1567,23 @@ body:not(.in-expedition) .live-version.update{color:#1b1206;background:#ffd76a}
 .cell.area-preview.area-hidden{background:#3a2c34;box-shadow:inset 0 0 0 1px #a86a7888}
 .minion-label .np-fill{background:linear-gradient(180deg,#d6b8ff,#9a6ae8 60%,#6a3fc0)}
 .iso-label.minion-label{border-style:dashed;border-color:#b48cff99}
+
+/* Selección de personaje: tarjetas verticales con el render de cada clase. */
+.class-card{position:relative;overflow:hidden;justify-content:flex-end;padding:0 0 8px;gap:1px;border-radius:10px}
+.class-card .class-art{display:block;width:100%;height:auto;aspect-ratio:3/4;border-radius:0;background:none;margin:0 0 4px;position:relative}
+.class-card .class-art::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,#1a1625f0 100%)}
+.class-card .class-art img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .3s,filter .3s;filter:saturate(.7) brightness(.9)}
+.class-card .class-art canvas{width:40px;margin:30% auto 0}
+.class-card:hover .class-art img{filter:none}
+.class-card[aria-checked=true] .class-art img{filter:none;transform:scale(1.04)}
+.class-card .class-name,.class-card small{position:relative;z-index:1}
+.class-card .class-name{margin-top:-18px}
+@media(max-width:700px){.class-card .class-art{width:100%;height:auto}.class-card .class-name{margin-top:-12px;font-size:.72rem}}
+
+/* Ficha del personaje elegido: ilustración grande + datos. */
+.class-preview{display:grid;grid-template-columns:150px 1fr;gap:14px;align-items:start}
+.preview-art{border-radius:8px;overflow:hidden;border:1px solid var(--line);box-shadow:0 8px 20px #0009;aspect-ratio:3/4}
+.preview-art img{display:block;width:100%;height:100%;object-fit:cover}
+.preview-body{min-width:0}
+@media(max-width:700px){.class-preview{grid-template-columns:96px 1fr;gap:10px}}
+.preview-head{flex-wrap:wrap}

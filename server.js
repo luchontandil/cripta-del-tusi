@@ -51,11 +51,11 @@ export const server = createServer(async (req,res) => {
       res.end(content);
       return;
     }
-    // Tilesets: solo PNG con nombres simples dentro de tiles/.
-    if (req.method === 'GET' && /^\/tiles\/[a-z0-9_]+\.png$/.test(path)) {
+    // Tilesets e ilustraciones: solo PNG/JPG con nombres simples dentro de tiles/.
+    if (req.method === 'GET' && /^\/tiles\/[a-z0-9_]+\.(png|jpg)$/.test(path)) {
       const content = await readFile(new URL('.'+path,import.meta.url)).catch(()=>null);
       if (!content) return send(404,{error:'Tileset no encontrado.'});
-      res.writeHead(200, {'Content-Type':'image/png','Cache-Control':'public, max-age=3600'});
+      res.writeHead(200, {'Content-Type':path.endsWith('.jpg')?'image/jpeg':'image/png','Cache-Control':'public, max-age=3600'});
       res.end(content);
       return;
     }

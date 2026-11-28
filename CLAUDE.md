@@ -56,6 +56,7 @@ capturas y espera su visto bueno.
 | `server.js` / `accounts.js` / `store.js` | Servidor HTTP/salas, cuentas y cartas, guardado en Upstash. |
 | `game.test.js` | Tests (`node:test`). Helpers: `battle(classId)`, `timeout(s)` para avanzar turnos de la IA. |
 | `tiles/*.png` | Tileset por bioma y `props.png` (ver §6). |
+| `tiles/card_<clase>.jpg` | Ilustraciones de la selección de personaje (las hace el usuario con IA; 3:4, recortadas a 480×640). |
 | `docs/skills-<clase>.md` | Hoja de habilidades de cada clase con **todas** las decisiones tomadas. Léela antes de tocar esa clase. |
 
 ### Habilidades
@@ -106,10 +107,10 @@ Referencias: ~1,6–2,6 de daño por PA a un objetivo; área/control ~1,2–1,6.
 | `guardia` | Valkyria | 15 habilidades nuevas, iconos, animaciones y poses de lanza. Equilibrada (referencia). |
 | `tirador` | Arquero | 15 habilidades nuevas, iconos, animaciones y poses de arco. Ajustado contra la Valkyria. |
 | `mago` | Mago | Solo 3 habilidades; pendiente de su hoja nueva. |
-| `mistico` | Clérigo | Kit antiguo (8). Pendiente. |
+| `mistico` | Paladín (antes Clérigo) | Kit antiguo (8). Pendiente; su ilustración es de paladín. |
 | `sombra` | Ninja | Kit antiguo (8). Pendiente. |
 
-Backlog conocido: habilidades nuevas de Mago/Clérigo/Ninja; nuevo poder para el **Oráculo de Ceniza** (sin glifos
+Backlog conocido: habilidades nuevas de Mago/Paladín/Ninja; nuevo poder para el **Oráculo de Ceniza** (sin glifos
 se quedó solo con su ataque); repasar recargas de todas las habilidades; tilesets de jungla, raíces y huesos;
 Amazona (aplazada); legendarios; borrar cuentas de prueba Ana/Bob.
 

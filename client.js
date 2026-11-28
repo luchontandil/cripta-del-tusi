@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=176';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=176';
-import {setupSfx} from './music.js?v=176';
-import {icon} from './icons.js?v=176';
-import {openMapEditor} from './mapeditor.js?v=176';
+  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=178';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=178';
+import {setupSfx} from './music.js?v=178';
+import {icon} from './icons.js?v=178';
+import {openMapEditor} from './mapeditor.js?v=178';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -28,7 +28,7 @@ const error=message=>{el('error').textContent=message;};
 const iconName={feeble:'Contagio',tracked:'Rastreado',frozen:'Congelado',chill:'Hielo roto',domain:'Expansión de dominio',reach:'Ojo de águila',corrode:'Corroído',detonate:'Detonado',expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',burn:'Quemadura',weak:'Maldito',haste:'Prisa',shield:'Escudo',fury:'Furia',barrier:'Guardia',blind:'Eclipse'};
 const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',feeble:v=>'hace un '+v+' % menos de daño',tracked:()=>'el arquero no necesita verlo para dispararle',frozen:()=>'el próximo golpe de hielo hace +35 % y quita 1 PM',chill:v=>'−'+v+' PM',domain:()=>'tus Congelamientos y Contagios duran 1 turno más',reach:v=>'+'+v+' de alcance',corrode:v=>'−'+v+' % a todas las resistencias',detonate:v=>'estalla al acabar su turno ('+v+' de fuego a 2 casillas)',haste:v=>'+'+v+' PM',shield:v=>'+'+v+' de armadura (−'+Math.floor(v/2)+' de daño físico por golpe)',fury:v=>'+'+v+' % de daño',barrier:v=>v+' de escudo',blind:v=>'−'+v+' de alcance'};
 const specs={guardia:'Lanza, empujes y escudo · controla el frente',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
-const roles={guardia:'Valkyria',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
+const roles={guardia:'Guerrera',tirador:'Distancia',mistico:'Apoyo',mago:'Hechicero',sombra:'Asesino'};
 // Editor de SFX desactivado por ahora; poner true para volver a mostrarlo al admin.
 const SFX_EDITOR=false;
 const sfx=setupSfx(el('field-sfx'));
@@ -146,7 +146,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=176').then(({createIso})=>{
+import('./isometric.js?v=178').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -636,15 +636,23 @@ function classPreview(){
     return item;
   }),...(loadout.passives||[]).map(id=>h('li','passive-line',h('span','passive-art',icon('crown')),h('span',null,cards[id].name),h('small','stat-pa','Pasiva'))));
   const deck=btn('',()=>openDeck(kind));deck.className='ghost small-button deck-open';deck.append(icon('level'),'Preparar cartas');
+  // Ilustración grande del personaje elegido a la izquierda; nombre, estadísticas y mazo a la derecha.
+  const big=Object.assign(document.createElement('img'),{src:'tiles/card_'+kind+'.jpg?v=178',alt:cls.name});
+  big.onerror=()=>big.parentNode?.remove();
   el('class-preview').replaceChildren(
-    h('div','preview-head',h('strong',null,cls.name),h('span','role-tag',roles[kind])),
-    h('p',null,specs[kind]),
-    h('div','preview-stats',h('span','mini-stat',icon('hp'),cls.hp+' PV'),h('span','mini-stat',icon('initiative'),'Iniciativa '+cls.initiative),deck),
-    skills);
+    h('div','preview-art',big),
+    h('div','preview-body',
+      h('div','preview-head',h('strong',null,cls.name),h('span','role-tag',roles[kind])),
+      h('p',null,specs[kind]),
+      h('div','preview-stats',h('span','mini-stat',icon('hp'),cls.hp+' PV'),h('span','mini-stat',icon('initiative'),'Iniciativa '+cls.initiative),deck),
+      skills));
 }
 el('class').onchange=classPreview;
 el('class-cards').replaceChildren(...Object.entries(classes).map(([kind,cls])=>{
-  const card=h('button','class-card',h('span','class-art',portrait(kind)),h('span','class-name',cls.name),h('small',null,roles[kind]));
+  // Tarjeta vertical con la ilustración del personaje (tiles/card_<clase>.jpg); si no carga, el retrato pequeño.
+  const art=Object.assign(document.createElement('img'),{src:'tiles/card_'+kind+'.jpg?v=178',alt:'',loading:'eager',decoding:'async'});
+  art.onerror=()=>art.replaceWith(portrait(kind));
+  const card=h('button','class-card',h('span','class-art',art),h('span','class-name',cls.name),h('small',null,roles[kind]));
   card.type='button';
   card.dataset.kind=kind;
   card.setAttribute('role','radio');
@@ -960,7 +968,7 @@ const skillLore={
   'Eclipse':'Oscureces el campo de batalla: todos los enemigos pierden alcance durante su próximo turno.',
   'Abrir las aguas':'Clava la lanza y abre una zona de hielo en forma de T que daña y aparta a los enemigos.',
   'Furia':'Durante un tiempo, todos tus golpes hacen más daño.',
-  // Clérigo
+  // Paladín (antes Clérigo)
   'Luz ardiente':'Un destello sagrado que quema a los enemigos que se acercan demasiado.',
   'Restaurar':'Posas la mano y la luz cierra las heridas, tuyas o de un aliado.',
   'Sello de fragilidad':'Un sello brilla sobre el enemigo y marca dónde golpear: todos le hacen más daño.',

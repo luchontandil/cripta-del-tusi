@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=191';
-import {playerColors} from './engine.js?v=191';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=192';
+import {playerColors} from './engine.js?v=192';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -266,6 +266,25 @@ export function createIso(mount,onCell){
   const overlays=[];
   const torches=[];
   const torchLights=[];
+  // «Charcos de luz» pintados en el suelo (truco barato): sustituyen a las sombras de las antorchas y a las luces
+  // de las velas, que encarecían mucho los shaders (y la carga, sobre todo en Firefox).
+  const lightPools=[];
+  let poolTexture=null;
+  /** Mancha de luz cálida en el suelo (plano aditivo con degradado radial) que parpadea con la llama. */
+  function lightPool(x,z,radius,color,strength){
+    if(!poolTexture){
+      const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');
+      const gr=g.createRadialGradient(64,64,0,64,64,64);
+      gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.35,'rgba(255,255,255,.55)');gr.addColorStop(.7,'rgba(255,255,255,.16)');gr.addColorStop(1,'rgba(255,255,255,0)');
+      g.fillStyle=gr;g.fillRect(0,0,128,128);
+      poolTexture=new T.CanvasTexture(c);poolTexture.colorSpace=T.SRGBColorSpace;
+    }
+    const mesh=new T.Mesh(new T.PlaneGeometry(radius*2,radius*2).rotateX(-Math.PI/2),
+      new T.MeshBasicMaterial({map:poolTexture,color,transparent:true,opacity:strength,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false}));
+    mesh.position.set(x,.014,z);mesh.renderOrder=2;mesh.userData.base=strength;
+    stage.add(mesh);lightPools.push(mesh);
+    return mesh;
+  }
   const gasPuffs=[];
   // Casilla bajo el ratón: mismo estilo que las de movimiento (relleno tenue + esquinas en «L» que laten), en blanco.
   const hoverMarker=new T.Mesh(flatTile,overlayMaterial('#ffffff',1,.18,1,.38,.19,1.15));
@@ -588,13 +607,13 @@ export function createIso(mount,onCell){
       if(v<.05){                                  // huesos y calavera
         for(let i=0;i<3;i++){const b=piece(stage,'cube','#d9cfb8',c.x+ox+(i-1)*.1,.03,c.z+oz,.22,.04,.05);b.rotation.y=v*40+i;b.castShadow=true;}
         if(v<.025){const sk=piece(stage,'orb','#e6dcc4',c.x+ox,.09,c.z+oz+.15,.16,.13,.16);sk.castShadow=true;piece(stage,'cube','#201a1a',c.x+ox-.03,.1,c.z+oz+.23,.03,.03,.01);piece(stage,'cube','#201a1a',c.x+ox+.03,.1,c.z+oz+.23,.03,.03,.01);}
-      }else if(v<.075&&candles<7){                 // velas con su propia luz
+      }else if(v<.075&&candles<7){                 // velas (con su charco de luz pintado, sin luz real)
         candles++;
         for(const [dx,dz,hh] of [[0,0,.22],[.09,.05,.15],[-.07,.08,.11]]){
           const cdl=piece(stage,'column','#e8dcc0',c.x+ox+dx,hh/2,c.z+oz+dz,.06,hh,.06);cdl.castShadow=true;
           piece(stage,'gem','#ffcf6b',c.x+ox+dx,hh+.04,c.z+oz+dz,.05,.09,.05,true);
         }
-        const l=new T.PointLight('#ffb15a',5,3.2,2);l.position.set(c.x+ox,.45,c.z+oz);stage.add(l);torchLights.push(l);
+        lightPool(c.x+ox,c.z+oz,1.9,'#ffa040',.5);
         const halo=piece(stage,'orb','#ffb15a',c.x+ox,.28,c.z+oz,.45,.45,.45,true);
         halo.material=new T.MeshBasicMaterial({color:'#ffb15a',transparent:true,opacity:.12,depthWrite:false,blending:T.AdditiveBlending});
       }else if(v<.11){                             // cascotes
@@ -604,7 +623,6 @@ export function createIso(mount,onCell){
         p.material=new T.MeshStandardMaterial({color:'#3a4660',roughness:.12,metalness:.35,transparent:true,opacity:.7});
       }
     }
-    for(;candles<7;candles++){const l=new T.PointLight('#ffb15a',0,3.2,2);l.position.set(0,-6,0);stage.add(l);}
     // Luces de los héroes: un juego fijo de 4 que sigue a cada héroe vivo (ver draw), por el mismo motivo.
     heroLamps.length=0;
     for(let i=0;i<4;i++){const l=new T.PointLight('#ffe6c4',0,2.6,2);l.position.set(0,-6,0);stage.add(l);heroLamps.push(l);}
@@ -621,7 +639,7 @@ export function createIso(mount,onCell){
     snareGroup.clear();stage.add(snareGroup);snareSignature='';
     overlays.length=0;
     torches.length=0;
-    torchLights.length=0;
+    torchLights.length=0;lightPools.length=0;
     gasPuffs.length=0;
     pan.x=pan.z=0;
     const mode=state.biome||'crypt';
@@ -730,7 +748,9 @@ export function createIso(mount,onCell){
       torches.push(flame);
       const light=new T.PointLight(color,deluxe?34:14,deluxe?11:6,2);
       light.position.set(x,1.47,z);
-      if(deluxe){light.castShadow=true;light.shadow.mapSize.set(512,512);light.shadow.bias=-.004;light.shadow.radius=3;}
+      // Sin sombras propias (eran 6 pasadas por antorcha y shaders mucho más pesados); en su lugar, un charco
+      // de luz en el suelo y la luz principal sigue haciendo las sombras de las figuras.
+      if(deluxe)lightPool(x,z,3.4,color,.22);
       stage.add(light);
       torchLights.push(light);
       const halo=piece(stage,'orb',color,x,1.36,z,.5,.5,.5,true);
@@ -1688,6 +1708,8 @@ export function createIso(mount,onCell){
     for(const [index,light] of torchLights.entries()){
       light.intensity=reduced?14:12.5+Math.sin(now*.011+index*2.1)*1.6+Math.sin(now*.027+index)*1.1;
     }
+    if(!reduced)for(const [index,pool] of lightPools.entries())
+      pool.material.opacity=pool.userData.base*(1+.12*Math.sin(now*.011+index*2.1)+.08*Math.sin(now*.027+index));
     for(const puff of gasPuffs){
       // Cada voluta sube despacio, se ensancha y se desvanece; luego vuelve a nacer en la rejilla.
       const {x,z,phase,angle}=puff.userData;

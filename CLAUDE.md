@@ -124,8 +124,9 @@ Amazona (aplazada); legendarios; borrar cuentas de prueba Ana/Bob.
   píxeles dibujadas por código. Nada de chibi «de belén».
 - **Valkyria**: mujer, armadura gris, mezcla valquiria/Amazona de Diablo 2, yelmo alado, pelo rubio, ojos celestes,
   lanza (golpea siempre con la **punta**).
-- **Escenario (HD, por defecto)**: tileset + relieve (bumpMap), ambiente oscuro y frío, antorchas cálidas con
-  sombras, velas, luz suave sobre los héroes, muros de ladrillo al fondo, decorado (huesos, cascotes, charcos),
+- **Escenario (HD, por defecto)**: tileset + relieve (bumpMap), ambiente oscuro y frío, antorchas cálidas **sin
+  sombras propias** (luz + «charco de luz» pintado en el suelo, `lightPool`; las sombras de antorcha encarecían mucho la
+  carga en Firefox), velas solo con charco de luz (sin luz real), luz suave sobre los héroes, muros de ladrillo al fondo, decorado (huesos, cascotes, charcos),
   piedra triplanar en obstáculos, viñeta. `?classic` en la URL vuelve a colores planos.
 - **Efectos**: viscerales y con peso: trazos del recorrido, impactos, chispas, púas, ondas y temblor de cámara en
   los golpes fuertes. Cada habilidad tiene los suyos; no reutilizar los del Mago.

@@ -1835,3 +1835,15 @@ test('los caminos rodean las trampas visibles si llegan los PM',()=>{
   // Sin PM suficientes para rodear, pasa por encima.
   assert.equal(paths(s,hero,2).get(hero.pos+2).length,2);
 });
+test('las invocaciones del Rey Osario pegan menos que él y solo caen ellas con él',()=>{
+  const s=battle('guardia');
+  const boss=s.units.find(u=>u.enemy);
+  Object.assign(boss,{boss:true,look:'skeletonking',name:'Rey Osario',damage:10,cycle:0});
+  const normal=s.units.filter(u=>u.enemy&&u!==boss);
+  const made=_test.summon(s,boss,'skeleton',2);
+  assert.ok(made.length>0);
+  for(const m of made){assert.ok(m.damage<boss.damage);assert.equal(m.minion,boss.id);}
+  boss.hp=1;hit(s,s.units.find(u=>!u.enemy),boss,50);
+  for(const m of made)assert.equal(m.hp,0);
+  for(const u of normal)assert.ok(u.hp>0,'los monstruos normales siguen vivos');
+});

@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=175';
-import {playerColors} from './engine.js?v=175';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=176';
+import {playerColors} from './engine.js?v=176';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -777,7 +777,7 @@ export function createIso(mount,onCell){
   /** Crea el cartel de nombre y vida de una unidad y su capa de iconos de estado. */
   function makeLabel(u){
     const label=document.createElement('div');
-    label.className='iso-label'+(u.enemy?' enemy-label':'')+(u.boss?' boss-label':'');
+    label.className='iso-label'+(u.enemy?' enemy-label':'')+(u.boss?' boss-label':'')+(u.minion?' minion-label':'');
     const tint=!u.enemy&&playerColors.find(c=>c.id===u.color);
     if(tint)label.style.setProperty('--player',tint.hex);
     const name=document.createElement('span');
@@ -832,6 +832,9 @@ export function createIso(mount,onCell){
         const tint=u.enemy?null:playerColors.find(c=>c.id===u.color)||null;
         const model=miniature(look(u),tint);
         ownMaterials(model);
+        // Invocaciones: figura espectral (translúcida y con brillo violeta) para distinguirlas de los monstruos normales.
+        if(u.minion)model.root.traverse(o=>{if(o.isMesh&&o.material){o.material.transparent=true;o.material.opacity=.62;o.material.depthWrite=true;if(o.material.emissive){o.material.emissive.set('#7a4cff');o.material.emissiveIntensity=.55;}}});
+        if(u.minion)model.baseEmissive=model.materials.map(m=>m.emissive?{color:m.emissive.clone(),intensity:m.emissiveIntensity}:null);
         model.root.position.copy(coords);
         model.root.rotation.y=u.enemy?-.9:.9;
         figures.add(model.root);

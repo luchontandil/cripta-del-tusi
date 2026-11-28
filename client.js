@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=175';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=175';
-import {setupSfx} from './music.js?v=175';
-import {icon} from './icons.js?v=175';
-import {openMapEditor} from './mapeditor.js?v=175';
+  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=176';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=176';
+import {setupSfx} from './music.js?v=176';
+import {icon} from './icons.js?v=176';
+import {openMapEditor} from './mapeditor.js?v=176';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -146,7 +146,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=175').then(({createIso})=>{
+import('./isometric.js?v=176').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -902,7 +902,7 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
     if(nodes.length)showTip(nodes,anchor,'tip-compact');
     return;
   }
-  const nodes=[tipHead(unitArt(unit),unit.name,unit.enemy?(unit.boss?'Jefe':unit.elite?'Élite':'Enemigo'):classes[unit.classId].name+(unit.level?' · nivel '+unit.level:''),null),hpBar(unit)];
+  const nodes=[tipHead(unitArt(unit),unit.name,unit.enemy?(unit.boss?'Jefe':unit.minion?'Invocación de '+(state.units.find(u=>u.id===unit.minion)?.name||'un jefe'):unit.elite?'Élite':'Enemigo'):classes[unit.classId].name+(unit.level?' · nivel '+unit.level:''),null),hpBar(unit)];
   if(unit.enemy&&skill){
     const preview=damagePreview(source,unit,skill);
     if(preview&&aim){
@@ -924,6 +924,7 @@ function inspectCell(unit,cell,pos,glyph,source,skill,aim){
   const note=unit.boss?bosses[unit.look]?.powers:traitNote(monsterTraits[unit.look]);
   if(unit.enemy&&unit.hp>0)nodes.push(h('p','tip-note foe-reach-note','Las casillas en rojo muestran hasta dónde puede moverse en su turno.'));
   if(unit.enemy&&note)nodes.push(h('p','tip-note',note));
+  if(unit.minion)nodes.push(h('p','tip-note','Invocación: se deshace si cae quien la invocó.'));
   if(unit.enemy&&unit.variant)nodes.push(h('p','tip-note tip-variant',h('strong',null,'Variante '+monsterVariants[unit.variant].name+': '),monsterVariants[unit.variant].text+'.'));
   const resist=Object.entries(unit.resist||{}).filter(([,v])=>v);
   if(unit.enemy&&resist.length)nodes.push(h('div','tip-resists',...resist.sort((a,b)=>b[1]-a[1]).map(([key,v])=>

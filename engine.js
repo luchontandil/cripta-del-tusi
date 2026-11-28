@@ -2355,7 +2355,9 @@ function summon(s,boss,species,count){
   for(const pos of around.slice(0,count)){
     s.minionId=(s.minionId||0)+1;
     const minion=monster(species,'minion'+s.minionId,s.floor,{solo:s.players.length===1});
-    minion.hp=minion.max=Math.round(minion.hp*.6);
+    // Invocación: más floja que su invocador (vida reducida y la mitad de su daño, ya ajustado al grupo).
+    minion.hp=minion.max=Math.max(1,Math.round(minion.hp*.6*(s.scaling?.hp||1)));
+    minion.damage=Math.max(1,Math.round(boss.damage*.5));
     minion.minion=boss.id;
     minion.pos=pos;
     s.units.push(minion);
@@ -3041,4 +3043,4 @@ export function act(s,id,a,rng=Math.random) {
 }
 
 /** Solo para los tests: mover unidades y empezar turnos a mano. */
-export const _test={move:(...a)=>move(...a),beginTurn:(...a)=>beginTurn(...a)};
+export const _test={move:(...a)=>move(...a),beginTurn:(...a)=>beginTurn(...a),summon:(...a)=>summon(...a)};

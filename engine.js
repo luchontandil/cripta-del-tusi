@@ -46,7 +46,7 @@ export const classes = {
     ['Restaurar',2,5,6,10,'heal','✚',0,{max:{range:1}}],
     ['Sello de fragilidad',1,4,1,3,'expose','✷',0,{element:'magic',value:3,max:{value:2}}],
     ['Purificar',2,3,3,6,'cleanse','❖',0,{max:{range:2}}],
-    ['Escudo sagrado',2,4,0,0,'shield','⛨',0,{value:4,max:{value:2}}],
+    ['Escudo sagrado',2,4,0,0,'shield','⛨',0,{value:8,max:{value:4}}],
     ['Celeridad divina',2,4,0,0,'haste','➝',0,{value:2,max:{range:2}}],
     ['Juicio',3,5,5,8,'blast','✹',2,{element:'fire',area:'cross',max:{crit:15}}],
     ['Alba radiante',3,4,8,12,'heal','✚',0,{area:'cross',max:{cost:-1}}]
@@ -1434,10 +1434,10 @@ export const reachable=(s,unit,limit)=>new Map([...paths(s,unit,limit)].map(([po
 /** Tope de las resistencias elementales (enemigos y, más adelante, héroes). Las debilidades no tienen tope. */
 export const RESIST_CAP=50;
 /**
- * Armadura (estilo Terraria): puntos de armadura + escudo. Cada 2 puntos quitan 1 de daño a cada golpe FÍSICO;
+ * Armadura (estilo Terraria): cada 2 puntos quitan 1 de daño a cada golpe FÍSICO;
  * el daño elemental solo lo frenan las resistencias.
  */
-export const armorPoints=target=>Math.max(0,(target.stats?.ward||0)+(target.effects?.shield?.value||0));
+export const armorPoints=target=>Math.max(0,target.stats?.ward||0);
 export const armorReduction=(target,element)=>element==='physical'?Math.floor(armorPoints(target)/2):0;
 function netDamage(target,raw,element,critical,extra=0){
   // Resistencia (o debilidad, si es negativa) al tipo de daño y armadura: ambas en %.
@@ -1462,12 +1462,13 @@ export function hit(s,actor,target,raw,kind='damage',critical=false,element='phy
   if(kind==='damage'&&actor?.effects?.feeble)raw=Math.max(1,Math.round(raw*(1-actor.effects.feeble.value/100)));
   const extra=kind==='damage'?(target.effects.expose?.value||0):0;
   let incoming=netDamage(target,raw,element,critical,extra);
-  // Escudo (En guardia!): absorbe daño antes de la vida.
-  const barrier=target.effects.barrier;
-  if(barrier&&incoming>0){
-    const absorbed=Math.min(barrier.value,incoming);
-    barrier.value-=absorbed;incoming-=absorbed;
-    if(barrier.value<=0)delete target.effects.barrier;
+  // Escudos (Escudo sagrado y En guardia!): vida extra que se gasta antes que los PV.
+  for(const key of ['shield','barrier']){
+    const guard=target.effects[key];
+    if(!guard||incoming<=0)continue;
+    const absorbed=Math.min(guard.value,incoming);
+    guard.value-=absorbed;incoming-=absorbed;
+    if(guard.value<=0)delete target.effects[key];
     emit(s,{kind:'block',unit:target.id,pos:target.pos,amount:absorbed});
     note(s,target.name+' absorbe '+absorbed+' de daño con su escudo.');
   }
@@ -2703,7 +2704,7 @@ function applySkill(s,unit,target,skill,rng,scale=1,origin){
   const opts=skillOptions(skill);
   const value=opts.value;
   if(supportKinds.includes(kind)){
-    if(kind==='shield'){effect(target,'shield',value||4,2);note(s,name+' → '+target.name+': +'+(value||4)+' de armadura 2 turnos.');emit(s,{kind:'buff',tone:'shield',unit:target.id,pos:target.pos,text:'+'+(value||4)+' armadura'});return;}
+    if(kind==='shield'){effect(target,'shield',value||8,2);note(s,name+' → '+target.name+': escudo de '+(value||8)+' durante 2 turnos.');emit(s,{kind:'buff',tone:'shield',unit:target.id,pos:target.pos,text:'⛨ '+(value||8)});return;}
     if(kind==='domain'){
       effect(target,'domain',value||1,opts.turns||2);
       note(s,name+': durante '+(opts.turns||2)+' turnos, tus Congelamientos y Contagios duran 1 turno más.');

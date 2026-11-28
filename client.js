@@ -1,10 +1,10 @@
 import {distance,setCustomMaps,testCustomMap,labCombat,cooldownLeft,critChance,classes,create,join,act,tick,paths,targetable,hasRange,inRange,castableCell,spellArea,slots,equipSlots,slotKind,polishable,statNames,onBoard,
   BASE_AP,BASE_MP,heroStats,gems,gemQualities,areaFalloff,shopRerollCost,glyphInfo,glyphText,forgeModes,forgeCost,forgeBlock,runesOf,socketsOf,monsterSkills,monsterExtraSkills,monsterVariants,skillFor,damagePreview,trainingChoices,trainingOffer,modifiableRange,reachBonus,elements,skillElement,skillSchool,damageBonus,damagePercent,castsLeft,scaledDamage,flatDamage,percentStats,skillOptions,maxBonusText,nodeKinds,modText,trapInfo,
-  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=184';
-import {portrait,spellIcon,equipmentIcon} from './art.js?v=184';
-import {setupSfx} from './music.js?v=184';
-import {icon} from './icons.js?v=184';
-import {openMapEditor} from './mapeditor.js?v=184';
+  lineOfSight,armorPoints,armorReduction,RESIST_CAP,playerColors,bosses,actNames,ACTS,TOTAL_FLOORS,runPoints,actOf,monsterTraits,cards,passiveCards,defaultLoadout,ACTIVE_SLOTS,MAX_ACTIVE_SLOTS,EXTRA_SLOT_PRICE,PASSIVE_SLOTS,MAX_PASSIVE_SLOTS,PASSIVE_SLOT_PRICE,passiveEffects} from './engine.js?v=185';
+import {portrait,spellIcon,equipmentIcon} from './art.js?v=185';
+import {setupSfx} from './music.js?v=185';
+import {icon} from './icons.js?v=185';
+import {openMapEditor} from './mapeditor.js?v=185';
 
 const el=id=>document.getElementById(id);
 const tintOf=u=>u&&!u.enemy?playerColors.find(c=>c.id===u.color)||null:null;
@@ -26,7 +26,7 @@ const onPages=location.hostname.endsWith('.github.io');
 el('server').value=localStorage.getItem('amber-server')||(onPages?'https://cripta-del-tusi.onrender.com':location.origin);
 const error=message=>{el('error').textContent=message;};
 const iconName={feeble:'Contagio',tracked:'Rastreado',frozen:'Congelado',chill:'Hielo roto',domain:'Expansión de dominio',reach:'Ojo de águila',corrode:'Corroído',detonate:'Detonado',expose:'Vulnerable',slow:'Ralentizado',poison:'Veneno',burn:'Quemadura',weak:'Maldito',haste:'Prisa',shield:'Escudo',fury:'Furia',barrier:'Guardia',blind:'Eclipse'};
-const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',feeble:v=>'hace un '+v+' % menos de daño',tracked:()=>'el arquero no necesita verlo para dispararle',frozen:()=>'el próximo golpe de hielo hace +35 % y quita 1 PM',chill:v=>'−'+v+' PM',domain:()=>'tus Congelamientos y Contagios duran 1 turno más',reach:v=>'+'+v+' de alcance',corrode:v=>'−'+v+' % a todas las resistencias',detonate:v=>'estalla al acabar su turno ('+v+' de fuego a 2 casillas)',haste:v=>'+'+v+' PM',shield:v=>'+'+v+' de armadura (−'+Math.floor(v/2)+' de daño físico por golpe)',fury:v=>'+'+v+' % de daño',barrier:v=>v+' de escudo',blind:v=>'−'+v+' de alcance'};
+const effectHelp={expose:v=>'+'+v+' de daño recibido',slow:v=>'−'+v+' PM',poison:v=>v+' PV por turno',burn:v=>v+' PV de fuego por turno',weak:v=>'−'+v+' PA',feeble:v=>'hace un '+v+' % menos de daño',tracked:()=>'el arquero no necesita verlo para dispararle',frozen:()=>'el próximo golpe de hielo hace +35 % y quita 1 PM',chill:v=>'−'+v+' PM',domain:()=>'tus Congelamientos y Contagios duran 1 turno más',reach:v=>'+'+v+' de alcance',corrode:v=>'−'+v+' % a todas las resistencias',detonate:v=>'estalla al acabar su turno ('+v+' de fuego a 2 casillas)',haste:v=>'+'+v+' PM',shield:v=>v+' de escudo: absorbe daño antes que la vida',fury:v=>'+'+v+' % de daño',barrier:v=>v+' de escudo',blind:v=>'−'+v+' de alcance'};
 const specs={guardia:'Lanza, empujes y escudo · controla el frente',tirador:'Flechas de largo alcance · ralentiza y empuja',mistico:'Cura y purifica a sus aliados',mago:'Daño en área y control con escarcha',sombra:'Traza rutas rápidas y envenena a sus rivales'};
 /** Perfil orientativo de cada clase (1–5) para la ficha de selección. */
 const classProfile={
@@ -154,7 +154,7 @@ worldMount.addEventListener('graphicslost',()=>{
   iso=null;
   syncViewport();
 });
-import('./isometric.js?v=184').then(({createIso})=>{
+import('./isometric.js?v=185').then(({createIso})=>{
   iso=createIso(worldMount,(event,pos)=>{
     const cell=el('board').children[pos];
     if(event==='click')cell?.click();
@@ -654,7 +654,7 @@ function heroSheetNodes(kind){
 }
 /** Ilustración de una clase (tiles/card_<clase>.jpg); si no carga, el retrato pequeño dibujado. */
 function classIllustration(kind){
-  const art=Object.assign(document.createElement('img'),{src:'tiles/card_'+kind+'.jpg?v=184',alt:'',loading:'eager',decoding:'async'});
+  const art=Object.assign(document.createElement('img'),{src:'tiles/card_'+kind+'.jpg?v=185',alt:'',loading:'eager',decoding:'async'});
   art.onerror=()=>art.replaceWith(portrait(kind));
   return art;
 }
@@ -805,7 +805,7 @@ const statusLong={
   blind:'Eclipse: tiene menos alcance en su próximo turno (mínimo 1).',
   reach:'Más alcance en los hechizos de alcance modificable.',domain:'Sus Congelamientos y Contagios duran 1 turno más.',
   fury:'Hace más daño con todos sus ataques.',barrier:'Escudo de En guardia!: absorbe el daño hasta su próximo turno.',
-  shield:'Más armadura: recibe menos daño físico de cada golpe.',haste:'Tendrá más PM en su próximo turno.'};
+  shield:'Escudo: absorbe el daño antes que la vida.',haste:'Tendrá más PM en su próximo turno.'};
 function statusDuration(status){
   if(status.untilTurnOf){
     const who=state?.units.find(u=>u.id===status.untilTurnOf)?.name||'quien lo aplicó';
@@ -892,7 +892,7 @@ function heroStatRows(u,rich=false){
   const st=u.stats||{};
   const row=(key,iconName,label,value,tone='')=>describeRow(statRow(iconName,label,value,tone),label,statHelp[key](u),rich);
   const rows=[
-    row('hp','heal','Vida',(u.hp??u.max??'—')+(u.max?' / '+u.max:'')+' PV'),
+    row('hp','heal','Vida',(u.hp??u.max??'—')+(u.max?' / '+u.max:'')+' PV'+((u.effects?.shield?.value||0)+(u.effects?.barrier?.value||0)?' + '+((u.effects?.shield?.value||0)+(u.effects?.barrier?.value||0))+' escudo':'')),
     row('ap','ap','Acción',(BASE_AP+(st.action||0))+' PA'),
     row('mp','mp','Movimiento',(BASE_MP+(st.movement||0))+' PM'),
     row('ward','ward','Armadura',String(armorPoints(u))),
@@ -1043,7 +1043,7 @@ function skillEffectText(skill){
     pull:o.area?'Atrae '+(o.pull||1)+(o.pull>1?' casillas':' casilla')+' hacia ti a los enemigos alcanzados':o.pull==='melee'?'Atrae al objetivo (aliado o enemigo) hasta el cuerpo a cuerpo; a los aliados no les hace daño':'Atrae '+(o.pull||1)+(o.pull>1?' casillas':' casilla')+' hacia ti',
     cleanse:'Elimina todos los efectos negativos del aliado',
     heal:'Cura a un aliado o a ti mismo',
-    shield:'+'+(o.value||3)+' de armadura durante 2 turnos',
+    shield:'Escudo de '+(o.value||8)+' durante 2 turnos',
     haste:'+'+(o.value||2)+' PM en el próximo turno del aliado',
     sprint:'Ganas +'+(o.value||2)+' PM este turno',
     snare:!o.blast?'Trampa de 1 casilla, visible. Quien la pise (aliado o enemigo) recibe el daño, veneno de '+(o.poison||2)+' PV (+ tu % de daño caótico) durante '+(o.poisonTurns||2)+' turnos y un '+(o.slowChance||30)+' % de probabilidad de −'+(o.value||1)+' PM. Dura todo el combate; hasta '+(o.maxTraps||3)+' a la vez':'Trampa oculta (los enemigos no la ven). Se activa cuando un enemigo pisa la cruz; estalla y daña a todos los enemigos a '+(o.blast||3)+' casillas o menos (−20 % por casilla, sin línea de visión) y después los congela. Dura todo el combate; solo una a la vez',
@@ -2333,7 +2333,7 @@ function aimDamage(area,skill,caster,center=null){
     const near=iso?.active?iso.anchor(pos):cell?.getBoundingClientRect();
     if(!near)continue;
     const [lo,hi]=preview.normal;
-    const kill=lo>=target.hp+(target.effects?.shield?.value||0);
+    const kill=lo>=target.hp+(target.effects?.shield?.value||0)+(target.effects?.barrier?.value||0);
     const tag=h('div','aim-damage'+(kill?' lethal':''),icon(preview.element),h('b',null,lo===hi?String(lo):lo+'–'+hi));
     tag.style.left=(near.left+(iso?.active?14:(near.width||0)/2))+'px';
     tag.style.top=(near.top-(iso?.active?30:6))+'px';

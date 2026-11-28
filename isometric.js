@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=184';
-import {playerColors} from './engine.js?v=184';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=185';
+import {playerColors} from './engine.js?v=185';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -786,7 +786,9 @@ export function createIso(mount,onCell){
     const hp=document.createElement('div');hp.className='np-bar';
     const lag=document.createElement('b');lag.className='np-lag';
     const fill=document.createElement('i');fill.className='np-fill';
-    hp.append(lag,fill);
+    // Escudo: tramo gris azulado justo después de la vida (se gasta antes que ella).
+    const guard=document.createElement('u');guard.className='np-shield';
+    hp.append(lag,fill,guard);
     // Estados encima del nombre (iconos con ficha al pasar el ratón; los dibuja el cliente).
     // Van en su propia capa, por encima de todos los nombres, para que ningún otro cartel los tape.
     const fx=document.createElement('div');fx.className='iso-effects';
@@ -851,8 +853,12 @@ export function createIso(mount,onCell){
       model.unit=u;
       model.label.classList.toggle('active',next.phase==='combat'&&next.units[next.turn]?.id===u.id);
       model.ring.visible=next.phase==='combat'&&next.units[next.turn]?.id===u.id;
+      // Si vida + escudo superan el máximo, la barra se reparte entre ambos.
+      const guard=(u.effects?.shield?.value||0)+(u.effects?.barrier?.value||0);
+      const total=Math.max(u.max,u.hp+guard);
       const ratio=Math.max(0,Math.min(1,u.hp/u.max));
-      model.hp.style.setProperty('--hp',(ratio*100)+'%');
+      model.hp.style.setProperty('--hp',(Math.max(0,u.hp)/total*100)+'%');
+      model.hp.style.setProperty('--sh',(guard/total*100)+'%');
       model.label.classList.toggle('low',ratio>0&&ratio<=.3);
       const sig=JSON.stringify(u.effects||{});
       if(sig!==model.fxSig){

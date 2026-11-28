@@ -1861,3 +1861,15 @@ test('pulir siempre mejora el modificador elegido',async()=>{
     assert.ok(after>before,'sube el total de los modificadores');
   }
 });
+test('el escudo absorbe el daño antes que la vida',()=>{
+  const s=battle('mistico');
+  const hero=s.units.find(u=>!u.enemy),foe=s.units.find(u=>u.enemy);
+  hero.effects.shield={value:8,turns:2};
+  const hp=hero.hp;
+  hit(s,foe,hero,5,'damage',false,'fire');
+  assert.equal(hero.hp,hp,'5 de daño se lo come el escudo');
+  assert.equal(hero.effects.shield.value,3);
+  hit(s,foe,hero,5,'damage',false,'fire');
+  assert.equal(hero.effects.shield,undefined,'el escudo se rompe');
+  assert.equal(hero.hp,hp-2);
+});

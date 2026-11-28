@@ -76,7 +76,9 @@ Tupla: `[nombre, PA, alcance, mín, máx, tipo, símbolo, alcanceMín, {opciones
 ### Reglas de combate (resumen)
 - 6 PA y 3 PM base. Crítico base 12 % (×1,5), tope 100 %.
 - **Armadura en puntos (estilo Terraria), siempre pares**: cada 2 puntos quitan 1 a cada golpe **físico** (mínimo 1 de
-  daño), después de los multiplicadores (`armorPoints`/`armorReduction`). El escudo suma puntos. El daño elemental solo lo
+  daño), después de los multiplicadores (`armorPoints`/`armorReduction`).
+- **Escudo** (`effects.shield` del Escudo sagrado, `effects.barrier` de En guardia!): vida extra que absorbe el daño antes
+  que los PV; se ve como tramo gris azulado al final de la barra de vida. El daño elemental solo lo
   frenan las resistencias, con tope del 50 % (`RESIST_CAP`, enemigos y, cuando existan, héroes).
 - Tusi: cada combate da al menos 25. Sin gemas como recompensa en los pisos 1–2.
 - Daño en área: −20 % por casilla de distancia al centro (mínimo 60 %).

@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=168';
-import {playerColors} from './engine.js?v=168';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=169';
+import {playerColors} from './engine.js?v=169';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -604,10 +604,8 @@ export function createIso(mount,onCell){
         // Juntas: antes cada losa era un bloque con una ranura honda alrededor; con una luz baja cerca, las caras
         // laterales se iluminaban y la ranura quedaba negra, como si las losas estuvieran muy separadas.
         // Ahora la ranura es poco profunda: debajo hay una capa de mortero casi a ras del suelo.
-        const grout=query.get('grout')||'a';
-        const gap=grout==='b'?.995:.963;
-        const slab=piece(stage,'cube',color,coord.x,-.057,coord.z,gap,.114,gap);
-        if(grout==='a')piece(stage,'cube',groutColor[mode]||'#2b2633',coord.x,-.03,coord.z,1,.036,1);
+        const slab=piece(stage,'cube',color,coord.x,-.057,coord.z,.963,.114,.963);
+        piece(stage,'cube',groutColor[mode]||'#2b2633',coord.x,-.03,coord.z,1,.036,1);
         // Con tileset: la losa lleva su dibujo (variante y giro según la semilla).
         const r=random(state.mapSeed,pos+911);
         // De más sana a más rota: las sanas salen mucho más a menudo.

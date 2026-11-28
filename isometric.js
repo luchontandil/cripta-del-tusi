@@ -1,6 +1,6 @@
 import * as T from './three.module.js';
-import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=165';
-import {playerColors} from './engine.js?v=165';
+import {miniature,ps1Obstacle,piece,solid,useObstacleTexture} from './models3d.js?v=166';
+import {playerColors} from './engine.js?v=166';
 
 const clamp=T.MathUtils.clamp;
 const ease=t=>t*t*(3-2*t);
@@ -235,7 +235,7 @@ export function createIso(mount,onCell){
   const models=new Map();
   const effects=[];
   const heroLamps=[];
-  let lastShadow=0,compiling=0;
+  let lastShadow=0;
   const steps=new Map();
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
   let stageKey='',state,active=false,hover=null,frame=0,viewWidth=0,viewHeight=0;
@@ -753,7 +753,7 @@ export function createIso(mount,onCell){
     if(id!==stageKey){
       stageKey=id;
       rebuild();
-      compiling=-1;
+      lastShadow=0;
     }
     const snareSig=JSON.stringify(state.snares||[]);
     if(snareSig!==snareSignature){
@@ -1501,12 +1501,6 @@ export function createIso(mount,onCell){
   }
   function draw(now){
     if(!active)return;
-    // Tras montar un escenario nuevo, los shaders se compilan en segundo plano (sin congelar la página).
-    if(compiling===-1){
-      compiling=now+4000;
-      renderer.compileAsync(scene,camera).catch(()=>{}).finally(()=>{compiling=0;});
-    }
-    if(compiling&&now<compiling){frame=requestAnimationFrame(draw);return;}
     const delta=previousFrame?Math.min(45,Math.max(0,now-previousFrame)):0;
     previousFrame=now;
     clock.value=now/1000;
